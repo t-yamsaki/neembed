@@ -1,5 +1,6 @@
 """Tests for the minimal manifold-valued sentence encoder."""
 
+import neembed
 import torch
 from torch import nn
 
@@ -32,6 +33,10 @@ class FakeSentenceTransformer(nn.Module):
 
 def _patch_encoder(monkeypatch) -> None:
     monkeypatch.setattr(model_module, "SentenceTransformer", FakeSentenceTransformer)
+
+
+def test_model_is_exported_from_package() -> None:
+    assert neembed.ManifoldSentenceTransformer is ManifoldSentenceTransformer
 
 
 def test_forward_with_projection_returns_finite_points_inside_ball(monkeypatch) -> None:
