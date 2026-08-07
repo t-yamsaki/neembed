@@ -48,3 +48,32 @@ class ManifoldSentenceTransformer(nn.Module):
         encoder_output: dict[str, Any] = self.encoder(features)
         tangent = self.projection(encoder_output["sentence_embedding"])
         return self.manifold.expmap0(tangent)
+
+    def encode(
+        self,
+        sentences: str | Sequence[str],
+        *,
+        convert_to_tensor: bool = False,
+    ) -> Any:
+        """Return manifold embeddings for one text or a batch of texts."""
+        single_input = isinstance(sentences, str)
+        batch = [sentences] if single_input else list(sentences)
+
+        self.eval()
+        with torch.inference_mode():
+            embeddings = self(batch)
+
+        if single_input:
+            embeddings = embeddings[0]
+        if convert_to_tensor:
+            return embeddings
+        return embeddings.cpu().numpy()
+
+    def distance(self, a: Any, b: Any) -> torch.Tensor:
+        """Return the geodesic distance between two manifold embeddings."""
+        reference = next(self.parameters())
+        a_tensor = torch.as_tensor(a, device=reference.device, dtype=reference.dtype)
+        b_tensor = torch.as_tensor(b, device=reference.device, dtype=reference.dtype)
+
+        with torch.inference_mode():
+            return self.manifold.dist(a_tensor, b_tensor)
