@@ -36,9 +36,6 @@ class ManifoldTrainer:
         epochs: int = 1,
     ) -> list[float]:
         """Train for the requested epochs and return mean loss per epoch."""
-        if epochs <= 0:
-            raise ValueError("epochs must be positive")
-
         history: list[float] = []
         for epoch in range(epochs):
             self.model.train()
@@ -53,9 +50,6 @@ class ManifoldTrainer:
 
                 total_loss += float(batch_loss.detach())
                 steps += 1
-
-            if steps == 0:
-                raise ValueError("train_dataloader must yield at least one batch")
 
             epoch_loss = total_loss / steps
             history.append(epoch_loss)
