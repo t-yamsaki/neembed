@@ -1,6 +1,7 @@
 """Tests for the minimal manifold-valued sentence encoder."""
 
 import neembed
+import numpy as np
 import torch
 from torch import nn
 
@@ -72,3 +73,53 @@ def test_gradients_flow_through_projection_and_manifold_map(monkeypatch) -> None
     assert model.encoder.linear.weight.grad is not None
     assert torch.isfinite(model.projection.weight.grad).all()
     assert torch.isfinite(model.encoder.linear.weight.grad).all()
+
+
+def test_encode_batch_returns_numpy_by_default(monkeypatch) -> None:
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", embedding_dim=2)
+
+    embeddings = model.encode(["Shiba Inu", "dog"])
+
+    assert isinstance(embeddings, np.ndarray)
+    assert embeddings.shape == (2, 2)
+    assert np.isfinite(embeddings).all()
+
+
+def test_encode_single_text_returns_one_embedding(monkeypatch) -> None:
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", embedding_dim=2)
+
+    embedding = model.encode("dog")
+
+    assert isinstance(embedding, np.ndarray)
+    assert embedding.shape == (2,)
+    assert np.isfinite(embedding).all()
+
+
+def test_encode_can_return_inference_tensor(monkeypatch) -> None:
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", embedding_dim=2)
+    model.train()
+
+    embeddings = model.encode(["dog", "mammal"], convert_to_tensor=True)
+
+    assert isinstance(embeddings, torch.Tensor)
+    assert embeddings.shape == (2, 2)
+    assert not embeddings.requires_grad
+    assert not model.training
+
+
+def test_distance_is_finite_nonnegative_zero_on_self_and_symmetric(monkeypatch) -> None:
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", embedding_dim=2)
+    embeddings = model.encode(["Shiba Inu", "dog"])
+
+    distance_ab = model.distance(embeddings[0], embeddings[1])
+    distance_ba = model.distance(embeddings[1], embeddings[0])
+    distance_aa = model.distance(embeddings[0], embeddings[0])
+
+    assert torch.isfinite(distance_ab)
+    assert float(distance_ab) >= 0.0
+    assert torch.allclose(distance_ab, distance_ba, atol=1e-6)
+    assert torch.allclose(distance_aa, torch.zeros_like(distance_aa), atol=1e-6)
