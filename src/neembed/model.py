@@ -88,7 +88,7 @@ class ManifoldSentenceTransformer(nn.Module):
         output_path = Path(output_path)
         output_path.mkdir(parents=True, exist_ok=True)
 
-        self.encoder.save_pretrained(output_path / "encoder")
+        self.encoder.save_pretrained(str(output_path / "encoder"))
         config = {
             "embedding_dim": self._projection_dim,
             "manifold": self.manifold_name,
