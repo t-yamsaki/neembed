@@ -30,6 +30,7 @@ class ManifoldSentenceTransformer(nn.Module):
         if encoder_dim is None:
             raise ValueError("Sentence Transformer embedding dimension is unknown")
 
+        self._projection_dim = embedding_dim
         self.projection: nn.Module
         if embedding_dim is None:
             self.projection = nn.Identity()
@@ -89,7 +90,7 @@ class ManifoldSentenceTransformer(nn.Module):
 
         self.encoder.save_pretrained(output_path / "encoder")
         config = {
-            "embedding_dim": self.embedding_dim,
+            "embedding_dim": self._projection_dim,
             "manifold": self.manifold_name,
             "curvature": self.curvature,
         }
