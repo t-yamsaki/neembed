@@ -167,6 +167,12 @@ distance = model.distance(
 
 The goal is for non-Euclidean fine-tuning to require only a small conceptual change from ordinary sentence-embedding fine-tuning.
 
+For a complete runnable workflow, see the [End-to-end Poincaré example](examples/train_poincare.py):
+
+```bash
+python examples/train_poincare.py
+```
+
 ## Model architecture
 
 For the initial Poincaré implementation:
