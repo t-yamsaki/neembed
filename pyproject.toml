@@ -24,3 +24,6 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "real_stack: loads the real Sentence Transformer and runs slow integration gates",
+]

@@ -1,5 +1,10 @@
 """Minimal end-to-end Poincaré fine-tuning example for neembed."""
 
+import random
+
+import numpy as np
+import torch
+
 from neembed import (
     ManifoldMultipleNegativesRankingLoss,
     ManifoldSentenceTransformer,
@@ -7,8 +12,16 @@ from neembed import (
 )
 
 
+def set_seed(seed: int) -> None:
+    """Seed the random sources used by this CPU example."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+
 def main() -> None:
     """Train on a tiny hierarchy-style dataset and print geodesic distances."""
+    set_seed(0)
     train_batches = [
         (
             ["Shiba Inu", "Siamese cat", "sparrow", "salmon"],
