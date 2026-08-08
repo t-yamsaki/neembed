@@ -1,6 +1,8 @@
 """Sentence Transformer integration for manifold-valued embeddings."""
 
 from collections.abc import Sequence
+import json
+from pathlib import Path
 from typing import Any
 
 import torch
@@ -36,7 +38,9 @@ class ManifoldSentenceTransformer(nn.Module):
             self.projection = nn.Linear(encoder_dim, embedding_dim)
             self.embedding_dim = embedding_dim
 
-        self.manifold = get_manifold(manifold, curvature)
+        self.manifold_name = manifold
+        self.curvature = float(curvature)
+        self.manifold = get_manifold(self.manifold_name, self.curvature)
 
     def forward(self, sentences: Sequence[str]) -> torch.Tensor:
         """Encode sentences and map their embeddings from the origin tangent space."""
@@ -77,3 +81,44 @@ class ManifoldSentenceTransformer(nn.Module):
 
         with torch.inference_mode():
             return self.manifold.dist(a_tensor, b_tensor)
+
+    def save_pretrained(self, output_path: str | Path) -> None:
+        """Save the encoder, projection weights, and neembed configuration."""
+        output_path = Path(output_path)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        self.encoder.save_pretrained(output_path / "encoder")
+        config = {
+            "embedding_dim": self.embedding_dim,
+            "manifold": self.manifold_name,
+            "curvature": self.curvature,
+        }
+        (output_path / "neembed_config.json").write_text(
+            json.dumps(config, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        torch.save(self.projection.state_dict(), output_path / "projection.pt")
+
+    @classmethod
+    def from_pretrained(
+        cls,
+        model_path: str | Path,
+    ) -> "ManifoldSentenceTransformer":
+        """Load a model previously saved with :meth:`save_pretrained`."""
+        model_path = Path(model_path)
+        config = json.loads(
+            (model_path / "neembed_config.json").read_text(encoding="utf-8")
+        )
+        model = cls(
+            str(model_path / "encoder"),
+            manifold=config["manifold"],
+            embedding_dim=config["embedding_dim"],
+            curvature=config["curvature"],
+        )
+        projection_state = torch.load(
+            model_path / "projection.pt",
+            map_location="cpu",
+            weights_only=True,
+        )
+        model.projection.load_state_dict(projection_state)
+        return model
