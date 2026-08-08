@@ -73,3 +73,24 @@ def test_save_pretrained_round_trip_preserves_config_and_embeddings(
     assert loaded.manifold_name == model.manifold_name
     assert loaded.curvature == model.curvature
     assert torch.allclose(before, after)
+
+
+def test_save_pretrained_round_trip_preserves_disabled_projection(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(model_module, "SentenceTransformer", FakeSentenceTransformer)
+    torch.manual_seed(0)
+    model = ManifoldSentenceTransformer("fake-model", embedding_dim=None)
+    before = model.encode(["dog", "mammal"], convert_to_tensor=True)
+    save_path = tmp_path / "saved-without-projection"
+
+    model.save_pretrained(save_path)
+    loaded = ManifoldSentenceTransformer.from_pretrained(save_path)
+    after = loaded.encode(["dog", "mammal"], convert_to_tensor=True)
+
+    config = json.loads((save_path / "neembed_config.json").read_text(encoding="utf-8"))
+    assert config["embedding_dim"] is None
+    assert isinstance(loaded.projection, nn.Identity)
+    assert loaded.embedding_dim == model.embedding_dim
+    assert torch.allclose(before, after)
