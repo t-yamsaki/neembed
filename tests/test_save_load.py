@@ -66,6 +66,22 @@ class RecordingLinear(nn.Linear):
         return self
 
 
+class RecordingManifold(nn.Module):
+    """Record the device requested for the manifold without moving tensors."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.requested_device: torch.device | None = None
+
+    def to(self, *args, **kwargs):
+        device = kwargs.get("device")
+        if device is None and args and isinstance(args[0], (str, torch.device)):
+            device = args[0]
+        if device is not None:
+            self.requested_device = torch.device(device)
+        return self
+
+
 def test_save_pretrained_round_trip_preserves_config_and_embeddings(
     monkeypatch,
     tmp_path,
@@ -120,7 +136,7 @@ def test_save_pretrained_round_trip_preserves_disabled_projection(
     assert torch.allclose(before, after)
 
 
-def test_from_pretrained_aligns_projection_with_encoder_device(
+def test_from_pretrained_aligns_projection_and_manifold_with_encoder_device(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -135,8 +151,11 @@ def test_from_pretrained_aligns_projection_with_encoder_device(
         DeviceReportingSentenceTransformer,
     )
     monkeypatch.setattr(model_module.nn, "Linear", RecordingLinear)
+    monkeypatch.setattr(model_module, "get_manifold", lambda *args: RecordingManifold())
 
     loaded = ManifoldSentenceTransformer.from_pretrained(save_path)
 
     assert isinstance(loaded.projection, RecordingLinear)
     assert loaded.projection.requested_device == torch.device("cuda")
+    assert isinstance(loaded.manifold, RecordingManifold)
+    assert loaded.manifold.requested_device == torch.device("cuda")
