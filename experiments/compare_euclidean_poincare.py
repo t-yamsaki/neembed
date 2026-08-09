@@ -6,6 +6,7 @@ import time
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from sentence_transformers import SentenceTransformer
 
 from neembed import (
@@ -79,7 +80,9 @@ def _evaluate_euclidean(model: SentenceTransformer) -> tuple[float, float]:
     started = time.perf_counter()
     anchor_embeddings = model.encode(anchors, convert_to_tensor=True)
     candidate_embeddings = model.encode(candidates, convert_to_tensor=True)
-    distances = torch.cdist(anchor_embeddings, candidate_embeddings, p=2)
+    anchor_embeddings = F.normalize(anchor_embeddings, dim=-1)
+    candidate_embeddings = F.normalize(candidate_embeddings, dim=-1)
+    distances = 1.0 - anchor_embeddings @ candidate_embeddings.T
     elapsed = time.perf_counter() - started
 
     return _parent_retrieval_accuracy(distances), elapsed
@@ -163,7 +166,7 @@ def run_experiment() -> dict[str, object]:
         },
         "results": {
             "euclidean_pretrained": {
-                "distance": "euclidean_l2",
+                "distance": "cosine",
                 "parent_retrieval_accuracy": euclidean_accuracy,
                 "training_seconds": 0.0,
                 "evaluation_seconds": euclidean_eval_seconds,
