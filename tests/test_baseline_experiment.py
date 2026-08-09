@@ -90,7 +90,7 @@ def test_baseline_experiment_returns_directly_comparable_results(monkeypatch) ->
 
     assert 0.0 <= euclidean["parent_retrieval_accuracy"] <= 1.0
     assert 0.0 <= poincare["parent_retrieval_accuracy"] <= 1.0
-    assert euclidean["distance"] == "euclidean_l2"
+    assert euclidean["distance"] == "cosine"
     assert poincare["distance"] == "poincare_geodesic"
     assert euclidean["training_seconds"] == 0.0
     assert poincare["training_seconds"] >= 0.0
