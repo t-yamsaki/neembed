@@ -4,11 +4,9 @@
 
 [English README](../README.md)
 
-> **Status:** Early development. 以下の API は v0.1 で目指す最小インターフェースであり、最初の安定版リリースまでは変更される可能性があります。
+> **Status:** v0.1 の実装は完了しており、最初の PyPI 公開に向けて準備中です。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
 
-`neembed` は、既存のテキスト埋め込みモデルと多様体上の最適化をつなぐ薄い integration layer です。
-
-基本アイデアはシンプルです。
+`neembed` は、既存のテキスト埋め込みモデルと manifold-valued representation をつなぐ薄い integration layer です。
 
 ```text
 Pretrained Sentence Encoder
@@ -17,13 +15,13 @@ Pretrained Sentence Encoder
 Euclidean sentence embedding
         │
         ▼
-Projection head
+Projection head (optional)
         │
         ▼
 Tangent-space representation
         │
         ▼
-Geoopt manifold map
+Geoopt expmap₀
         │
         ▼
 Non-Euclidean embedding
@@ -32,77 +30,59 @@ Non-Euclidean embedding
 Geodesic-distance loss
 ```
 
-リーマン幾何の演算を独自実装するのではなく、Poincaré ball や測地距離などの多様体演算は [Geoopt](https://geoopt.readthedocs.io/) に任せ、`neembed` は **既存の埋め込みモデルを非ユークリッド空間で学習しやすくすること**に集中します。
+リーマン幾何の演算を独自実装するのではなく、Poincaré ball や geodesic distance などの多様体演算は [Geoopt](https://geoopt.readthedocs.io/) に任せ、`neembed` は **既存の Sentence Transformer を非ユークリッド空間で学習しやすくすること**に集中します。
 
 ## なぜ neembed なのか
 
-一般的な pretrained sentence embedding model は、テキストをユークリッド空間のベクトルとして表現します。
+一般的な pretrained sentence embedding model はテキストをユークリッド空間のベクトルとして表現します。多くの意味類似度・検索タスクでは有効ですが、階層的・木構造的なデータは平坦な空間では表現しづらい場合があります。
 
-これは多くの意味類似度・検索タスクで有効ですが、データによっては平坦な空間では表現しづらい構造を持ちます。
-
-例えば：
+代表例：
 
 - taxonomy・概念階層
 - knowledge graph
 - 階層ラベル
 - 木構造に近い意味関係
-- 球面的・混合曲率的な潜在構造を持つデータ
 
-特に双曲空間は、急速に分岐する木構造を比較的コンパクトに表現できるため、階層データとの相性が良いと考えられています。
-
-`neembed` の目標は、このような非ユークリッド埋め込みの実験を、通常の Sentence Transformers の fine-tuning に近い感覚で実行できるようにすることです。
+双曲空間は、急速に分岐する木構造を比較的コンパクトに表現できるため、階層データとの相性が良いと考えられています。
 
 ## 設計方針
 
-`neembed` では、意図的に以下の原則を採用します。
+1. **既存の pretrained embedding model を再利用する。** Sentence Transformers / Hugging Face が提供する encoder を作り直さない。
+2. **幾何演算は Geoopt を再利用する。** exponential map、logarithmic map、geodesic distance などを理由なく独自実装しない。
+3. **公開 API を小さく保つ。** 基本概念は `Model`、`Loss`、`Trainer` の3つ。
+4. **最初は1つの幾何に集中する。** v0.1 は Poincaré ball のみをサポート。
+5. **manifold-valued output と manifold-valued parameter を区別する。** 出力が多様体上にあるだけなら Riemannian optimizer は必須ではない。
 
-1. **既存の pretrained embedding model を再利用する。**  
-   Hugging Face や Sentence Transformers が提供している encoder を作り直さない。
+## v0.1 のスコープ
 
-2. **幾何演算は Geoopt を再利用する。**  
-   exponential map、logarithmic map、geodesic distance、Riemannian optimizer などを理由なく独自実装しない。
+最初のリリースには以下を含みます。
 
-3. **公開 API を小さく保つ。**  
-   基本概念は `Model`、`Loss`、`Trainer` の3つにする。
-
-4. **最初は1つの幾何に集中する。**  
-   v0.1 は Poincaré ball に限定し、Lorentz、sphere、product manifold、mixed curvature は後から追加する。
-
-5. **manifold-valued output と manifold-valued parameter を区別する。**  
-   出力が多様体上にあることと、Riemannian optimizer が必要であることは同義ではない。
-
-## スコープ
-
-### v0.1
-
-最初のリリースは意図的に狭くします。
-
-- pretrained encoder の第一選択肢として Sentence Transformers を利用
+- pretrained encoder として Sentence Transformers を利用
 - Geoopt による Poincaré ball embedding
-- 接空間への任意の projection
+- 接空間への任意の低次元 projection
 - geodesic distance
-- in-batch contrastive / multiple-negatives ranking objective
+- in-batch multiple-negatives ranking / InfoNCE-style loss
 - `AdamW` による通常の fine-tuning
-- embedding の生成と距離計算
+- `encode()` / `distance()`
+- `save_pretrained()` / `from_pretrained()` によるローカル保存・復元
+- Poincaré path の数値安定性テスト
+- end-to-end の実行例
+- Euclidean と Poincaré を比較する再現可能な baseline experiment
 
-### v0.1 では扱わないもの
-
-以下は明示的に後回しにします。
+v0.1 では扱いません。
 
 - 多様体演算の独自実装
 - 汎用 manifold registry
 - Lorentz / sphere / SPD / product manifold
 - learnable curvature
-- manifold prototype
-- Riemannian classifier
+- manifold-valued な trainable prototype / classifier
 - distributed contrastive training
-- 独自 vector database / ANN index
-- 大規模な設定フレームワーク
-- Sentence Transformers の代替となる汎用 training framework
+- vector database / ANN
+- Sentence Transformers の置き換え
 
 ## インストール
 
-リリース後：
+`v0.1.0` を PyPI に公開後：
 
 ```bash
 pip install neembed
@@ -111,12 +91,12 @@ pip install neembed
 開発版：
 
 ```bash
-git clone https://github.com/<YOUR_USERNAME>/neembed.git
+git clone https://github.com/t-yamsaki/neembed.git
 cd neembed
 pip install -e ".[dev]"
 ```
 
-主要な依存ライブラリは以下を想定しています。
+runtime dependency は意図的に次の3つへ限定しています。
 
 ```text
 torch
@@ -125,8 +105,6 @@ geoopt
 ```
 
 ## Quick Start
-
-v0.1 で目指す API は次の形です。
 
 ```python
 from neembed import (
@@ -152,26 +130,34 @@ trainer = ManifoldTrainer(
     loss=loss,
 )
 
-trainer.fit(train_dataset)
+train_batches = [
+    (["柴犬", "シャム猫"], ["犬", "猫"]),
+    (["犬", "猫"], ["哺乳類", "ネコ科"]),
+]
+
+trainer.fit(train_batches, epochs=1)
 
 embeddings = model.encode([
     "柴犬",
     "犬",
     "哺乳類",
-    "動物",
 ])
 
-distance = model.distance(
-    embeddings[0],
-    embeddings[1],
-)
+distance = model.distance(embeddings[0], embeddings[1])
+print(float(distance))
 ```
 
-通常の sentence embedding の fine-tuning から、できるだけ小さな概念変更だけで非ユークリッド埋め込みへ移行できることを目指します。
+各 anchor は同じ batch index の positive と対応します。off-diagonal の positive candidate は in-batch negative として扱われるため、同じ batch 内で positive を重複させないでください。
+
+完全な実行例は [examples/train_poincare.py](../examples/train_poincare.py) を参照してください。
+
+```bash
+python examples/train_poincare.py
+```
 
 ## モデルアーキテクチャ
 
-初期の Poincaré 実装では次の構成を想定します。
+v0.1 の Poincaré 実装は次の構成です。
 
 ```text
 SentenceTransformer
@@ -182,10 +168,7 @@ Linear projection (optional)
         │
         │ tangent vector v ∈ T₀M
         ▼
-Scale / stabilization
-        │
-        ▼
-expmap₀
+Geoopt expmap₀
         │
         │ z ∈ M
         ▼
@@ -194,247 +177,87 @@ Poincaré embedding
 
 概念的には、
 
-\[
+$$
 h = f_\theta(x),
-\]
+$$
 
-\[
+$$
 v = Wh,
-\]
+$$
 
-\[
-z = \operatorname{Exp}_0^c(v),
-\]
+$$
+z = \mathrm{Exp}_0^c(v),
+$$
 
-とします。
-
-ここで、
-
-- \(f_\theta\)：pretrained sentence encoder
-- \(W\)：任意の projection layer
-- \(v\)：接空間上の表現
-- \(z\)：最終的な manifold-valued embedding
-
-です。
-
-Transformer 本体まで双曲ニューラルネットワーク化するのではなく、Transformer は通常の PyTorch model のまま利用し、最終表現だけを多様体上へ写します。
+です。$f_\theta$ は pretrained sentence encoder、$W$ は任意の projection layer、$z$ は最終的な manifold-valued embedding です。
 
 ## 学習目的
 
-初期版の contrastive objective では、cosine similarity や Euclidean distance の代わりに geodesic distance を利用します。
+anchor-positive pair のバッチに対して、Euclidean / cosine similarity の代わりに負の geodesic distance を利用します。
 
-anchor-positive pair のバッチに対して、
+$$
+s_{ij} = -\frac{d_{\mathcal M}(z_i, z_j^+)}{\tau}.
+$$
 
-\[
-s_{ij}
-=
--\frac{d_{\mathcal M}(z_i, z_j^+)}{\tau}
-\]
+in-batch objective は、
 
-とします。
+$$
+\mathcal L_i = -\log\frac{\exp(s_{ii})}{\sum_j \exp(s_{ij})}.
+$$
 
-ここで \(d_{\mathcal M}\) は多様体上の geodesic distance、\(\tau\) は temperature です。
+となり、multiple-negatives ranking / InfoNCE の manifold-aware な形として扱います。
 
-損失は、
+## v0.1 で AdamW を使う理由
 
-\[
-\mathcal L_i
-=
--\log
-\frac{\exp(s_{ii})}
-{\sum_j \exp(s_{ij})}
-\]
+encoder と optional projection は通常の Euclidean PyTorch parameter です。出力だけを Geoopt を通して多様体上へ写すため、gradient は manifold map / geodesic distance を通じて逆伝播でき、trainable parameter は通常の `AdamW` で最適化できます。
 
-とし、in-batch multiple-negatives ranking / InfoNCE の manifold-aware な拡張として扱います。
+trainable hierarchy node や manifold prototype のように、学習パラメータそのものが多様体上にある場合は Riemannian optimizer が必要になりますが、v0.1 の対象外です。
 
-## Optimizer
-
-**非ユークリッド空間へ出力するだけなら、Riemannian optimizer は必須ではありません。**
-
-最小モデルでは、
-
-```text
-Transformer parameters   ┐
-Projection parameters    ├─ Euclidean parameters → AdamW
-                         │
-Output embeddings        └─ manifold 上へ map
-```
-
-という構造です。
-
-manifold map と geodesic loss を通じて gradient が通常のモデルパラメータまで逆伝播するため、v0.1 では `AdamW` で十分です。
-
-Geoopt の `RiemannianAdam` のような optimizer が必要になるのは、例えば次のように**学習パラメータそのものが多様体上に存在する場合**です。
-
-- manifold prototype
-- trainable hierarchy node
-- class centroid
-- manifold-valued entity embedding
-
-これらは v0.1 の対象外とします。
-
-## 想定パッケージ構成
-
-```text
-neembed/
-├── pyproject.toml
-├── README.md
-├── docs/
-│   └── README_ja.md
-├── src/
-│   └── neembed/
-│       ├── __init__.py
-│       ├── model.py
-│       ├── manifolds.py
-│       ├── losses.py
-│       └── trainer.py
-├── examples/
-│   └── train_poincare.py
-└── tests/
-    ├── test_model.py
-    ├── test_losses.py
-    └── test_training.py
-```
-
-### `model.py`
-
-pretrained sentence encoder と manifold-valued output の接続を担当します。
+## 保存と読み込み
 
 ```python
-model = ManifoldSentenceTransformer(
-    "sentence-transformers/all-MiniLM-L6-v2",
-    manifold="poincare",
-    embedding_dim=64,
-    curvature=1.0,
-)
+model.save_pretrained("./saved_model")
+
+loaded = ManifoldSentenceTransformer.from_pretrained("./saved_model")
 ```
 
-### `manifolds.py`
+保存ディレクトリには underlying Sentence Transformer の状態と、neembed の projection / manifold configuration が保存されます。
 
-Geoopt に対する薄い interface のみを提供します。
+## Validation experiment
 
-v0.1 で必要なのは Poincaré ball だけです。
+最初の比較実験では、fine-tuning 前の Euclidean encoder と Poincaré fine-tuning 後の同じ encoder を、同じ held-out hierarchy retrieval pair で比較します。
 
-```python
-import geoopt
-
-def get_manifold(name: str, curvature: float = 1.0):
-    if name == "poincare":
-        return geoopt.PoincareBall(c=curvature)
-
-    raise ValueError(f"Unsupported manifold: {name}")
+```bash
+python experiments/compare_euclidean_poincare.py
 ```
 
-実際の利用例が要求するまでは、独自の汎用 `Manifold` 抽象クラスは作りません。
-
-### `losses.py`
-
-manifold geometry に基づく loss を実装します。
-
-v0.1 の中心：
-
-```text
-ManifoldMultipleNegativesRankingLoss
-```
-
-将来候補：
-
-```text
-ManifoldTripletLoss
-ManifoldContrastiveLoss
-HierarchyLoss
-```
-
-### `trainer.py`
-
-Hugging Face や Sentence Transformers の training framework 全体を置き換えるのではなく、最小限の PyTorch training loop を提供します。
-
-責務は以下に限定します。
-
-- forward
-- loss calculation
-- backward
-- optimizer step
-- validation hook
-- checkpoint
-
-## データ
-
-ライブラリ独自の dataset format は必須にしません。
-
-pair data を使う場合、概念的には例えば次のようになります。
-
-```json
-{"anchor": "柴犬", "positive": "犬"}
-{"anchor": "犬", "positive": "哺乳類"}
-{"anchor": "哺乳類", "positive": "脊椎動物"}
-```
-
-ただし、利用者は通常の PyTorch Dataset や Hugging Face Dataset をそのまま使えることを目指します。
-
-正例関係の例：
-
-- 子ノード → 親ノード
-- 文書 → 正しいカテゴリ
-- query → relevant document
-- paraphrase
-- synonym
-- click された query-document pair
-
-## 評価
-
-適切な評価指標はタスクによって異なります。
-
-検索：
-
-- Recall@K
-- MRR
-- nDCG
-
-階層埋め込み：
-
-- parent retrieval accuracy
-- ancestor retrieval accuracy
-- hierarchy reconstruction
-- manifold radius と既知の hierarchy depth の Spearman 相関
-
-一般的な representation learning：
-
-- downstream classification
-- clustering
-- 元の Euclidean encoder との比較
-
-実験では、fine-tuning 前の pretrained Euclidean model を baseline として必ず比較することを推奨します。
+固定設定と結果の読み方は [experiments/README.md](../experiments/README.md) を参照してください。この小規模実験は、双曲埋め込みが常に優れていると主張する benchmark ではありません。
 
 ## 数値安定性
 
-Poincaré ball では、embedding が境界付近へ近づくと数値的に不安定になる可能性があります。
+Poincaré embedding は ball の境界付近で数値的に不安定になり得ます。v0.1 では projection / geometry を Geoopt に委譲し、以下をテストしています。
 
-実用上は次のような制御を検討します。
-
-- tangent vector scaling
-- Geoopt による projection / stabilization
-- 保守的な learning rate
-- curvature sweep
-- temperature sweep
-- gradient clipping
-
-深い階層や最適化が難しい条件では、将来的に Lorentz model backend を追加する価値があります。
+- representative / large tangent vector から得られる embedding が finite
+- embedding が有効な Poincaré ball domain 内にある
+- near-boundary geodesic distance が finite
+- forward / loss path の gradient が finite
+- curvature / temperature の edge case
 
 ## Roadmap
 
 ### v0.1 — Minimal hyperbolic fine-tuning
 
-- [ ] Sentence Transformer backbone
-- [ ] Geoopt Poincaré ball
-- [ ] projection head
-- [ ] geodesic distance
-- [ ] manifold multiple-negatives ranking loss
-- [ ] minimal trainer
-- [ ] `encode()`
-- [ ] save / load
-- [ ] basic tests
-- [ ] minimal example
+- [x] Sentence Transformer backbone
+- [x] Geoopt Poincaré ball
+- [x] optional projection head
+- [x] geodesic distance
+- [x] manifold multiple-negatives ranking loss
+- [x] minimal trainer
+- [x] `encode()`
+- [x] save / load
+- [x] numerical stability tests
+- [x] minimal end-to-end example
+- [x] Euclidean baseline experiment
 
 ### v0.2 — More objectives and geometries
 
@@ -470,17 +293,15 @@ Poincaré ball では、embedding が境界付近へ近づくと数値的に不�
 - 汎用 hyperbolic neural-network library
 - vector database
 
-役割はもっと小さく定義します。
+役割は意図的に小さく定義します。
 
 > **Geoopt を使って、pretrained sentence embedding model を manifold-valued embedding model に変換する。**
 
 ## Contributing
 
-現在は v0.1 の surface area を小さく保つことを優先します。
-
 大きな abstraction や subsystem を追加する前に、次の3点を確認します。
 
-1. Poincaré fine-tuning に本当に必要か？
+1. 対象となる manifold fine-tuning workflow に本当に必要か？
 2. Geoopt や Sentence Transformers がすでに提供していないか？
 3. core API を壊さず後から追加できないか？
 
@@ -494,4 +315,6 @@ Poincaré ball では、embedding が境界付近へ近づくと数値的に不�
 
 ## License
 
-TBD.
+`neembed` は [MIT License](../LICENSE) で公開します。
+
+Geoopt を含む third-party dependency は、それぞれのライセンスに従います。neembed は Geoopt の source code を vendoring / relicensing せず、依存ライブラリとして利用します。

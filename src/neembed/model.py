@@ -13,7 +13,15 @@ from neembed.manifolds import get_manifold
 
 
 class ManifoldSentenceTransformer(nn.Module):
-    """Map pretrained sentence embeddings onto the configured manifold."""
+    """Map pretrained sentence embeddings onto a configured manifold.
+
+    Args:
+        model_name_or_path: Sentence Transformer model name or local model path.
+        manifold: Manifold backend name. v0.1 supports only ``"poincare"``.
+        embedding_dim: Optional output dimension for a learned linear projection.
+            If omitted, the encoder embedding dimension is preserved.
+        curvature: Positive, finite Poincaré-ball curvature parameter.
+    """
 
     def __init__(
         self,
@@ -46,7 +54,15 @@ class ManifoldSentenceTransformer(nn.Module):
         self.manifold.to(self.encoder.device)
 
     def forward(self, sentences: Sequence[str]) -> torch.Tensor:
-        """Encode sentences and map their embeddings from the origin tangent space."""
+        """Encode a batch and map the embeddings from the origin tangent space.
+
+        Args:
+            sentences: Batch of input texts.
+
+        Returns:
+            A tensor of manifold-valued embeddings with shape
+            ``(batch_size, embedding_dim)``.
+        """
         features = self.encoder.preprocess(list(sentences))
         features = {
             key: value.to(self.encoder.device) if torch.is_tensor(value) else value
@@ -62,7 +78,23 @@ class ManifoldSentenceTransformer(nn.Module):
         *,
         convert_to_tensor: bool = False,
     ) -> Any:
-        """Return manifold embeddings for one text or a batch of texts."""
+        """Encode text as manifold-valued embeddings for inference.
+
+        Args:
+            sentences: A single text or a sequence of texts.
+            convert_to_tensor: Return a ``torch.Tensor`` instead of a NumPy array.
+
+        Returns:
+            A single embedding with shape ``(embedding_dim,)`` for string input,
+            or a batch with shape ``(batch_size, embedding_dim)`` for sequence
+            input. NumPy arrays are returned by default; tensors are returned when
+            ``convert_to_tensor=True``.
+
+        Notes:
+            Encoding switches the model to evaluation mode and runs under
+            ``torch.inference_mode()``, so returned embeddings do not track
+            gradients.
+        """
         single_input = isinstance(sentences, str)
         batch = [sentences] if single_input else list(sentences)
 
@@ -77,7 +109,19 @@ class ManifoldSentenceTransformer(nn.Module):
         return embeddings.cpu().numpy()
 
     def distance(self, a: Any, b: Any) -> torch.Tensor:
-        """Return the geodesic distance between two manifold embeddings."""
+        """Return the geodesic distance between two manifold embeddings.
+
+        Args:
+            a: First manifold embedding or array-like value.
+            b: Second manifold embedding or array-like value.
+
+        Returns:
+            A tensor containing the manifold geodesic distance.
+
+        Notes:
+            This is an inference helper. Inputs are moved to the model device and
+            dtype, and the distance is computed under ``torch.no_grad()``.
+        """
         reference = next(self.parameters())
         a_tensor = torch.as_tensor(a, device=reference.device, dtype=reference.dtype)
         b_tensor = torch.as_tensor(b, device=reference.device, dtype=reference.dtype)
@@ -86,7 +130,11 @@ class ManifoldSentenceTransformer(nn.Module):
             return self.manifold.dist(a_tensor, b_tensor)
 
     def save_pretrained(self, output_path: str | Path) -> None:
-        """Save the encoder, projection weights, and neembed configuration."""
+        """Save the encoder, projection weights, and neembed configuration.
+
+        Args:
+            output_path: Directory in which to save the model.
+        """
         output_path = Path(output_path)
         output_path.mkdir(parents=True, exist_ok=True)
 
@@ -107,7 +155,14 @@ class ManifoldSentenceTransformer(nn.Module):
         cls,
         model_path: str | Path,
     ) -> "ManifoldSentenceTransformer":
-        """Load a model previously saved with :meth:`save_pretrained`."""
+        """Load a model previously saved with :meth:`save_pretrained`.
+
+        Args:
+            model_path: Directory containing a saved neembed model.
+
+        Returns:
+            The reconstructed manifold sentence model.
+        """
         model_path = Path(model_path)
         config = json.loads(
             (model_path / "neembed_config.json").read_text(encoding="utf-8")

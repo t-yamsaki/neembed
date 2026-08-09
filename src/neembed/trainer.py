@@ -9,7 +9,15 @@ from neembed.model import ManifoldSentenceTransformer
 
 
 class ManifoldTrainer:
-    """Fine-tune a manifold sentence model with ordinary Euclidean optimization."""
+    """Fine-tune a manifold sentence model with ordinary AdamW optimization.
+
+    Args:
+        model: Model whose Euclidean parameters are optimized.
+        loss: Manifold-aware ranking loss used for each training batch.
+        learning_rate: AdamW learning rate.
+        weight_decay: AdamW weight decay.
+        verbose: Print one mean-loss line after each epoch when ``True``.
+    """
 
     def __init__(
         self,
@@ -35,7 +43,17 @@ class ManifoldTrainer:
         *,
         epochs: int = 1,
     ) -> list[float]:
-        """Train for the requested epochs and return mean loss per epoch."""
+        """Train on anchor-positive batches and return mean loss per epoch.
+
+        Args:
+            train_dataloader: Iterable yielding ``(anchors, positives)`` batches.
+                Each element is a sequence of texts consumed by the configured
+                ranking loss.
+            epochs: Number of full passes over ``train_dataloader``.
+
+        Returns:
+            Mean training loss for each completed epoch.
+        """
         history: list[float] = []
         for epoch in range(epochs):
             self.model.train()

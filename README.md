@@ -4,11 +4,9 @@
 
 [日本語](docs/README_ja.md)
 
-> **Status:** Early development. The API shown below describes the intended minimal v0.1 interface and may change before the first stable release.
+> **Status:** v0.1 is implemented and being prepared for its first public PyPI release. The API is intentionally small and may still evolve before a stable 1.0 release.
 
-`neembed` is a lightweight integration layer between pretrained text embedding models and manifold-aware optimization.
-
-The core idea is deliberately small:
+`neembed` is a lightweight integration layer between pretrained text embedding models and manifold-valued representations.
 
 ```text
 Pretrained Sentence Encoder
@@ -17,13 +15,13 @@ Pretrained Sentence Encoder
 Euclidean sentence embedding
         │
         ▼
-Projection head
+Projection head (optional)
         │
         ▼
 Tangent-space representation
         │
         ▼
-Geoopt manifold map
+Geoopt expmap₀
         │
         ▼
 Non-Euclidean embedding
@@ -32,75 +30,59 @@ Non-Euclidean embedding
 Geodesic-distance loss
 ```
 
-Rather than reimplementing Riemannian geometry, `neembed` delegates manifold operations to [Geoopt](https://geoopt.readthedocs.io/) and focuses on making existing embedding models easy to fine-tune in non-Euclidean spaces.
+Rather than reimplementing Riemannian geometry, `neembed` delegates manifold operations to [Geoopt](https://geoopt.readthedocs.io/) and focuses on making existing Sentence Transformer models easy to fine-tune in non-Euclidean spaces.
 
 ## Why neembed?
 
-Most pretrained sentence embedding models represent text in Euclidean vector spaces. This works well for many semantic similarity and retrieval tasks, but some data have structures that are naturally difficult to represent in a flat space.
+Most pretrained sentence embedding models represent text in Euclidean vector spaces. This works well for many semantic similarity and retrieval tasks, but hierarchical or tree-like data can be awkward to represent in a flat space.
 
-Examples include:
+Typical examples include:
 
 - taxonomies and concept hierarchies
 - knowledge graphs
 - hierarchical labels
 - tree-like semantic relations
-- data with latent spherical or mixed-curvature structure
 
-Hyperbolic spaces are particularly attractive for hierarchical data because they can represent rapidly expanding tree-like structures compactly.
-
-`neembed` aims to make experiments with these geometries feel close to ordinary Sentence Transformers fine-tuning.
+Hyperbolic spaces are especially attractive for hierarchical data because they can represent rapidly expanding tree-like structures compactly.
 
 ## Design goals
 
-`neembed` follows a few intentionally strict design principles:
+1. **Reuse pretrained embedding models.** Do not rebuild encoders already provided by Sentence Transformers or Hugging Face.
+2. **Reuse Geoopt for geometry.** Do not maintain custom exponential maps, logarithmic maps, or geodesic-distance implementations without a compelling reason.
+3. **Keep the public API small.** The core concepts are `Model`, `Loss`, and `Trainer`.
+4. **Start with one geometry.** v0.1 supports the Poincaré ball only.
+5. **Separate manifold-valued outputs from manifold-valued parameters.** Manifold-valued outputs alone do not require a Riemannian optimizer.
 
-1. **Reuse pretrained embedding models.**  
-   Do not rebuild encoders that Hugging Face or Sentence Transformers already provide.
+## v0.1 scope
 
-2. **Reuse Geoopt for geometry.**  
-   Do not maintain custom implementations of exponential maps, logarithmic maps, geodesic distances, or Riemannian optimizers unless there is a compelling reason.
+The first release includes:
 
-3. **Keep the public API small.**  
-   The core concepts should remain `Model`, `Loss`, and `Trainer`.
-
-4. **Start with one geometry.**  
-   v0.1 focuses on the Poincaré ball before adding Lorentz, spherical, product, or mixed-curvature spaces.
-
-5. **Separate manifold-valued outputs from manifold-valued parameters.**  
-   Producing embeddings on a manifold does not automatically require a Riemannian optimizer.
-
-## Scope
-
-### v0.1
-
-The initial release is intentionally narrow:
-
-- Sentence Transformers as the primary pretrained encoder backend
-- Poincaré ball embeddings via Geoopt
-- optional projection to a lower-dimensional tangent space
+- Sentence Transformers as the pretrained encoder backend
+- Poincaré ball embeddings through Geoopt
+- optional lower-dimensional tangent-space projection
 - geodesic distance
-- in-batch contrastive / multiple-negatives ranking objective
-- Euclidean fine-tuning with `AdamW`
-- encoding and distance computation
+- in-batch multiple-negatives ranking / InfoNCE-style loss
+- ordinary `AdamW` fine-tuning
+- `encode()` and `distance()` inference helpers
+- local `save_pretrained()` / `from_pretrained()` round trips
+- numerical stability coverage for the Poincaré path
+- a runnable end-to-end training example
+- a reproducible Euclidean-vs-Poincaré baseline experiment
 
-### Not in v0.1
+Not included in v0.1:
 
-The following are deliberately postponed:
-
-- custom implementations of manifold mathematics
-- arbitrary manifold registries
-- Lorentz, sphere, SPD, or product manifolds
+- custom manifold mathematics
+- generic manifold registries
+- Lorentz, spherical, SPD, or product manifolds
 - learnable curvature
-- manifold prototypes
-- Riemannian classifiers
+- manifold-valued trainable prototypes or classifiers
 - distributed contrastive training
-- custom vector databases or ANN indexes
-- large configuration frameworks
-- a general-purpose replacement for Sentence Transformers
+- vector database / ANN functionality
+- a replacement for Sentence Transformers
 
 ## Installation
 
-Once released:
+After `v0.1.0` is published to PyPI:
 
 ```bash
 pip install neembed
@@ -109,12 +91,12 @@ pip install neembed
 For development:
 
 ```bash
-git clone https://github.com/<YOUR_USERNAME>/neembed.git
+git clone https://github.com/t-yamsaki/neembed.git
 cd neembed
 pip install -e ".[dev]"
 ```
 
-Core dependencies are expected to include:
+Runtime dependencies are intentionally limited to:
 
 ```text
 torch
@@ -123,8 +105,6 @@ geoopt
 ```
 
 ## Quick start
-
-The intended v0.1 API is:
 
 ```python
 from neembed import (
@@ -150,24 +130,26 @@ trainer = ManifoldTrainer(
     loss=loss,
 )
 
-trainer.fit(train_dataset)
+train_batches = [
+    (["Shiba Inu", "Siamese cat"], ["dog", "cat"]),
+    (["dog", "cat"], ["mammal", "feline"]),
+]
+
+trainer.fit(train_batches, epochs=1)
 
 embeddings = model.encode([
     "Shiba Inu",
     "dog",
     "mammal",
-    "animal",
 ])
 
-distance = model.distance(
-    embeddings[0],
-    embeddings[1],
-)
+distance = model.distance(embeddings[0], embeddings[1])
+print(float(distance))
 ```
 
-The goal is for non-Euclidean fine-tuning to require only a small conceptual change from ordinary sentence-embedding fine-tuning.
+Each anchor is paired with the positive at the same batch index. Because off-diagonal positive candidates are used as in-batch negatives, avoid duplicate positives within the same batch.
 
-For a complete runnable workflow, see the [End-to-end Poincaré example](examples/train_poincare.py):
+For a complete runnable workflow, see [examples/train_poincare.py](examples/train_poincare.py):
 
 ```bash
 python examples/train_poincare.py
@@ -175,7 +157,7 @@ python examples/train_poincare.py
 
 ## Model architecture
 
-For the initial Poincaré implementation:
+For the v0.1 Poincaré implementation:
 
 ```text
 SentenceTransformer
@@ -186,10 +168,7 @@ Linear projection (optional)
         │
         │ tangent vector v ∈ T₀M
         ▼
-Scale / stabilization
-        │
-        ▼
-expmap₀
+Geoopt expmap₀
         │
         │ z ∈ M
         ▼
@@ -198,239 +177,87 @@ Poincaré embedding
 
 Conceptually,
 
-\[
+$$
 h = f_\theta(x),
-\]
+$$
 
-\[
+$$
 v = Wh,
-\]
+$$
 
-\[
-z = \operatorname{Exp}_0^c(v),
-\]
+$$
+z = \mathrm{Exp}_0^c(v),
+$$
 
-where:
-
-- \(f_\theta\) is the pretrained sentence encoder,
-- \(W\) is an optional projection layer,
-- \(v\) is a tangent-space representation,
-- \(z\) is the final manifold-valued embedding.
-
-The Transformer itself remains an ordinary PyTorch model. Only the final representation is mapped onto the manifold.
+where $f_\theta$ is the pretrained sentence encoder, $W$ is an optional projection layer, and $z$ is the final manifold-valued embedding.
 
 ## Training objective
 
-The initial contrastive objective uses geodesic distance instead of cosine similarity or Euclidean distance.
+For a batch of anchor-positive pairs, `neembed` replaces Euclidean/cosine similarity with negative geodesic distance:
 
-For a batch of anchor-positive pairs, define:
+$$
+s_{ij} = -\frac{d_{\mathcal M}(z_i, z_j^+)}{\tau}.
+$$
 
-\[
-s_{ij}
-=
--\frac{d_{\mathcal M}(z_i, z_j^+)}{\tau},
-\]
+The in-batch objective is then
 
-where \(d_{\mathcal M}\) is the geodesic distance on the manifold and \(\tau\) is the temperature.
+$$
+\mathcal L_i = -\log\frac{\exp(s_{ii})}{\sum_j \exp(s_{ij})}.
+$$
 
-The loss is then:
+This is the manifold-aware analogue of a multiple-negatives ranking / InfoNCE objective.
 
-\[
-\mathcal L_i
-=
--\log
-\frac{\exp(s_{ii})}
-{\sum_j \exp(s_{ij})}.
-\]
+## Why AdamW is enough for v0.1
 
-This provides a manifold-aware analogue of in-batch multiple-negatives ranking / InfoNCE training.
+The encoder and optional projection are ordinary Euclidean PyTorch parameters. Only the output representation is mapped onto the manifold, so gradients can flow through Geoopt's map and geodesic distance while the trainable parameters are optimized with ordinary `AdamW`.
 
-## Optimizers
+A Riemannian optimizer becomes relevant when trainable parameters themselves live on a manifold, such as trainable hierarchy nodes or manifold prototypes. That is outside the v0.1 scope.
 
-A non-Euclidean output does **not** by itself require a Riemannian optimizer.
-
-In the minimal model:
-
-```text
-Transformer parameters   ┐
-Projection parameters    ├─ Euclidean parameters → AdamW
-                         │
-Output embeddings        └─ mapped onto a manifold
-```
-
-Gradients flow through the manifold map and geodesic loss back into the ordinary model parameters.
-
-A Riemannian optimizer such as Geoopt's `RiemannianAdam` becomes useful when the model contains trainable parameters that themselves live on a manifold, for example:
-
-- manifold prototypes
-- trainable hierarchy nodes
-- class centroids
-- manifold-valued entity embeddings
-
-That functionality is outside the initial v0.1 scope.
-
-## Proposed package structure
-
-```text
-neembed/
-├── pyproject.toml
-├── README.md
-├── docs/
-│   └── README_ja.md
-├── src/
-│   └── neembed/
-│       ├── __init__.py
-│       ├── model.py
-│       ├── manifolds.py
-│       ├── losses.py
-│       └── trainer.py
-├── examples/
-│   └── train_poincare.py
-└── tests/
-    ├── test_model.py
-    ├── test_losses.py
-    └── test_training.py
-```
-
-### `model.py`
-
-Owns the integration between a pretrained sentence encoder and a manifold-valued output.
+## Saving and loading
 
 ```python
-model = ManifoldSentenceTransformer(
-    "sentence-transformers/all-MiniLM-L6-v2",
-    manifold="poincare",
-    embedding_dim=64,
-    curvature=1.0,
-)
+model.save_pretrained("./saved_model")
+
+loaded = ManifoldSentenceTransformer.from_pretrained("./saved_model")
 ```
 
-### `manifolds.py`
+A saved model contains the underlying Sentence Transformer state plus the neembed projection and manifold configuration.
 
-Provides a deliberately thin interface over Geoopt.
+## Validation experiment
 
-For v0.1, only the Poincaré ball is required.
+The first comparison experiment evaluates the original pretrained Euclidean encoder and the same encoder after Poincaré fine-tuning on the same held-out hierarchy retrieval pairs:
 
-```python
-import geoopt
-
-def get_manifold(name: str, curvature: float = 1.0):
-    if name == "poincare":
-        return geoopt.PoincareBall(c=curvature)
-
-    raise ValueError(f"Unsupported manifold: {name}")
+```bash
+python experiments/compare_euclidean_poincare.py
 ```
 
-The package should avoid creating its own general manifold abstraction unless real use cases require one.
-
-### `losses.py`
-
-Contains losses defined in terms of manifold geometry.
-
-Initial target:
-
-```text
-ManifoldMultipleNegativesRankingLoss
-```
-
-Possible later additions:
-
-```text
-ManifoldTripletLoss
-ManifoldContrastiveLoss
-HierarchyLoss
-```
-
-### `trainer.py`
-
-Contains a small PyTorch training loop rather than trying to replace the full Hugging Face or Sentence Transformers training stack.
-
-Its responsibilities should stay limited to:
-
-- forward passes
-- loss computation
-- backward propagation
-- optimizer steps
-- validation hooks
-- checkpointing
-
-## Data
-
-The library itself should not require a custom dataset format.
-
-A pair-based dataset may conceptually contain:
-
-```json
-{"anchor": "Shiba Inu", "positive": "dog"}
-{"anchor": "dog", "positive": "mammal"}
-{"anchor": "mammal", "positive": "vertebrate"}
-```
-
-but users should be free to supply ordinary PyTorch or Hugging Face datasets.
-
-Typical positive relations include:
-
-- child → parent
-- document → category
-- query → relevant document
-- paraphrase pairs
-- synonym pairs
-- clicked query-document pairs
-
-## Evaluation
-
-Useful evaluation metrics depend on the task.
-
-For retrieval:
-
-- Recall@K
-- MRR
-- nDCG
-
-For hierarchical embeddings:
-
-- parent retrieval accuracy
-- ancestor retrieval accuracy
-- hierarchy reconstruction
-- Spearman correlation between manifold radius and known hierarchy depth
-
-For generic representation learning:
-
-- downstream classification
-- clustering quality
-- comparison against the original Euclidean encoder
-
-A strong experiment should always include the original pretrained Euclidean model as a baseline.
+See [experiments/README.md](experiments/README.md) for the fixed configuration and interpretation notes. The experiment is intentionally small and is not a claim that hyperbolic embeddings are universally superior.
 
 ## Numerical considerations
 
-Hyperbolic models can become unstable when embeddings approach the boundary of the Poincaré ball.
+Poincaré embeddings can become numerically sensitive near the ball boundary. v0.1 delegates projection and geometry to Geoopt and includes tests for:
 
-Practical controls may include:
-
-- tangent-vector scaling
-- projection / stabilization through Geoopt
-- conservative learning rates
-- curvature sweeps
-- temperature sweeps
-- gradient clipping
-
-For deep hierarchies or difficult optimization regimes, a Lorentz-model backend may become a useful future extension.
+- finite embeddings for representative and large tangent vectors
+- valid Poincaré ball domain
+- finite near-boundary geodesic distances
+- finite gradients through the forward/loss path
+- curvature and temperature edge cases
 
 ## Roadmap
 
 ### v0.1 — Minimal hyperbolic fine-tuning
 
-- [ ] Sentence Transformer backbone
-- [ ] Poincaré ball through Geoopt
-- [ ] projection head
-- [ ] geodesic distance
-- [ ] manifold multiple-negatives ranking loss
-- [ ] minimal trainer
-- [ ] `encode()`
-- [ ] save / load
-- [ ] basic tests
-- [ ] minimal example
+- [x] Sentence Transformer backbone
+- [x] Poincaré ball through Geoopt
+- [x] optional projection head
+- [x] geodesic distance
+- [x] manifold multiple-negatives ranking loss
+- [x] minimal trainer
+- [x] `encode()`
+- [x] save / load
+- [x] numerical stability tests
+- [x] minimal end-to-end example
+- [x] Euclidean baseline experiment
 
 ### v0.2 — More objectives and geometries
 
@@ -466,19 +293,17 @@ For deep hierarchies or difficult optimization regimes, a Lorentz-model backend 
 - a full hyperbolic neural-network library
 - a vector database
 
-Its role is much smaller:
+Its role is deliberately smaller:
 
 > **Turn pretrained sentence embedding models into manifold-valued embedding models with Geoopt.**
 
 ## Contributing
 
-The project is currently focused on keeping the v0.1 surface area small.
+The project prioritizes a small, well-tested surface area. Before proposing a large abstraction or subsystem, consider:
 
-Before proposing a large abstraction or new subsystem, prefer an implementation that answers:
-
-1. Is this required for Poincaré fine-tuning?
-2. Can Geoopt or Sentence Transformers already do it?
-3. Can this be added later without breaking the core API?
+1. Is it required for the target manifold fine-tuning workflow?
+2. Can Geoopt or Sentence Transformers already provide it?
+3. Can it be added later without breaking the core API?
 
 Small, well-tested additions are preferred over broad framework-level abstractions.
 
@@ -490,4 +315,6 @@ Small, well-tested additions are preferred over broad framework-level abstractio
 
 ## License
 
-TBD.
+`neembed` is released under the [MIT License](LICENSE).
+
+Third-party dependencies retain their own licenses. In particular, neembed depends on Geoopt rather than vendoring or relicensing Geoopt source code.
