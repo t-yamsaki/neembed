@@ -52,10 +52,12 @@ def test_public_api_docstrings_cover_v01_usage_constraints() -> None:
     losses = (ROOT / "src" / "neembed" / "losses.py").read_text(encoding="utf-8")
     trainer = (ROOT / "src" / "neembed" / "trainer.py").read_text(encoding="utf-8")
 
+    normalized_losses = " ".join(losses.split())
+
     assert "NumPy arrays are returned by default" in model
     assert "torch.inference_mode()" in model
     assert "torch.no_grad()" in model
-    assert "duplicate\n    positives within one batch should be avoided" in losses
+    assert "duplicate positives within one batch should be avoided" in normalized_losses
     assert "Iterable yielding ``(anchors, positives)`` batches" in trainer
 
 
