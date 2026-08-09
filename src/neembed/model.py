@@ -82,7 +82,7 @@ class ManifoldSentenceTransformer(nn.Module):
         a_tensor = torch.as_tensor(a, device=reference.device, dtype=reference.dtype)
         b_tensor = torch.as_tensor(b, device=reference.device, dtype=reference.dtype)
 
-        with torch.inference_mode():
+        with torch.no_grad():
             return self.manifold.dist(a_tensor, b_tensor)
 
     def save_pretrained(self, output_path: str | Path) -> None:
