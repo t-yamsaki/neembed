@@ -11,7 +11,16 @@ from neembed.model import ManifoldSentenceTransformer
 
 
 class ManifoldMultipleNegativesRankingLoss(nn.Module):
-    """InfoNCE-style in-batch ranking loss using manifold geodesic distance."""
+    """In-batch ranking loss based on manifold geodesic distance.
+
+    Each anchor is paired with the positive at the same batch index. All
+    off-diagonal positive candidates are treated as negatives, so duplicate
+    positives within one batch should be avoided.
+
+    Args:
+        model: Manifold sentence model used to encode anchors and positives.
+        temperature: Positive, finite temperature used to scale distance logits.
+    """
 
     def __init__(
         self,
@@ -30,7 +39,15 @@ class ManifoldMultipleNegativesRankingLoss(nn.Module):
         anchors: Sequence[str],
         positives: Sequence[str],
     ) -> torch.Tensor:
-        """Return the in-batch contrastive loss for aligned anchor-positive pairs."""
+        """Return the contrastive loss for aligned anchor-positive pairs.
+
+        Args:
+            anchors: Batch of anchor texts.
+            positives: Batch of positive texts aligned by index with ``anchors``.
+
+        Returns:
+            A scalar cross-entropy loss built from pairwise geodesic distances.
+        """
         anchor_embeddings = self.model(anchors)
         positive_embeddings = self.model(positives)
 
