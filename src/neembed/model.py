@@ -43,6 +43,7 @@ class ManifoldSentenceTransformer(nn.Module):
         self.manifold_name = manifold
         self.curvature = float(curvature)
         self.manifold = get_manifold(self.manifold_name, self.curvature)
+        self.manifold.to(self.encoder.device)
 
     def forward(self, sentences: Sequence[str]) -> torch.Tensor:
         """Encode sentences and map their embeddings from the origin tangent space."""
