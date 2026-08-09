@@ -132,7 +132,7 @@ trainer = ManifoldTrainer(
 
 train_batches = [
     (["柴犬", "シャム猫"], ["犬", "猫"]),
-    (["犬", "猫"], ["哺乳類", "哺乳類"]),
+    (["犬", "猫"], ["哺乳類", "ネコ科"]),
 ]
 
 trainer.fit(train_batches, epochs=1)
