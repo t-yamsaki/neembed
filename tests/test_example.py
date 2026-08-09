@@ -79,5 +79,5 @@ def test_train_poincare_example_is_reproducible_within_numerical_tolerance(
 def test_readme_documents_example_command() -> None:
     readme = (Path(__file__).parents[1] / "README.md").read_text(encoding="utf-8")
 
-    assert "[End-to-end Poincaré example](examples/train_poincare.py)" in readme
+    assert "[examples/train_poincare.py](examples/train_poincare.py)" in readme
     assert "python examples/train_poincare.py" in readme
