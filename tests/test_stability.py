@@ -89,7 +89,7 @@ def test_geodesic_distance_is_finite_for_near_boundary_points(
     ("curvature", "temperature"),
     [(1e-3, 10.0), (1.0, 0.1), (10.0, 1e-3)],
 )
-def test_forward_distance_and_loss_backward_remain_finite(
+def test_inference_distance_warmup_then_loss_backward_remain_finite(
     monkeypatch,
     curvature: float,
     temperature: float,
@@ -112,23 +112,30 @@ def test_forward_distance_and_loss_backward_remain_finite(
     anchors = ["Shiba Inu", "salmon", "sparrow", "oak"]
     positives = ["dog", "fish", "bird", "plant"]
 
+    warm_embeddings = model.encode(
+        ["Shiba Inu", "dog"],
+        convert_to_tensor=True,
+    )
+    public_distance = model.distance(warm_embeddings[0], warm_embeddings[1])
+
     anchor_embeddings = model(anchors)
     positive_embeddings = model(positives)
     distances = model.manifold.dist(
         anchor_embeddings[:, None, :],
         positive_embeddings[None, :, :],
     )
-    public_distance = model.distance(anchor_embeddings[0], positive_embeddings[0])
     loss = loss_fn(anchors, positives)
     loss.backward()
     radius = 1.0 / math.sqrt(curvature)
 
+    assert torch.isfinite(public_distance)
+    assert not public_distance.requires_grad
+    assert not torch.is_inference(public_distance)
     assert torch.isfinite(anchor_embeddings).all()
     assert torch.isfinite(positive_embeddings).all()
     assert bool((anchor_embeddings.norm(dim=-1) < radius).all())
     assert bool((positive_embeddings.norm(dim=-1) < radius).all())
     assert torch.isfinite(distances).all()
-    assert torch.isfinite(public_distance)
     assert torch.isfinite(loss)
 
     gradients = [
