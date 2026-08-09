@@ -4,7 +4,7 @@
 
 The [Euclidean baseline experiment](compare_euclidean_poincare.py) is the first minimal validation experiment for neembed. It compares:
 
-- the original pretrained Sentence Transformer using Euclidean L2 distance, and
+- the original pretrained Sentence Transformer using cosine distance, and
 - the same pretrained encoder after neembed Poincaré fine-tuning using geodesic distance.
 
 Both variants are evaluated on the same held-out child-to-parent retrieval pairs. The experiment reports parent retrieval accuracy in one JSON object together with the training and evaluation runtime notes needed to interpret the comparison.
@@ -21,6 +21,7 @@ The comparison is intentionally small and is not a benchmark or a claim that hyp
 
 - encoder: `sentence-transformers/all-MiniLM-L6-v2`
 - seed: `0`
+- Euclidean baseline distance: cosine
 - Poincaré embedding dimension: `32`
 - curvature: `1.0`
 - temperature: `0.1`
