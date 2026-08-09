@@ -186,7 +186,7 @@ v = Wh,
 $$
 
 $$
-z = \operatorname{Exp}_0^c(v),
+z = \mathrm{Exp}_0^c(v),
 $$
 
 です。$f_\theta$ は pretrained sentence encoder、$W$ は任意の projection layer、$z$ は最終的な manifold-valued embedding です。
