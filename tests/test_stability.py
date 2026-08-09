@@ -119,9 +119,12 @@ def test_forward_distance_and_loss_backward_remain_finite(
     )
     loss = loss_fn(anchors, positives)
     loss.backward()
+    radius = 1.0 / math.sqrt(curvature)
 
     assert torch.isfinite(anchor_embeddings).all()
     assert torch.isfinite(positive_embeddings).all()
+    assert bool((anchor_embeddings.norm(dim=-1) < radius).all())
+    assert bool((positive_embeddings.norm(dim=-1) < radius).all())
     assert torch.isfinite(distances).all()
     assert torch.isfinite(loss)
 
