@@ -42,6 +42,30 @@ class FakeSentenceTransformer(nn.Module):
         torch.save(self.state_dict(), output_path / "encoder.pt")
 
 
+class DeviceReportingSentenceTransformer(FakeSentenceTransformer):
+    """Fake a restored encoder that Sentence Transformers placed on CUDA."""
+
+    @property
+    def device(self) -> torch.device:
+        return torch.device("cuda")
+
+
+class RecordingLinear(nn.Linear):
+    """Record device moves without requiring a CUDA-capable test host."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.requested_device: torch.device | None = None
+
+    def to(self, *args, **kwargs):
+        device = kwargs.get("device")
+        if device is None and args and isinstance(args[0], (str, torch.device)):
+            device = args[0]
+        if device is not None:
+            self.requested_device = torch.device(device)
+        return self
+
+
 def test_save_pretrained_round_trip_preserves_config_and_embeddings(
     monkeypatch,
     tmp_path,
@@ -94,3 +118,25 @@ def test_save_pretrained_round_trip_preserves_disabled_projection(
     assert isinstance(loaded.projection, nn.Identity)
     assert loaded.embedding_dim == model.embedding_dim
     assert torch.allclose(before, after)
+
+
+def test_from_pretrained_aligns_projection_with_encoder_device(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(model_module, "SentenceTransformer", FakeSentenceTransformer)
+    model = ManifoldSentenceTransformer("fake-model", embedding_dim=2)
+    save_path = tmp_path / "saved-model"
+    model.save_pretrained(save_path)
+
+    monkeypatch.setattr(
+        model_module,
+        "SentenceTransformer",
+        DeviceReportingSentenceTransformer,
+    )
+    monkeypatch.setattr(model_module.nn, "Linear", RecordingLinear)
+
+    loaded = ManifoldSentenceTransformer.from_pretrained(save_path)
+
+    assert isinstance(loaded.projection, RecordingLinear)
+    assert loaded.projection.requested_device == torch.device("cuda")
