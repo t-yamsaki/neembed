@@ -147,6 +147,8 @@ distance = model.distance(embeddings[0], embeddings[1])
 print(float(distance))
 ```
 
+Each anchor is paired with the positive at the same batch index. Because off-diagonal positive candidates are used as in-batch negatives, avoid duplicate positives within the same batch.
+
 For a complete runnable workflow, see [examples/train_poincare.py](examples/train_poincare.py):
 
 ```bash
