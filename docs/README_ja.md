@@ -147,6 +147,8 @@ distance = model.distance(embeddings[0], embeddings[1])
 print(float(distance))
 ```
 
+各 anchor は同じ batch index の positive と対応します。off-diagonal の positive candidate は in-batch negative として扱われるため、同じ batch 内で positive を重複させないでください。
+
 完全な実行例は [examples/train_poincare.py](../examples/train_poincare.py) を参照してください。
 
 ```bash
