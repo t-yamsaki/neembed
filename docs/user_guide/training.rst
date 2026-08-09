@@ -55,8 +55,10 @@ nodes. neembed v0.1 does not introduce such parameters.
 Minimal training loop
 ---------------------
 
-``ManifoldTrainer.fit`` accepts any iterable yielding ``(anchors, positives)``
-batches and returns one mean loss value per epoch:
+``ManifoldTrainer.fit`` accepts an iterable yielding ``(anchors, positives)``
+batches. For more than one epoch, that input must be re-iterable, such as a
+list or a DataLoader; a one-shot iterator or generator is only suitable for a
+single epoch. The method returns one mean loss value per completed epoch:
 
 .. code-block:: python
 
