@@ -37,6 +37,18 @@ def test_readmes_describe_the_implemented_v01_release() -> None:
     assert "https://github.com/t-yamsaki/neembed.git" in japanese
 
 
+def test_readmes_use_github_math_delimiters() -> None:
+    english = (ROOT / "README.md").read_text(encoding="utf-8")
+    japanese = (ROOT / "docs" / "README_ja.md").read_text(encoding="utf-8")
+
+    for readme in (english, japanese):
+        assert "\\[" not in readme
+        assert "\\]" not in readme
+        assert "\\(" not in readme
+        assert "\\)" not in readme
+        assert readme.count("$$") >= 10
+
+
 def test_quick_start_avoids_duplicate_in_batch_positives() -> None:
     english = (ROOT / "README.md").read_text(encoding="utf-8")
     japanese = (ROOT / "docs" / "README_ja.md").read_text(encoding="utf-8")
