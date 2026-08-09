@@ -177,33 +177,33 @@ Poincaré embedding
 
 Conceptually,
 
-\[
+$$
 h = f_\theta(x),
-\]
+$$
 
-\[
+$$
 v = Wh,
-\]
+$$
 
-\[
+$$
 z = \operatorname{Exp}_0^c(v),
-\]
+$$
 
-where \(f_\theta\) is the pretrained sentence encoder, \(W\) is an optional projection layer, and \(z\) is the final manifold-valued embedding.
+where $f_\theta$ is the pretrained sentence encoder, $W$ is an optional projection layer, and $z$ is the final manifold-valued embedding.
 
 ## Training objective
 
 For a batch of anchor-positive pairs, `neembed` replaces Euclidean/cosine similarity with negative geodesic distance:
 
-\[
+$$
 s_{ij} = -\frac{d_{\mathcal M}(z_i, z_j^+)}{\tau}.
-\]
+$$
 
 The in-batch objective is then
 
-\[
+$$
 \mathcal L_i = -\log\frac{\exp(s_{ii})}{\sum_j \exp(s_{ij})}.
-\]
+$$
 
 This is the manifold-aware analogue of a multiple-negatives ranking / InfoNCE objective.
 
