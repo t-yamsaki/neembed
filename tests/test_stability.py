@@ -99,6 +99,7 @@ def test_forward_distance_and_loss_backward_remain_finite(
         "SentenceTransformer",
         StabilitySentenceTransformer,
     )
+    torch.manual_seed(0)
     model = ManifoldSentenceTransformer(
         "fake-model",
         embedding_dim=2,
