@@ -37,6 +37,16 @@ def test_readmes_describe_the_implemented_v01_release() -> None:
     assert "https://github.com/t-yamsaki/neembed.git" in japanese
 
 
+def test_quick_start_avoids_duplicate_in_batch_positives() -> None:
+    english = (ROOT / "README.md").read_text(encoding="utf-8")
+    japanese = (ROOT / "docs" / "README_ja.md").read_text(encoding="utf-8")
+
+    assert '["mammal", "mammal"]' not in english
+    assert '["哺乳類", "哺乳類"]' not in japanese
+    assert '(["dog", "cat"], ["mammal", "feline"])' in english
+    assert '(["犬", "猫"], ["哺乳類", "ネコ科"])' in japanese
+
+
 def test_gitignore_protects_common_public_release_artifacts() -> None:
     gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
 
