@@ -103,6 +103,35 @@ def test_baseline_experiment_returns_directly_comparable_results(monkeypatch) ->
     json.dumps(result)
 
 
+def test_evaluators_synchronize_device_around_timing(monkeypatch) -> None:
+    experiment = _load_experiment_module()
+    monkeypatch.setattr(experiment, "SentenceTransformer", FakeSentenceTransformer)
+    monkeypatch.setattr(model_module, "SentenceTransformer", FakeSentenceTransformer)
+
+    euclidean_model = FakeSentenceTransformer("fake-model")
+    poincare_model = model_module.ManifoldSentenceTransformer(
+        "fake-model",
+        embedding_dim=2,
+    )
+    synchronized_devices: list[torch.device] = []
+
+    monkeypatch.setattr(
+        experiment,
+        "_synchronize_cuda",
+        lambda device: synchronized_devices.append(torch.device(device)),
+    )
+
+    experiment._evaluate_euclidean(euclidean_model)
+    experiment._evaluate_poincare(poincare_model)
+
+    assert synchronized_devices == [
+        euclidean_model.device,
+        euclidean_model.device,
+        poincare_model.encoder.device,
+        poincare_model.encoder.device,
+    ]
+
+
 def test_baseline_experiment_cli_emits_json(monkeypatch, capsys) -> None:
     experiment = _load_experiment_module()
     monkeypatch.setattr(experiment, "SentenceTransformer", FakeSentenceTransformer)
