@@ -54,6 +54,13 @@ def set_seed(seed: int) -> None:
     torch.manual_seed(seed)
 
 
+def _synchronize_cuda(device: torch.device) -> None:
+    """Synchronize CUDA work when timing GPU evaluation."""
+    device = torch.device(device)
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+
+
 def _train_batches() -> list[tuple[list[str], list[str]]]:
     batches: list[tuple[list[str], list[str]]] = []
     for start in range(0, len(TRAIN_PAIRS), BATCH_SIZE):
@@ -76,13 +83,16 @@ def _parent_retrieval_accuracy(distances: torch.Tensor) -> float:
 def _evaluate_euclidean(model: SentenceTransformer) -> tuple[float, float]:
     anchors = [anchor for anchor, _ in EVALUATION_PAIRS]
     candidates = [positive for _, positive in EVALUATION_PAIRS]
+    device = model.device
 
+    _synchronize_cuda(device)
     started = time.perf_counter()
     anchor_embeddings = model.encode(anchors, convert_to_tensor=True)
     candidate_embeddings = model.encode(candidates, convert_to_tensor=True)
     anchor_embeddings = F.normalize(anchor_embeddings, dim=-1)
     candidate_embeddings = F.normalize(candidate_embeddings, dim=-1)
     distances = 1.0 - anchor_embeddings @ candidate_embeddings.T
+    _synchronize_cuda(device)
     elapsed = time.perf_counter() - started
 
     return _parent_retrieval_accuracy(distances), elapsed
@@ -93,7 +103,9 @@ def _evaluate_poincare(
 ) -> tuple[float, float]:
     anchors = [anchor for anchor, _ in EVALUATION_PAIRS]
     candidates = [positive for _, positive in EVALUATION_PAIRS]
+    device = model.encoder.device
 
+    _synchronize_cuda(device)
     started = time.perf_counter()
     anchor_embeddings = model.encode(anchors, convert_to_tensor=True)
     candidate_embeddings = model.encode(candidates, convert_to_tensor=True)
@@ -105,6 +117,7 @@ def _evaluate_poincare(
             for anchor in anchor_embeddings
         ]
     )
+    _synchronize_cuda(device)
     elapsed = time.perf_counter() - started
 
     return _parent_retrieval_accuracy(distances), elapsed
