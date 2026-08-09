@@ -109,8 +109,10 @@ def test_baseline_experiment_cli_emits_json(monkeypatch, capsys) -> None:
     assert set(output["results"]) == {"euclidean_pretrained", "poincare_finetuned"}
 
 
-def test_readme_documents_baseline_experiment_command() -> None:
-    readme = (Path(__file__).parents[1] / "README.md").read_text(encoding="utf-8")
+def test_experiment_readme_documents_baseline_command() -> None:
+    readme = (
+        Path(__file__).parents[1] / "experiments" / "README.md"
+    ).read_text(encoding="utf-8")
 
-    assert "[Euclidean baseline experiment](experiments/compare_euclidean_poincare.py)" in readme
+    assert "[Euclidean baseline experiment](compare_euclidean_poincare.py)" in readme
     assert "python experiments/compare_euclidean_poincare.py" in readme
