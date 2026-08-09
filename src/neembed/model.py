@@ -38,6 +38,7 @@ class ManifoldSentenceTransformer(nn.Module):
         else:
             self.projection = nn.Linear(encoder_dim, embedding_dim)
             self.embedding_dim = embedding_dim
+        self.projection.to(self.encoder.device)
 
         self.manifold_name = manifold
         self.curvature = float(curvature)
