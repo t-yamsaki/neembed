@@ -117,6 +117,7 @@ def test_forward_distance_and_loss_backward_remain_finite(
         anchor_embeddings[:, None, :],
         positive_embeddings[None, :, :],
     )
+    public_distance = model.distance(anchor_embeddings[0], positive_embeddings[0])
     loss = loss_fn(anchors, positives)
     loss.backward()
     radius = 1.0 / math.sqrt(curvature)
@@ -126,6 +127,7 @@ def test_forward_distance_and_loss_backward_remain_finite(
     assert bool((anchor_embeddings.norm(dim=-1) < radius).all())
     assert bool((positive_embeddings.norm(dim=-1) < radius).all())
     assert torch.isfinite(distances).all()
+    assert torch.isfinite(public_distance)
     assert torch.isfinite(loss)
 
     gradients = [
