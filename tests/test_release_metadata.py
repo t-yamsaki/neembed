@@ -47,6 +47,18 @@ def test_quick_start_avoids_duplicate_in_batch_positives() -> None:
     assert '(["犬", "猫"], ["哺乳類", "ネコ科"])' in japanese
 
 
+def test_public_api_docstrings_cover_v01_usage_constraints() -> None:
+    model = (ROOT / "src" / "neembed" / "model.py").read_text(encoding="utf-8")
+    losses = (ROOT / "src" / "neembed" / "losses.py").read_text(encoding="utf-8")
+    trainer = (ROOT / "src" / "neembed" / "trainer.py").read_text(encoding="utf-8")
+
+    assert "NumPy arrays are returned by default" in model
+    assert "torch.inference_mode()" in model
+    assert "torch.no_grad()" in model
+    assert "duplicate\n    positives within one batch should be avoided" in losses
+    assert "Iterable yielding ``(anchors, positives)`` batches" in trainer
+
+
 def test_gitignore_protects_common_public_release_artifacts() -> None:
     gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
 
