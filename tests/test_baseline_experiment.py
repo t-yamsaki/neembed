@@ -78,12 +78,17 @@ def test_baseline_experiment_returns_directly_comparable_results(monkeypatch) ->
     monkeypatch.setattr(model_module, "SentenceTransformer", FakeSentenceTransformer)
 
     result = experiment.run_experiment()
+    train_pairs = result["metadata"]["train_pairs"]
+    evaluation_pairs = result["metadata"]["evaluation_pairs"]
 
     assert result["metadata"]["metric"] == "parent_retrieval_accuracy"
     assert result["metadata"]["seed"] == 0
     assert result["metadata"]["model"] == "sentence-transformers/all-MiniLM-L6-v2"
-    assert len(result["metadata"]["train_pairs"]) == 10
-    assert len(result["metadata"]["evaluation_pairs"]) == 5
+    assert len(train_pairs) == 10
+    assert len(evaluation_pairs) == 5
+    assert {pair["anchor"] for pair in train_pairs}.isdisjoint(
+        {pair["anchor"] for pair in evaluation_pairs}
+    )
 
     euclidean = result["results"]["euclidean_pretrained"]
     poincare = result["results"]["poincare_finetuned"]
