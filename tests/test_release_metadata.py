@@ -75,6 +75,21 @@ def test_public_api_docstrings_cover_v01_usage_constraints() -> None:
     assert "Iterable yielding ``(anchors, positives)`` batches" in trainer
 
 
+def test_release_workflow_restricts_production_publish_to_tag_pushes() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "if: github.event_name == 'push' && "
+        "startsWith(github.ref, 'refs/tags/v')"
+    ) in workflow
+    assert (
+        "if: github.event_name == 'workflow_dispatch' && "
+        "github.ref == 'refs/heads/main'"
+    ) in workflow
+
+
 def test_gitignore_protects_common_public_release_artifacts() -> None:
     gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
 
