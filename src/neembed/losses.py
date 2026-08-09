@@ -1,6 +1,7 @@
 """Losses for manifold-valued sentence embeddings."""
 
 from collections.abc import Sequence
+import math
 
 import torch
 import torch.nn.functional as F
@@ -18,8 +19,8 @@ class ManifoldMultipleNegativesRankingLoss(nn.Module):
         temperature: float = 0.1,
     ) -> None:
         super().__init__()
-        if temperature <= 0:
-            raise ValueError("temperature must be positive")
+        if temperature <= 0 or not math.isfinite(temperature):
+            raise ValueError("temperature must be positive and finite")
 
         self.model = model
         self.temperature = float(temperature)

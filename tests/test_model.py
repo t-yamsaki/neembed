@@ -123,3 +123,15 @@ def test_distance_is_finite_nonnegative_zero_on_self_and_symmetric(monkeypatch) 
     assert float(distance_ab) >= 0.0
     assert torch.allclose(distance_ab, distance_ba, atol=1e-6)
     assert torch.allclose(distance_aa, torch.zeros_like(distance_aa), atol=1e-6)
+
+
+def test_distance_returns_regular_tensor_without_grad_tracking(monkeypatch) -> None:
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", embedding_dim=2)
+    embeddings = model.encode(["Shiba Inu", "dog"], convert_to_tensor=True)
+
+    distance = model.distance(embeddings[0], embeddings[1])
+
+    assert torch.isfinite(distance)
+    assert not distance.requires_grad
+    assert not torch.is_inference(distance)
