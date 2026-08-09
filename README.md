@@ -186,7 +186,7 @@ v = Wh,
 $$
 
 $$
-z = \operatorname{Exp}_0^c(v),
+z = \mathrm{Exp}_0^c(v),
 $$
 
 where $f_\theta$ is the pretrained sentence encoder, $W$ is an optional projection layer, and $z$ is the final manifold-valued embedding.
