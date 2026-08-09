@@ -177,33 +177,33 @@ Poincaré embedding
 
 概念的には、
 
-\[
+$$
 h = f_\theta(x),
-\]
+$$
 
-\[
+$$
 v = Wh,
-\]
+$$
 
-\[
+$$
 z = \operatorname{Exp}_0^c(v),
-\]
+$$
 
-です。\(f_\theta\) は pretrained sentence encoder、\(W\) は任意の projection layer、\(z\) は最終的な manifold-valued embedding です。
+です。$f_\theta$ は pretrained sentence encoder、$W$ は任意の projection layer、$z$ は最終的な manifold-valued embedding です。
 
 ## 学習目的
 
 anchor-positive pair のバッチに対して、Euclidean / cosine similarity の代わりに負の geodesic distance を利用します。
 
-\[
+$$
 s_{ij} = -\frac{d_{\mathcal M}(z_i, z_j^+)}{\tau}.
-\]
+$$
 
 in-batch objective は、
 
-\[
+$$
 \mathcal L_i = -\log\frac{\exp(s_{ii})}{\sum_j \exp(s_{ij})}.
-\]
+$$
 
 となり、multiple-negatives ranking / InfoNCE の manifold-aware な形として扱います。
 
