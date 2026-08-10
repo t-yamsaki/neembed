@@ -52,3 +52,11 @@ jobs:
       - name: Check distributions
         if: matrix.python-version == '3.12'
         run: python -m twine check dist/*
+
+      - name: Install built wheel and verify import
+        if: matrix.python-version == '3.12'
+        shell: bash
+        run: |
+          python -m pip uninstall -y neembed-geoopt
+          python -m pip install --no-deps dist/*.whl
+          python -c "import neembed; print(neembed.__file__)"
