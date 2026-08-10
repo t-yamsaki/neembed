@@ -48,7 +48,9 @@ class ManifoldTrainer:
         Args:
             train_dataloader: Iterable yielding ``(anchors, positives)`` batches.
                 Each element is a sequence of texts consumed by the configured
-                ranking loss.
+                ranking loss. For ``epochs > 1``, the iterable must be
+                re-iterable; a one-shot iterator or generator is suitable only
+                for a single epoch.
             epochs: Number of full passes over ``train_dataloader``.
 
         Returns:
