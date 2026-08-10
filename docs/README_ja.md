@@ -2,7 +2,7 @@
 
 **Geoopt を使って、既存の sentence embedding モデルを非ユークリッド空間で fine-tuning するための軽量ライブラリ。**
 
-[English README](../README.md)
+[Documentation](https://neembed.readthedocs.io/en/latest/) · [English README](../README.md)
 
 > **Status:** v0.1 の実装は完了しており、最初の PyPI 公開に向けて準備中です。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
 
