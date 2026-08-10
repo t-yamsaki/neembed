@@ -43,6 +43,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/t-yamsaki/neembed"
+Documentation = "https://neembed.readthedocs.io/en/latest/"
 Repository = "https://github.com/t-yamsaki/neembed"
 Issues = "https://github.com/t-yamsaki/neembed/issues"
 

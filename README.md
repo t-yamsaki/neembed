@@ -2,7 +2,7 @@
 
 **Fine-tune pretrained sentence embedding models in non-Euclidean spaces with Geoopt.**
 
-[日本語](docs/README_ja.md)
+[Documentation](https://neembed.readthedocs.io/en/latest/) · [日本語](docs/README_ja.md)
 
 > **Status:** v0.1 is implemented and being prepared for its first public PyPI release. The API is intentionally small and may still evolve before a stable 1.0 release.
 
