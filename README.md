@@ -118,7 +118,13 @@ The full guide is hosted on Read the Docs:
 
 ## Examples and validation
 
-- [examples/train_poincare.py](examples/train_poincare.py) provides a runnable end-to-end workflow.
+Run the end-to-end example:
+
+```bash
+python examples/train_poincare.py
+```
+
+- [examples/train_poincare.py](examples/train_poincare.py) contains the workflow.
 - [experiments/README.md](experiments/README.md) documents the fixed Euclidean-vs-Poincaré comparison experiment and its interpretation limits.
 
 ## License
