@@ -85,8 +85,10 @@ Not included in v0.1:
 After `v0.1.0` is published to PyPI:
 
 ```bash
-pip install neembed
+pip install neembed-geoopt
 ```
+
+The PyPI distribution is named `neembed-geoopt`; the Python import package remains `neembed`.
 
 For development:
 
