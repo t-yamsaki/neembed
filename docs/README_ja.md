@@ -85,8 +85,10 @@ v0.1 では扱いません。
 `v0.1.0` を PyPI に公開後：
 
 ```bash
-pip install neembed
+pip install neembed-geoopt
 ```
+
+PyPI 上の distribution 名は `neembed-geoopt` ですが、Python の import package 名は `neembed` のままです。
 
 開発版：
 
