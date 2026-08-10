@@ -10,6 +10,7 @@ def test_pyproject_declares_v01_public_metadata() -> None:
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
     assert 'requires = ["setuptools>=77.0.3"]' in pyproject
+    assert 'name = "neembed-geoopt"' in pyproject
     assert 'version = "0.1.0"' in pyproject
     assert 'license = "MIT"' in pyproject
     assert 'license-files = ["LICENSE"]' in pyproject
@@ -20,6 +21,22 @@ def test_pyproject_declares_v01_public_metadata() -> None:
 
     for dependency in ("torch", "sentence-transformers", "geoopt"):
         assert f'    "{dependency}",' in pyproject
+
+
+def test_distribution_name_keeps_neembed_import_package() -> None:
+    assert (ROOT / "src" / "neembed" / "__init__.py").is_file()
+
+    english = (ROOT / "README.md").read_text(encoding="utf-8")
+    japanese = (ROOT / "docs" / "README_ja.md").read_text(encoding="utf-8")
+    installation = (
+        ROOT / "docs" / "getting_started" / "installation.rst"
+    ).read_text(encoding="utf-8")
+
+    for document in (english, japanese, installation):
+        assert "pip install neembed-geoopt" in document
+
+    assert "from neembed import (" in english
+    assert "from neembed import (" in japanese
 
 
 def test_readmes_describe_the_implemented_v01_release() -> None:
@@ -88,6 +105,8 @@ def test_release_workflow_restricts_production_publish_to_tag_pushes() -> None:
         "if: github.event_name == 'workflow_dispatch' && "
         "github.ref == 'refs/heads/main'"
     ) in workflow
+    assert "https://test.pypi.org/p/neembed-geoopt" in workflow
+    assert "https://pypi.org/p/neembed-geoopt" in workflow
 
 
 def test_gitignore_protects_common_public_release_artifacts() -> None:
