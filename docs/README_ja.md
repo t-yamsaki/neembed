@@ -118,7 +118,13 @@ print(float(distance))
 
 ## 実行例と検証
 
-- [examples/train_poincare.py](../examples/train_poincare.py) に end-to-end の実行例があります。
+end-to-end の実行例：
+
+```bash
+python examples/train_poincare.py
+```
+
+- [examples/train_poincare.py](../examples/train_poincare.py) に workflow があります。
 - [experiments/README.md](../experiments/README.md) に Euclidean-vs-Poincaré の固定比較実験と結果の解釈上の注意をまとめています。
 
 ## License
