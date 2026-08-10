@@ -1,9 +1,11 @@
 """Release-readiness checks for public v0.1 metadata."""
 
+from importlib.metadata import metadata
 from pathlib import Path
 
 
 ROOT = Path(__file__).parents[1]
+DOCUMENTATION_URL = "https://neembed.readthedocs.io/en/latest/"
 
 
 def test_pyproject_declares_v01_public_metadata() -> None:
@@ -15,12 +17,20 @@ def test_pyproject_declares_v01_public_metadata() -> None:
     assert 'license = "MIT"' in pyproject
     assert 'license-files = ["LICENSE"]' in pyproject
     assert '{ name = "taishi-yamasaki" }' in pyproject
+    assert 'Homepage = "https://github.com/t-yamsaki/neembed"' in pyproject
+    assert f'Documentation = "{DOCUMENTATION_URL}"' in pyproject
     assert 'Repository = "https://github.com/t-yamsaki/neembed"' in pyproject
     assert 'Issues = "https://github.com/t-yamsaki/neembed/issues"' in pyproject
     assert "License ::" not in pyproject
 
     for dependency in ("torch", "sentence-transformers", "geoopt"):
         assert f'    "{dependency}",' in pyproject
+
+
+def test_installed_distribution_exposes_documentation_url() -> None:
+    project_urls = metadata("neembed-geoopt").get_all("Project-URL") or []
+
+    assert f"Documentation, {DOCUMENTATION_URL}" in project_urls
 
 
 def test_distribution_name_keeps_neembed_import_package() -> None:
@@ -49,6 +59,7 @@ def test_readmes_describe_the_implemented_v01_release() -> None:
         assert "0.1.0" in readme
         assert "MIT License" in readme
         assert "- [x]" in readme
+        assert DOCUMENTATION_URL in readme
 
     assert "https://github.com/t-yamsaki/neembed.git" in english
     assert "https://github.com/t-yamsaki/neembed.git" in japanese
