@@ -58,25 +58,26 @@ def test_readmes_describe_the_implemented_v01_release() -> None:
         assert "<YOUR_USERNAME>" not in readme
         assert "0.1.0" in readme
         assert "MIT License" in readme
-        assert "- [x]" in readme
         assert DOCUMENTATION_URL in readme
 
     assert "https://github.com/t-yamsaki/neembed.git" in english
     assert "https://github.com/t-yamsaki/neembed.git" in japanese
 
 
-def test_readmes_use_github_compatible_math() -> None:
+def test_readmes_defer_detailed_guidance_to_read_the_docs() -> None:
     english = (ROOT / "README.md").read_text(encoding="utf-8")
     japanese = (ROOT / "docs" / "README_ja.md").read_text(encoding="utf-8")
 
     for readme in (english, japanese):
-        assert "\\[" not in readme
-        assert "\\]" not in readme
-        assert "\\(" not in readme
-        assert "\\)" not in readme
-        assert "\\operatorname" not in readme
-        assert "\\mathrm{Exp}" in readme
-        assert readme.count("$$") >= 10
+        assert DOCUMENTATION_URL in readme
+        assert "$$" not in readme
+
+    assert "## Training objective" not in english
+    assert "## Why AdamW is enough for v0.1" not in english
+    assert "## Numerical considerations" not in english
+    assert "## 学習目的" not in japanese
+    assert "## v0.1 で AdamW を使う理由" not in japanese
+    assert "## 数値安定性" not in japanese
 
 
 def test_quick_start_avoids_duplicate_in_batch_positives() -> None:
