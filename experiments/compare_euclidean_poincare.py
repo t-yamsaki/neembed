@@ -1,15 +1,18 @@
-"""Compare the original Euclidean encoder with Poincare fine-tuning."""
+"""Reproducible Euclidean-vs-Poincare benchmark for neembed v0.2."""
 
+from collections.abc import Sequence
 import json
 import random
-import time
+from typing import Any
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 from sentence_transformers import SentenceTransformer
+from torch import nn
 
 from neembed import (
+    ManifoldEmbeddingEvaluator,
     ManifoldMultipleNegativesRankingLoss,
     ManifoldSentenceTransformer,
     ManifoldTrainer,
@@ -48,87 +51,172 @@ EVALUATION_PAIRS = [
 
 
 def set_seed(seed: int) -> None:
-    """Seed random sources used by the comparison."""
+    """Seed random sources used by the benchmark."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
 
 
-def _synchronize_cuda(device: torch.device) -> None:
-    """Synchronize CUDA work when timing GPU evaluation."""
-    device = torch.device(device)
-    if device.type == "cuda":
-        torch.cuda.synchronize(device)
-
-
 def _train_batches() -> list[tuple[list[str], list[str]]]:
+    """Return deterministic batches with unique positive candidates per batch."""
     batches: list[tuple[list[str], list[str]]] = []
     for start in range(0, len(TRAIN_PAIRS), BATCH_SIZE):
         batch = TRAIN_PAIRS[start : start + BATCH_SIZE]
+        positives = [positive for _, positive in batch]
+        if len(set(positives)) != len(positives):
+            raise ValueError("benchmark batches must not contain duplicate positives")
         batches.append(
             (
                 [anchor for anchor, _ in batch],
-                [positive for _, positive in batch],
+                positives,
             )
         )
     return batches
 
 
-def _parent_retrieval_accuracy(distances: torch.Tensor) -> float:
-    targets = torch.arange(distances.shape[0], device=distances.device)
-    predictions = distances.argmin(dim=1)
-    return float((predictions == targets).float().mean())
+class EuclideanSentenceTransformer(nn.Module):
+    """Sentence Transformer baseline with a learned Euclidean projection.
+
+    This benchmark-local wrapper mirrors neembed's encoder plus projection path,
+    but keeps the output in normalized Euclidean space and uses cosine distance.
+    It intentionally is not part of neembed's public API.
+    """
+
+    def __init__(self, model_name_or_path: str, *, embedding_dim: int) -> None:
+        super().__init__()
+        self.encoder = SentenceTransformer(model_name_or_path)
+        encoder_dim = self.encoder.get_embedding_dimension()
+        if encoder_dim is None:
+            raise ValueError("Sentence Transformer embedding dimension is unknown")
+        self.projection = nn.Linear(encoder_dim, embedding_dim)
+        self.projection.to(self.encoder.device)
+
+    def forward(self, sentences: Sequence[str]) -> torch.Tensor:
+        """Encode texts as unit-normalized Euclidean embeddings."""
+        features = self.encoder.preprocess(list(sentences))
+        features = {
+            key: value.to(self.encoder.device) if torch.is_tensor(value) else value
+            for key, value in features.items()
+        }
+        encoder_output: dict[str, Any] = self.encoder(features)
+        projected = self.projection(encoder_output["sentence_embedding"])
+        return F.normalize(projected, dim=-1)
+
+    def encode(
+        self,
+        sentences: str | Sequence[str],
+        *,
+        convert_to_tensor: bool = False,
+    ) -> Any:
+        """Encode texts for evaluator compatibility."""
+        single_input = isinstance(sentences, str)
+        batch = [sentences] if single_input else list(sentences)
+        self.eval()
+        with torch.inference_mode():
+            embeddings = self(batch)
+        if single_input:
+            embeddings = embeddings[0]
+        if convert_to_tensor:
+            return embeddings
+        return embeddings.cpu().numpy()
+
+    def distance(self, a: Any, b: Any) -> torch.Tensor:
+        """Return cosine distance for broadcast-compatible embedding tensors."""
+        reference = next(self.parameters())
+        a_tensor = torch.as_tensor(a, device=reference.device, dtype=reference.dtype)
+        b_tensor = torch.as_tensor(b, device=reference.device, dtype=reference.dtype)
+        return 1.0 - F.cosine_similarity(a_tensor, b_tensor, dim=-1)
 
 
-def _evaluate_euclidean(model: SentenceTransformer) -> tuple[float, float]:
-    anchors = [anchor for anchor, _ in EVALUATION_PAIRS]
-    candidates = [positive for _, positive in EVALUATION_PAIRS]
-    device = model.device
+class EuclideanMultipleNegativesRankingLoss(nn.Module):
+    """Benchmark-local cosine counterpart to neembed's geodesic ranking loss."""
 
-    _synchronize_cuda(device)
-    started = time.perf_counter()
-    anchor_embeddings = model.encode(anchors, convert_to_tensor=True)
-    candidate_embeddings = model.encode(candidates, convert_to_tensor=True)
-    anchor_embeddings = F.normalize(anchor_embeddings, dim=-1)
-    candidate_embeddings = F.normalize(candidate_embeddings, dim=-1)
-    distances = 1.0 - anchor_embeddings @ candidate_embeddings.T
-    _synchronize_cuda(device)
-    elapsed = time.perf_counter() - started
+    def __init__(
+        self,
+        *,
+        model: EuclideanSentenceTransformer,
+        temperature: float,
+    ) -> None:
+        super().__init__()
+        self.model = model
+        self.temperature = temperature
 
-    return _parent_retrieval_accuracy(distances), elapsed
+    def forward(
+        self,
+        anchors: Sequence[str],
+        positives: Sequence[str],
+    ) -> torch.Tensor:
+        """Return in-batch multiple-negatives loss using cosine similarity."""
+        anchor_embeddings = self.model(anchors)
+        positive_embeddings = self.model(positives)
+        logits = anchor_embeddings @ positive_embeddings.T / self.temperature
+        targets = torch.arange(logits.shape[0], device=logits.device)
+        return F.cross_entropy(logits, targets)
 
 
-def _evaluate_poincare(
-    model: ManifoldSentenceTransformer,
-) -> tuple[float, float]:
-    anchors = [anchor for anchor, _ in EVALUATION_PAIRS]
-    candidates = [positive for _, positive in EVALUATION_PAIRS]
-    device = model.encoder.device
-
-    _synchronize_cuda(device)
-    started = time.perf_counter()
-    anchor_embeddings = model.encode(anchors, convert_to_tensor=True)
-    candidate_embeddings = model.encode(candidates, convert_to_tensor=True)
-    distances = torch.stack(
-        [
-            torch.stack(
-                [model.distance(anchor, candidate) for candidate in candidate_embeddings]
-            )
-            for anchor in anchor_embeddings
-        ]
+def _train_euclidean(
+    model: EuclideanSentenceTransformer,
+) -> list[float]:
+    """Train the Euclidean baseline with the same schedule as neembed."""
+    loss = EuclideanMultipleNegativesRankingLoss(
+        model=model,
+        temperature=TEMPERATURE,
     )
-    _synchronize_cuda(device)
-    elapsed = time.perf_counter() - started
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=LEARNING_RATE,
+        weight_decay=WEIGHT_DECAY,
+    )
+    history: list[float] = []
 
-    return _parent_retrieval_accuracy(distances), elapsed
+    for _ in range(EPOCHS):
+        model.train()
+        total_loss = 0.0
+        steps = 0
+        for anchors, positives in _train_batches():
+            optimizer.zero_grad()
+            batch_loss = loss(anchors, positives)
+            batch_loss.backward()
+            optimizer.step()
+            total_loss += float(batch_loss.detach())
+            steps += 1
+        history.append(total_loss / steps)
+
+    return history
 
 
-def run_experiment() -> dict[str, object]:
-    """Run the minimal Euclidean-vs-Poincare hierarchy comparison."""
+def _evaluator(model: nn.Module) -> ManifoldEmbeddingEvaluator:
+    """Build the shared v0.2 evaluator for the fixed held-out task."""
+    return ManifoldEmbeddingEvaluator(
+        model=model,  # type: ignore[arg-type]
+        anchors=[anchor for anchor, _ in EVALUATION_PAIRS],
+        positives=[positive for _, positive in EVALUATION_PAIRS],
+    )
+
+
+def _result(
+    *,
+    distance: str,
+    metrics: dict[str, float],
+    final_training_loss: float,
+) -> dict[str, float | str]:
+    """Combine shared evaluator metrics with the final training loss."""
+    return {
+        "distance": distance,
+        **metrics,
+        "final_training_loss": final_training_loss,
+    }
+
+
+def run_benchmark() -> dict[str, object]:
+    """Run the deterministic tiny hierarchy retrieval benchmark."""
     set_seed(SEED)
-
-    euclidean_model = SentenceTransformer(MODEL_NAME)
-    euclidean_accuracy, euclidean_eval_seconds = _evaluate_euclidean(euclidean_model)
+    euclidean_model = EuclideanSentenceTransformer(
+        MODEL_NAME,
+        embedding_dim=EMBEDDING_DIM,
+    )
+    euclidean_history = _train_euclidean(euclidean_model)
+    euclidean_metrics = _evaluator(euclidean_model)()
 
     set_seed(SEED)
     poincare_model = ManifoldSentenceTransformer(
@@ -137,28 +225,32 @@ def run_experiment() -> dict[str, object]:
         embedding_dim=EMBEDDING_DIM,
         curvature=CURVATURE,
     )
-    loss = ManifoldMultipleNegativesRankingLoss(
+    poincare_loss = ManifoldMultipleNegativesRankingLoss(
         model=poincare_model,
         temperature=TEMPERATURE,
     )
-    trainer = ManifoldTrainer(
+    poincare_trainer = ManifoldTrainer(
         model=poincare_model,
-        loss=loss,
+        loss=poincare_loss,
         learning_rate=LEARNING_RATE,
         weight_decay=WEIGHT_DECAY,
         verbose=False,
     )
-
-    training_started = time.perf_counter()
-    history = trainer.fit(_train_batches(), epochs=EPOCHS)
-    training_seconds = time.perf_counter() - training_started
-    poincare_accuracy, poincare_eval_seconds = _evaluate_poincare(poincare_model)
+    poincare_history = poincare_trainer.fit(_train_batches(), epochs=EPOCHS)
+    poincare_metrics = _evaluator(poincare_model)()
 
     return {
         "metadata": {
+            "benchmark": "tiny_hierarchy_retrieval",
             "model": MODEL_NAME,
             "seed": SEED,
-            "metric": "parent_retrieval_accuracy",
+            "embedding_dim": EMBEDDING_DIM,
+            "temperature": TEMPERATURE,
+            "learning_rate": LEARNING_RATE,
+            "weight_decay": WEIGHT_DECAY,
+            "epochs": EPOCHS,
+            "batch_size": BATCH_SIZE,
+            "curvature": CURVATURE,
             "train_pairs": [
                 {"anchor": anchor, "positive": positive}
                 for anchor, positive in TRAIN_PAIRS
@@ -167,37 +259,30 @@ def run_experiment() -> dict[str, object]:
                 {"anchor": anchor, "positive": positive}
                 for anchor, positive in EVALUATION_PAIRS
             ],
-            "poincare_config": {
-                "embedding_dim": EMBEDDING_DIM,
-                "curvature": CURVATURE,
-                "temperature": TEMPERATURE,
-                "learning_rate": LEARNING_RATE,
-                "weight_decay": WEIGHT_DECAY,
-                "epochs": EPOCHS,
-                "batch_size": BATCH_SIZE,
-            },
         },
         "results": {
-            "euclidean_pretrained": {
-                "distance": "cosine",
-                "parent_retrieval_accuracy": euclidean_accuracy,
-                "training_seconds": 0.0,
-                "evaluation_seconds": euclidean_eval_seconds,
-            },
-            "poincare_finetuned": {
-                "distance": "poincare_geodesic",
-                "parent_retrieval_accuracy": poincare_accuracy,
-                "final_training_loss": float(history[-1]),
-                "training_seconds": training_seconds,
-                "evaluation_seconds": poincare_eval_seconds,
-            },
+            "euclidean_finetuned": _result(
+                distance="cosine",
+                metrics=euclidean_metrics,
+                final_training_loss=float(euclidean_history[-1]),
+            ),
+            "poincare_finetuned": _result(
+                distance="poincare_geodesic",
+                metrics=poincare_metrics,
+                final_training_loss=float(poincare_history[-1]),
+            ),
         },
     }
 
 
+def run_experiment() -> dict[str, object]:
+    """Backward-compatible alias for the original experiment entry point."""
+    return run_benchmark()
+
+
 def main() -> None:
-    """Run the comparison and emit one machine-readable JSON result."""
-    print(json.dumps(run_experiment(), indent=2, allow_nan=False))
+    """Run the benchmark and emit one stable machine-readable JSON result."""
+    print(json.dumps(run_benchmark(), indent=2, allow_nan=False))
 
 
 if __name__ == "__main__":
