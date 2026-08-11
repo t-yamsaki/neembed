@@ -58,7 +58,8 @@ Minimal training loop
 ``ManifoldTrainer.fit`` accepts an iterable yielding ``(anchors, positives)``
 batches. For more than one epoch, that input must be re-iterable, such as a
 list or a DataLoader; a one-shot iterator or generator is only suitable for a
-single epoch. The method returns one mean loss value per completed epoch:
+single epoch. Without validation, the method keeps its original return value:
+one mean loss value per completed epoch.
 
 .. code-block:: python
 
@@ -70,6 +71,33 @@ single epoch. The method returns one mean loss value per completed epoch:
    history = trainer.fit(train_batches, epochs=3)
    print(history)
 
+Optional validation
+-------------------
+
+Pass a ``ManifoldEmbeddingEvaluator`` to run validation once after each
+completed epoch. Validation runs without gradient tracking, and training mode
+is restored before the next epoch.
+
+.. code-block:: python
+
+   evaluator = ManifoldEmbeddingEvaluator(
+       model=model,
+       anchors=["Shiba Inu", "Siamese cat"],
+       positives=["dog", "cat"],
+   )
+
+   history = trainer.fit(
+       train_batches,
+       epochs=3,
+       evaluator=evaluator,
+   )
+
+With an evaluator, each history entry has a mean ``train_loss`` and a nested
+``validation`` dictionary containing the evaluator metrics. This keeps the
+no-evaluator return behavior backward-compatible while making epoch validation
+results explicit.
+
 For argument and return-value details, see
-:class:`neembed.ManifoldMultipleNegativesRankingLoss` and
+:class:`neembed.ManifoldMultipleNegativesRankingLoss`,
+:class:`neembed.ManifoldEmbeddingEvaluator`, and
 :class:`neembed.ManifoldTrainer`.
