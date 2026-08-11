@@ -63,9 +63,7 @@ def test_forward_without_projection_preserves_encoder_dimension(monkeypatch) -> 
     assert isinstance(model.projection, nn.Identity)
 
 
-def test_lorentz_forward_adds_one_ambient_coordinate_and_satisfies_constraint(
-    monkeypatch,
-) -> None:
+def test_lorentz_forward_uses_float64_and_satisfies_constraint(monkeypatch) -> None:
     _patch_encoder(monkeypatch)
     model = ManifoldSentenceTransformer(
         "fake-model",
@@ -79,15 +77,13 @@ def test_lorentz_forward_adds_one_ambient_coordinate_and_satisfies_constraint(
 
     assert model.embedding_dim == 2
     assert embeddings.shape == (2, 3)
+    assert embeddings.dtype == torch.float64
     assert torch.isfinite(embeddings).all()
-    # This path intentionally follows the model's float32 dtype. Geoopt's
-    # Lorentz operations accumulate about 1e-4 constraint error at this scale;
-    # precision-specific geometry regression belongs in #47.
     assert torch.allclose(
         quad_form,
         torch.full_like(quad_form, -0.5),
-        atol=2e-4,
-        rtol=2e-4,
+        atol=1e-8,
+        rtol=1e-8,
     )
 
 
@@ -157,7 +153,9 @@ def test_lorentz_encode_distance_and_evaluator_return_finite_values(monkeypatch)
     metrics = evaluator()
 
     assert embeddings.shape == (2, 3)
+    assert embeddings.dtype == torch.float64
     assert torch.isfinite(embeddings).all()
+    assert distance.dtype == torch.float64
     assert torch.isfinite(distance)
     assert float(distance) >= 0.0
     assert all(np.isfinite(value) for value in metrics.values())
