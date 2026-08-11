@@ -6,6 +6,7 @@ import torch
 from torch import nn
 
 import neembed.model as model_module
+from neembed.evaluator import ManifoldEmbeddingEvaluator
 from neembed.model import ManifoldSentenceTransformer
 
 
@@ -62,6 +63,26 @@ def test_forward_without_projection_preserves_encoder_dimension(monkeypatch) -> 
     assert isinstance(model.projection, nn.Identity)
 
 
+def test_lorentz_forward_adds_one_ambient_coordinate_and_satisfies_constraint(
+    monkeypatch,
+) -> None:
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer(
+        "fake-model",
+        manifold="lorentz",
+        embedding_dim=2,
+        curvature=2.0,
+    )
+
+    embeddings = model(["Shiba Inu", "dog"])
+    quad_form = -embeddings[:, 0].square() + embeddings[:, 1:].square().sum(dim=-1)
+
+    assert model.embedding_dim == 2
+    assert embeddings.shape == (2, 3)
+    assert torch.isfinite(embeddings).all()
+    assert torch.allclose(quad_form, torch.full_like(quad_form, -0.5), atol=1e-5)
+
+
 def test_gradients_flow_through_projection_and_manifold_map(monkeypatch) -> None:
     _patch_encoder(monkeypatch)
     model = ManifoldSentenceTransformer("fake-model", embedding_dim=2)
@@ -108,6 +129,30 @@ def test_encode_can_return_inference_tensor(monkeypatch) -> None:
     assert embeddings.shape == (2, 2)
     assert not embeddings.requires_grad
     assert not model.training
+
+
+def test_lorentz_encode_distance_and_evaluator_return_finite_values(monkeypatch) -> None:
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer(
+        "fake-model",
+        manifold="lorentz",
+        embedding_dim=2,
+    )
+    embeddings = model.encode(["a", "long"], convert_to_tensor=True)
+
+    distance = model.distance(embeddings[0], embeddings[1])
+    evaluator = ManifoldEmbeddingEvaluator(
+        model=model,
+        anchors=["a", "long"],
+        positives=["bb", "longer"],
+    )
+    metrics = evaluator()
+
+    assert embeddings.shape == (2, 3)
+    assert torch.isfinite(embeddings).all()
+    assert torch.isfinite(distance)
+    assert float(distance) >= 0.0
+    assert all(np.isfinite(value) for value in metrics.values())
 
 
 def test_distance_is_finite_nonnegative_zero_on_self_and_symmetric(monkeypatch) -> None:
