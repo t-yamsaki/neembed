@@ -25,6 +25,7 @@ the public docstrings.
 
    user_guide/architecture
    user_guide/training
+   user_guide/evaluation
    user_guide/inference
    user_guide/saving_loading
 

@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [English README](../README.md)
 
-> **Status:** v0.1 の実装は完了しており、最初の PyPI 公開に向けて準備中です。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
+> **Status:** v0.1.0 は PyPI で公開済みです。v0.2 では evaluation、epoch validation、DataLoader 連携例、再現可能な Euclidean-vs-Poincaré benchmark を追加中です。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
 
 `neembed` は、pretrained Sentence Transformer と manifold-valued representation をつなぐ軽量な integration layer です。pretrained encoder はそのまま利用し、必要に応じて Euclidean embedding を projection したうえで、Poincaré-ball の幾何演算を Geoopt に委譲します。
 
@@ -31,7 +31,7 @@ Non-Euclidean embedding
 - 階層ラベル
 - 木構造に近い意味関係
 
-v0.1 は対象を広げすぎず、Poincaré ball のみに集中します。
+現在のgeometry scopeは広げすぎず、Poincaré ball のみに限定しています。
 
 ## v0.1
 
@@ -50,8 +50,6 @@ v0.1 は対象を広げすぎず、Poincaré ball のみに集中します。
 詳細な挙動、前提、API signature は [Documentation](https://neembed.readthedocs.io/en/latest/) にまとめています。
 
 ## インストール
-
-`v0.1.0` を PyPI に公開後：
 
 ```bash
 pip install neembed-geoopt
@@ -112,6 +110,7 @@ print(float(distance))
 - [Quick Start](https://neembed.readthedocs.io/en/latest/getting_started/quickstart.html)
 - [Architecture](https://neembed.readthedocs.io/en/latest/user_guide/architecture.html)
 - [Training](https://neembed.readthedocs.io/en/latest/user_guide/training.html)
+- [Evaluation](https://neembed.readthedocs.io/en/latest/user_guide/evaluation.html)
 - [Inference](https://neembed.readthedocs.io/en/latest/user_guide/inference.html)
 - [Saving and Loading](https://neembed.readthedocs.io/en/latest/user_guide/saving_loading.html)
 - [API Reference](https://neembed.readthedocs.io/en/latest/#api-reference)
@@ -124,8 +123,9 @@ end-to-end の実行例：
 python examples/train_poincare.py
 ```
 
-- [examples/train_poincare.py](../examples/train_poincare.py) に workflow があります。
-- [experiments/README.md](../experiments/README.md) に Euclidean-vs-Poincaré の固定比較実験と結果の解釈上の注意をまとめています。
+- [examples/train_poincare.py](../examples/train_poincare.py) に最小workflowがあります。
+- [examples/train_dataloader.py](../examples/train_dataloader.py) で通常の PyTorch `DataLoader` と epoch validation を確認できます。
+- [experiments/README.md](../experiments/README.md) に再現可能な Euclidean-vs-Poincaré benchmark と結果の解釈上の注意をまとめています。
 
 ## License
 
