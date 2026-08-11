@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [English README](../README.md)
 
-> **Status:** v0.2.0 には evaluation、epoch validation、DataLoader 連携例、再現可能な Euclidean-vs-Poincaré benchmark が含まれます。v0.3.0 に向けた開発では、2つ目の双曲幾何として Lorentz / Hyperboloid embedding を追加しています。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
+> **Status:** v0.3.0 では、2つ目の双曲幾何として Lorentz / Hyperboloid embedding、Poincaré–Lorentz の幾何整合性 regression、Lorentz の train / evaluate example、再現可能な Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark を追加します。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
 
 `neembed` は、pretrained Sentence Transformer と manifold-valued representation をつなぐ軽量な integration layer です。pretrained encoder はそのまま利用し、必要に応じて Euclidean embedding を projection したうえで、双曲幾何の演算を Geoopt に委譲します。
 
@@ -31,24 +31,27 @@ Non-Euclidean embedding
 - 階層ラベル
 - 木構造に近い意味関係
 
-現在の開発版 API は、Poincaré ball と Lorentz / Hyperboloid を同じ model・loss・trainer・evaluator・save/load workflow で扱えます。公開済みの v0.2.0 は Poincaré のみで、Lorentz 対応は v0.3.0 を対象としています。
+現在の API は、Poincaré ball と Lorentz / Hyperboloid を同じ model・loss・trainer・evaluator・save/load workflow で扱えます。
 
-## v0.2
+## v0.3
 
-v0.2 には以下を含みます。
+v0.3 には以下を含みます。
 
 - pretrained encoder として Sentence Transformers を利用
-- Geoopt による Poincaré-ball embedding
+- Geoopt による Poincaré-ball と Lorentz / Hyperboloid embedding
 - 任意の低次元 tangent-space projection
+- 2つの双曲モデルで統一した public curvature semantics
 - geodesic distance
 - manifold-aware な multiple-negatives ranking / InfoNCE-style loss
 - 通常の `AdamW` による fine-tuning
 - `encode()` / `distance()` inference helper
-- `save_pretrained()` / `from_pretrained()` によるローカル保存・復元
+- 両 manifold の `save_pretrained()` / `from_pretrained()` ローカル保存・復元
 - retrieval / distance metrics を返す `ManifoldEmbeddingEvaluator`
 - `ManifoldTrainer` の任意の epoch-end validation
 - 通常の PyTorch `DataLoader` 連携例
-- 再現可能な Euclidean-vs-Poincaré engineering benchmark
+- Poincaré–Lorentz geometry consistency regression test
+- Lorentz の train / evaluate / inference 実行例
+- 再現可能な Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark
 
 詳細な挙動、前提、API signature は [Documentation](https://neembed.readthedocs.io/en/latest/) にまとめています。
 
