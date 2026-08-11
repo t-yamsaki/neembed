@@ -1,4 +1,4 @@
-"""Tests for the reproducible Euclidean-vs-Poincare benchmark."""
+"""Tests for the reproducible Euclidean-Poincare-Lorentz benchmark."""
 
 import importlib.util
 import json
@@ -74,14 +74,21 @@ def test_benchmark_returns_directly_comparable_results(monkeypatch) -> None:
     _patch_benchmark(monkeypatch, benchmark)
 
     result = benchmark.run_benchmark()
-    train_pairs = result["metadata"]["train_pairs"]
-    evaluation_pairs = result["metadata"]["evaluation_pairs"]
+    metadata = result["metadata"]
+    train_pairs = metadata["train_pairs"]
+    evaluation_pairs = metadata["evaluation_pairs"]
 
-    assert result["metadata"]["benchmark"] == "tiny_hierarchy_retrieval"
-    assert result["metadata"]["seed"] == 0
-    assert result["metadata"]["model"] == "sentence-transformers/all-MiniLM-L6-v2"
-    assert result["metadata"]["epochs"] == 2
-    assert result["metadata"]["embedding_dim"] == 2
+    assert metadata["benchmark"] == "tiny_hierarchy_retrieval"
+    assert metadata["seed"] == 0
+    assert metadata["model"] == "sentence-transformers/all-MiniLM-L6-v2"
+    assert metadata["epochs"] == 2
+    assert metadata["embedding_dim"] == 2
+    assert metadata["curvature"] == 1.0
+    assert metadata["ambient_dimensions"] == {
+        "euclidean_finetuned": 2,
+        "poincare_finetuned": 2,
+        "lorentz_finetuned": 3,
+    }
     assert len(train_pairs) == 10
     assert len(evaluation_pairs) == 5
     assert {pair["anchor"] for pair in train_pairs}.isdisjoint(
@@ -89,9 +96,14 @@ def test_benchmark_returns_directly_comparable_results(monkeypatch) -> None:
     )
 
     results = result["results"]
-    assert set(results) == {"euclidean_finetuned", "poincare_finetuned"}
+    assert set(results) == {
+        "euclidean_finetuned",
+        "poincare_finetuned",
+        "lorentz_finetuned",
+    }
     assert results["euclidean_finetuned"]["distance"] == "cosine"
     assert results["poincare_finetuned"]["distance"] == "poincare_geodesic"
+    assert results["lorentz_finetuned"]["distance"] == "lorentz_geodesic"
 
     for variant in results.values():
         assert set(variant) == {
@@ -119,7 +131,11 @@ def test_benchmark_is_deterministic_with_fixed_seed(monkeypatch) -> None:
     second = benchmark.run_benchmark()
 
     assert first["metadata"] == second["metadata"]
-    for variant in ("euclidean_finetuned", "poincare_finetuned"):
+    for variant in (
+        "euclidean_finetuned",
+        "poincare_finetuned",
+        "lorentz_finetuned",
+    ):
         first_result = first["results"][variant]
         second_result = second["results"][variant]
         assert first_result["distance"] == second_result["distance"]
@@ -143,7 +159,12 @@ def test_original_run_experiment_alias_and_cli_emit_benchmark_json(
 
     benchmark.main()
     output = json.loads(capsys.readouterr().out)
-    assert set(output["results"]) == {"euclidean_finetuned", "poincare_finetuned"}
+    assert set(output["results"]) == {
+        "euclidean_finetuned",
+        "poincare_finetuned",
+        "lorentz_finetuned",
+    }
+    assert output["metadata"]["ambient_dimensions"]["lorentz_finetuned"] == 3
 
 
 def test_experiment_readme_documents_benchmark_command() -> None:
@@ -151,6 +172,7 @@ def test_experiment_readme_documents_benchmark_command() -> None:
         Path(__file__).parents[1] / "experiments" / "README.md"
     ).read_text(encoding="utf-8")
 
-    assert "[v0.2 comparison benchmark](compare_euclidean_poincare.py)" in readme
+    assert "Euclidean vs Poincaré vs Lorentz benchmark" in readme
     assert "python experiments/compare_euclidean_poincare.py" in readme
+    assert "Lorentz output is 33-dimensional" in readme
     assert "not a leaderboard or a research result" in readme
