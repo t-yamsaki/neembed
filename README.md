@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [日本語](docs/README_ja.md)
 
-> **Status:** v0.2.0 adds evaluation, epoch validation, DataLoader interoperability examples, and a reproducible Euclidean-vs-Poincaré benchmark. Development toward v0.3.0 adds Lorentz / Hyperboloid embeddings as the second supported hyperbolic geometry. The API remains intentionally small and may still evolve before a stable 1.0 release.
+> **Status:** v0.3.0 adds Lorentz / Hyperboloid embeddings as the second supported hyperbolic geometry, geometry-consistency regressions, a Lorentz train/evaluate example, and a reproducible Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark. The API remains intentionally small and may still evolve before a stable 1.0 release.
 
 `neembed` is a lightweight integration layer between pretrained Sentence Transformer models and manifold-valued representations. It keeps the pretrained encoder intact, optionally projects its Euclidean output, and delegates hyperbolic geometry to Geoopt.
 
@@ -31,24 +31,27 @@ Hierarchical and tree-like relations can be awkward to represent in a flat Eucli
 - hierarchical labels
 - tree-like semantic relations
 
-The current development API supports the Poincaré ball and Lorentz / Hyperboloid models through the same model, loss, trainer, evaluator, and save/load workflow. The published v0.2.0 release remains Poincaré-only; Lorentz support is targeted for v0.3.0.
+The current API supports the Poincaré ball and Lorentz / Hyperboloid models through the same model, loss, trainer, evaluator, and save/load workflow.
 
-## v0.2
+## v0.3
 
-The v0.2 release includes:
+The v0.3 release includes:
 
 - Sentence Transformers as the pretrained encoder backend
-- Poincaré-ball embeddings through Geoopt
+- Poincaré-ball and Lorentz / Hyperboloid embeddings through Geoopt
 - optional lower-dimensional tangent-space projection
+- shared public curvature semantics across the two hyperbolic models
 - geodesic distance
 - manifold-aware multiple-negatives ranking / InfoNCE-style loss
 - ordinary `AdamW` fine-tuning
 - `encode()` and `distance()` inference helpers
-- `save_pretrained()` / `from_pretrained()` local persistence
+- `save_pretrained()` / `from_pretrained()` local persistence for both manifolds
 - `ManifoldEmbeddingEvaluator` with retrieval and distance metrics
 - optional epoch-end validation in `ManifoldTrainer`
 - ordinary PyTorch `DataLoader` interoperability example
-- a reproducible Euclidean-vs-Poincaré engineering benchmark
+- Poincaré–Lorentz geometry-consistency regression tests
+- a runnable Lorentz train/evaluate/inference example
+- a reproducible Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark
 
 Detailed behavior, assumptions, and API signatures live in the [documentation](https://neembed.readthedocs.io/en/latest/).
 
