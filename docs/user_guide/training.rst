@@ -1,7 +1,7 @@
 Training
 ========
 
-neembed v0.1 fine-tunes the pretrained encoder and optional projection with a
+neembed fine-tunes the pretrained encoder and optional projection with a
 multiple-negatives ranking objective based on manifold geodesic distance.
 
 Geodesic ranking objective
@@ -40,7 +40,7 @@ Optimizer behavior
 ------------------
 
 ``ManifoldTrainer`` uses ordinary ``torch.optim.AdamW`` over
-``model.parameters()``. This is intentional for v0.1.
+``model.parameters()``. This is intentional for the current training path.
 
 The trainable sentence-encoder weights and optional linear projection are
 ordinary Euclidean PyTorch parameters. The forward output is manifold-valued,
@@ -50,7 +50,7 @@ distance back to the Euclidean trainable parameters.
 
 A Riemannian optimizer becomes relevant when trainable parameters themselves
 live on a manifold, for example trainable manifold prototypes or hierarchy
-nodes. neembed v0.1 does not introduce such parameters.
+nodes. The current public model does not introduce such parameters.
 
 Minimal training loop
 ---------------------
@@ -95,7 +95,8 @@ is restored before the next epoch.
 With an evaluator, each history entry has a mean ``train_loss`` and a nested
 ``validation`` dictionary containing the evaluator metrics. This keeps the
 no-evaluator return behavior backward-compatible while making epoch validation
-results explicit.
+results explicit. See :doc:`evaluation` for metric definitions and
+interpretation.
 
 PyTorch DataLoader
 ------------------
