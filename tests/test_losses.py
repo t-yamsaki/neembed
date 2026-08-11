@@ -34,9 +34,17 @@ class FakeSentenceTransformer(nn.Module):
         return {"sentence_embedding": self.linear(features["input_features"])}
 
 
-def _make_model(monkeypatch) -> ManifoldSentenceTransformer:
+def _make_model(
+    monkeypatch,
+    *,
+    manifold: str = "poincare",
+) -> ManifoldSentenceTransformer:
     monkeypatch.setattr(model_module, "SentenceTransformer", FakeSentenceTransformer)
-    return ManifoldSentenceTransformer("fake-model", embedding_dim=2)
+    return ManifoldSentenceTransformer(
+        "fake-model",
+        manifold=manifold,
+        embedding_dim=2,
+    )
 
 
 def test_loss_is_exported_from_package() -> None:
@@ -77,9 +85,10 @@ def test_loss_uses_diagonal_pairs_as_positive_targets(monkeypatch) -> None:
     assert torch.allclose(actual, expected)
 
 
-def test_loss_is_finite_scalar_and_backpropagates(monkeypatch) -> None:
+@pytest.mark.parametrize("manifold", ["poincare", "lorentz"])
+def test_loss_is_finite_scalar_and_backpropagates(monkeypatch, manifold: str) -> None:
     torch.manual_seed(0)
-    model = _make_model(monkeypatch)
+    model = _make_model(monkeypatch, manifold=manifold)
     loss_fn = ManifoldMultipleNegativesRankingLoss(model=model, temperature=0.1)
 
     loss = loss_fn(["dog", "cat"], ["mammal", "animal"])
