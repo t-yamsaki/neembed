@@ -4,9 +4,9 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [日本語](docs/README_ja.md)
 
-> **Status:** v0.2.0 adds evaluation, epoch validation, DataLoader interoperability examples, and a reproducible Euclidean-vs-Poincaré benchmark. The API remains intentionally small and may still evolve before a stable 1.0 release.
+> **Status:** v0.2.0 adds evaluation, epoch validation, DataLoader interoperability examples, and a reproducible Euclidean-vs-Poincaré benchmark. Development toward v0.3.0 adds Lorentz / Hyperboloid embeddings as the second supported hyperbolic geometry. The API remains intentionally small and may still evolve before a stable 1.0 release.
 
-`neembed` is a lightweight integration layer between pretrained Sentence Transformer models and manifold-valued representations. It keeps the pretrained encoder intact, optionally projects its Euclidean output, and delegates Poincaré-ball geometry to Geoopt.
+`neembed` is a lightweight integration layer between pretrained Sentence Transformer models and manifold-valued representations. It keeps the pretrained encoder intact, optionally projects its Euclidean output, and delegates hyperbolic geometry to Geoopt.
 
 ```text
 Pretrained Sentence Encoder
@@ -31,7 +31,7 @@ Hierarchical and tree-like relations can be awkward to represent in a flat Eucli
 - hierarchical labels
 - tree-like semantic relations
 
-The current geometry scope deliberately remains the Poincaré ball.
+The current development API supports the Poincaré ball and Lorentz / Hyperboloid models. The published v0.2.0 release remains Poincaré-only; Lorentz support is targeted for v0.3.0.
 
 ## v0.2
 

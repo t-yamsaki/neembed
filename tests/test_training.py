@@ -3,6 +3,7 @@
 import math
 
 import neembed
+import pytest
 import torch
 from torch import nn
 
@@ -35,9 +36,13 @@ class FakeSentenceTransformer(nn.Module):
         return {"sentence_embedding": self.linear(features["input_features"])}
 
 
-def _make_trainer(monkeypatch) -> ManifoldTrainer:
+def _make_trainer(monkeypatch, *, manifold: str = "poincare") -> ManifoldTrainer:
     monkeypatch.setattr(model_module, "SentenceTransformer", FakeSentenceTransformer)
-    model = ManifoldSentenceTransformer("fake-model", embedding_dim=2)
+    model = ManifoldSentenceTransformer(
+        "fake-model",
+        manifold=manifold,
+        embedding_dim=2,
+    )
     loss = ManifoldMultipleNegativesRankingLoss(model=model, temperature=0.5)
     return ManifoldTrainer(model=model, loss=loss, learning_rate=1e-2)
 
@@ -52,12 +57,14 @@ def test_trainer_uses_adamw_by_default(monkeypatch) -> None:
     assert isinstance(trainer.optimizer, torch.optim.AdamW)
 
 
+@pytest.mark.parametrize("manifold", ["poincare", "lorentz"])
 def test_fit_returns_finite_epoch_losses_and_updates_parameters(
     monkeypatch,
     capsys,
+    manifold: str,
 ) -> None:
     torch.manual_seed(0)
-    trainer = _make_trainer(monkeypatch)
+    trainer = _make_trainer(monkeypatch, manifold=manifold)
     batches = [
         (["dog", "cat"], ["mammal", "animal"]),
         (["wolf", "fox"], ["canine", "mammal"]),
@@ -69,6 +76,7 @@ def test_fit_returns_finite_epoch_losses_and_updates_parameters(
     after = trainer.model.projection.weight.detach()
     output = capsys.readouterr().out
 
+    assert isinstance(trainer.optimizer, torch.optim.AdamW)
     assert len(history) == 2
     assert all(math.isfinite(value) for value in history)
     assert not torch.allclose(before, after)

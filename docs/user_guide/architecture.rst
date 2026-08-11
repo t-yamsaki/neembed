@@ -1,9 +1,8 @@
 Architecture
 ============
 
-neembed v0.1 is a small integration layer between a pretrained Sentence
-Transformer and Geoopt's Poincare ball. It does not implement its own manifold
-math.
+neembed is a small integration layer between a pretrained Sentence Transformer
+and Geoopt manifolds. It does not implement its own manifold math.
 
 Data flow
 ---------
@@ -27,7 +26,7 @@ The implemented forward path is:
    Geoopt expmap0
            |
            v
-   Poincare embedding
+   Manifold-valued embedding
 
 For an input sentence :math:`x`, the pretrained encoder produces a Euclidean
 embedding
@@ -37,7 +36,7 @@ embedding
    h = f_\theta(x).
 
 When ``embedding_dim`` is provided, a learned linear projection maps the
-encoder output to a tangent vector:
+encoder output to an intrinsic tangent representation:
 
 .. math::
 
@@ -46,15 +45,28 @@ encoder output to a tangent vector:
 When ``embedding_dim`` is omitted, the projection is ``torch.nn.Identity`` and
 the encoder dimension is preserved.
 
-The tangent vector is then mapped from the origin tangent space onto the
-Poincare ball using Geoopt:
+For ``manifold="poincare"``, :math:`v` is mapped directly from the origin
+tangent space onto the Poincare ball using Geoopt:
 
 .. math::
 
    z = \mathrm{Exp}_0^c(v).
 
-Here :math:`c` is the positive curvature parameter passed to
-``geoopt.PoincareBall``.
+For ``manifold="lorentz"``, neembed prepends the required zero time-like
+tangent coordinate before calling Geoopt's Lorentz ``expmap0``. If the intrinsic
+``embedding_dim`` is :math:`D`, the resulting Lorentz point therefore has
+ambient dimension :math:`D + 1`.
+
+The public ``curvature`` argument is the positive magnitude of the negative
+sectional curvature for both geometries. Poincare passes this value to
+``geoopt.PoincareBall(c=...)``. Geoopt's Lorentz model uses the squared
+hyperboloid radius ``k``, so neembed maps the same public value :math:`c` to
+``k = 1 / c``.
+
+Lorentz geometry is evaluated in ``float64`` while the pretrained encoder and
+ordinary Euclidean projection parameters keep their normal dtype. Geoopt
+recommends double precision for the Lorentz model because its Minkowski-space
+operations are sensitive to floating-point error.
 
 Why map from the tangent space?
 -------------------------------
@@ -68,12 +80,13 @@ This keeps the boundary between responsibilities small:
 
 * Sentence Transformers owns text encoding.
 * PyTorch owns the trainable Euclidean parameters.
-* Geoopt owns the Poincare geometry.
+* Geoopt owns the Poincare and Lorentz geometry.
 * neembed connects those pieces for sentence-embedding fine-tuning.
 
-v0.1 geometry scope
--------------------
+Geometry scope
+--------------
 
-Only ``manifold="poincare"`` is supported in v0.1. Lorentz, spherical, SPD,
-product manifolds, learnable curvature, and trainable manifold parameters are
-outside the current implementation and should not be assumed from the API.
+The current development API supports ``manifold="poincare"`` and
+``manifold="lorentz"``. The published v0.2.0 release is Poincare-only; Lorentz
+support is targeted for v0.3.0. Spherical, SPD, product manifolds, learnable
+curvature, and trainable manifold parameters remain outside the current scope.

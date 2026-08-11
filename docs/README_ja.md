@@ -4,9 +4,9 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [English README](../README.md)
 
-> **Status:** v0.2.0 には evaluation、epoch validation、DataLoader 連携例、再現可能な Euclidean-vs-Poincaré benchmark が含まれます。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
+> **Status:** v0.2.0 には evaluation、epoch validation、DataLoader 連携例、再現可能な Euclidean-vs-Poincaré benchmark が含まれます。v0.3.0 に向けた開発では、2つ目の双曲幾何として Lorentz / Hyperboloid embedding を追加しています。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
 
-`neembed` は、pretrained Sentence Transformer と manifold-valued representation をつなぐ軽量な integration layer です。pretrained encoder はそのまま利用し、必要に応じて Euclidean embedding を projection したうえで、Poincaré-ball の幾何演算を Geoopt に委譲します。
+`neembed` は、pretrained Sentence Transformer と manifold-valued representation をつなぐ軽量な integration layer です。pretrained encoder はそのまま利用し、必要に応じて Euclidean embedding を projection したうえで、双曲幾何の演算を Geoopt に委譲します。
 
 ```text
 Pretrained Sentence Encoder
@@ -31,7 +31,7 @@ Non-Euclidean embedding
 - 階層ラベル
 - 木構造に近い意味関係
 
-現在のgeometry scopeは広げすぎず、Poincaré ball のみに限定しています。
+現在の開発版 API は Poincaré ball と Lorentz / Hyperboloid をサポートします。公開済みの v0.2.0 は Poincaré のみで、Lorentz 対応は v0.3.0 を対象としています。
 
 ## v0.2
 
