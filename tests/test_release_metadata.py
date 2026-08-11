@@ -1,4 +1,4 @@
-"""Release-readiness checks for public v0.2 metadata."""
+"""Release-readiness checks for public v0.3 metadata and geometry contracts."""
 
 from importlib.metadata import metadata
 from pathlib import Path
@@ -10,12 +10,12 @@ ROOT = Path(__file__).parents[1]
 DOCUMENTATION_URL = "https://neembed.readthedocs.io/en/latest/"
 
 
-def test_pyproject_declares_v02_public_metadata() -> None:
+def test_pyproject_declares_v03_public_metadata() -> None:
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
     assert 'requires = ["setuptools>=77.0.3"]' in pyproject
     assert 'name = "neembed-geoopt"' in pyproject
-    assert 'version = "0.2.0"' in pyproject
+    assert 'version = "0.3.0"' in pyproject
     assert 'requires-python = ">=3.10"' in pyproject
     assert 'license = "MIT"' in pyproject
     assert 'license-files = ["LICENSE"]' in pyproject
@@ -38,6 +38,7 @@ def test_installed_distribution_exposes_release_metadata() -> None:
     project_urls = package_metadata.get_all("Project-URL") or []
 
     assert package_metadata["Name"] == "neembed-geoopt"
+    assert package_metadata["Version"] == "0.3.0"
     assert package_metadata["Requires-Python"] == ">=3.10"
     assert f"Documentation, {DOCUMENTATION_URL}" in project_urls
 
@@ -59,15 +60,17 @@ def test_distribution_name_keeps_neembed_import_package() -> None:
     assert "from neembed import (" in japanese
 
 
-def test_readmes_describe_the_implemented_v02_release() -> None:
+def test_readmes_describe_the_implemented_v03_release() -> None:
     english = (ROOT / "README.md").read_text(encoding="utf-8")
     japanese = (ROOT / "docs" / "README_ja.md").read_text(encoding="utf-8")
 
     for readme in (english, japanese):
         assert "TBD" not in readme
         assert "<YOUR_USERNAME>" not in readme
-        assert "0.2.0" in readme
+        assert "0.3.0" in readme
+        assert "Lorentz" in readme
         assert "ManifoldEmbeddingEvaluator" in readme
+        assert "Euclidean-vs-Poincaré-vs-Lorentz" in readme
         assert "MIT License" in readme
         assert DOCUMENTATION_URL in readme
 
@@ -99,7 +102,7 @@ def test_quick_start_avoids_duplicate_in_batch_positives() -> None:
     assert '(["犬", "猫"], ["哺乳類", "ネコ科"])' in japanese
 
 
-def test_public_api_docstrings_cover_v02_usage_constraints() -> None:
+def test_public_api_and_persistence_cover_v03_geometry_contracts() -> None:
     public_api = (ROOT / "src" / "neembed" / "__init__.py").read_text(encoding="utf-8")
     model = (ROOT / "src" / "neembed" / "model.py").read_text(encoding="utf-8")
     losses = (ROOT / "src" / "neembed" / "losses.py").read_text(encoding="utf-8")
@@ -108,8 +111,22 @@ def test_public_api_docstrings_cover_v02_usage_constraints() -> None:
 
     normalized_losses = " ".join(losses.split())
 
-    assert "ManifoldEmbeddingEvaluator" in public_api
+    assert "ManifoldSentenceTransformer" in neembed.__all__
+    assert "ManifoldMultipleNegativesRankingLoss" in neembed.__all__
+    assert "ManifoldTrainer" in neembed.__all__
     assert "ManifoldEmbeddingEvaluator" in neembed.__all__
+    assert "LorentzTrainer" not in public_api
+    assert "LorentzEvaluator" not in public_api
+
+    assert 'Supports ``"poincare"`` and ``"lorentz"``' in model
+    assert "Lorentz embeddings use one additional ambient coordinate" in model
+    assert "Positive, finite magnitude of the negative sectional curvature" in model
+    assert "Lorentz outputs" in model and "float64" in model
+    assert '"manifold": self.manifold_name' in model
+    assert '"curvature": self.curvature' in model
+    assert 'manifold=config["manifold"]' in model
+    assert 'curvature=config["curvature"]' in model
+
     assert "NumPy arrays are returned by default" in model
     assert "torch.inference_mode()" in model
     assert "torch.no_grad()" in model
@@ -121,6 +138,22 @@ def test_public_api_docstrings_cover_v02_usage_constraints() -> None:
         "mean_negative_distance",
     ):
         assert metric in evaluator
+
+
+def test_release_real_stack_covers_poincare_and_lorentz() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
+        encoding="utf-8"
+    )
+    real_stack = (
+        ROOT / "tests" / "integration" / "test_real_stack.py"
+    ).read_text(encoding="utf-8")
+
+    assert 'NEEMBED_REAL_STACK: "1"' in workflow
+    assert "tests/integration/test_real_stack.py" in workflow
+    assert 'manifold: str = "poincare"' in real_stack
+    assert 'manifold="lorentz"' in real_stack
+    assert "geoopt.Lorentz" in real_stack
+    assert "torch.optim.AdamW" in real_stack
 
 
 def test_release_workflow_restricts_production_publish_to_tag_pushes() -> None:
@@ -139,6 +172,7 @@ def test_release_workflow_restricts_production_publish_to_tag_pushes() -> None:
     assert "environment:\n      name: testpypi" in workflow
     assert "environment:\n      name: pypi" in workflow
     assert "id-token: write" in workflow
+    assert "pypa/gh-action-pypi-publish@release/v1" in workflow
     assert "https://test.pypi.org/p/neembed-geoopt" in workflow
     assert "https://pypi.org/p/neembed-geoopt" in workflow
 
