@@ -1,4 +1,4 @@
-"""Reproducible Euclidean-vs-Poincare benchmark for neembed v0.2."""
+"""Reproducible Euclidean-vs-hyperbolic benchmark for neembed v0.3."""
 
 from collections.abc import Sequence
 import json
@@ -185,6 +185,31 @@ def _train_euclidean(
     return history
 
 
+def _train_manifold(
+    manifold: str,
+) -> tuple[ManifoldSentenceTransformer, list[float]]:
+    """Train one neembed geometry with the shared benchmark configuration."""
+    model = ManifoldSentenceTransformer(
+        MODEL_NAME,
+        manifold=manifold,
+        embedding_dim=EMBEDDING_DIM,
+        curvature=CURVATURE,
+    )
+    loss = ManifoldMultipleNegativesRankingLoss(
+        model=model,
+        temperature=TEMPERATURE,
+    )
+    trainer = ManifoldTrainer(
+        model=model,
+        loss=loss,
+        learning_rate=LEARNING_RATE,
+        weight_decay=WEIGHT_DECAY,
+        verbose=False,
+    )
+    history = trainer.fit(_train_batches(), epochs=EPOCHS)
+    return model, history  # type: ignore[return-value]
+
+
 def _evaluator(model: nn.Module) -> ManifoldEmbeddingEvaluator:
     """Build the shared v0.2 evaluator for the fixed held-out task."""
     return ManifoldEmbeddingEvaluator(
@@ -219,25 +244,12 @@ def run_benchmark() -> dict[str, object]:
     euclidean_metrics = _evaluator(euclidean_model)()
 
     set_seed(SEED)
-    poincare_model = ManifoldSentenceTransformer(
-        MODEL_NAME,
-        manifold="poincare",
-        embedding_dim=EMBEDDING_DIM,
-        curvature=CURVATURE,
-    )
-    poincare_loss = ManifoldMultipleNegativesRankingLoss(
-        model=poincare_model,
-        temperature=TEMPERATURE,
-    )
-    poincare_trainer = ManifoldTrainer(
-        model=poincare_model,
-        loss=poincare_loss,
-        learning_rate=LEARNING_RATE,
-        weight_decay=WEIGHT_DECAY,
-        verbose=False,
-    )
-    poincare_history = poincare_trainer.fit(_train_batches(), epochs=EPOCHS)
+    poincare_model, poincare_history = _train_manifold("poincare")
     poincare_metrics = _evaluator(poincare_model)()
+
+    set_seed(SEED)
+    lorentz_model, lorentz_history = _train_manifold("lorentz")
+    lorentz_metrics = _evaluator(lorentz_model)()
 
     return {
         "metadata": {
@@ -245,6 +257,11 @@ def run_benchmark() -> dict[str, object]:
             "model": MODEL_NAME,
             "seed": SEED,
             "embedding_dim": EMBEDDING_DIM,
+            "ambient_dimensions": {
+                "euclidean_finetuned": EMBEDDING_DIM,
+                "poincare_finetuned": EMBEDDING_DIM,
+                "lorentz_finetuned": EMBEDDING_DIM + 1,
+            },
             "temperature": TEMPERATURE,
             "learning_rate": LEARNING_RATE,
             "weight_decay": WEIGHT_DECAY,
@@ -270,6 +287,11 @@ def run_benchmark() -> dict[str, object]:
                 distance="poincare_geodesic",
                 metrics=poincare_metrics,
                 final_training_loss=float(poincare_history[-1]),
+            ),
+            "lorentz_finetuned": _result(
+                distance="lorentz_geodesic",
+                metrics=lorentz_metrics,
+                final_training_loss=float(lorentz_history[-1]),
             ),
         },
     }
