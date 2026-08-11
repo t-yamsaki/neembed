@@ -1,10 +1,12 @@
-"""Tests for the minimal Euclidean-vs-Poincare baseline experiment."""
+"""Tests for the reproducible Euclidean-vs-Poincare benchmark."""
 
 import importlib.util
 import json
+import math
 from pathlib import Path
 import sys
 
+import pytest
 import torch
 from torch import nn
 
@@ -47,24 +49,12 @@ class FakeSentenceTransformer(nn.Module):
     def forward(self, features: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         return {"sentence_embedding": self.linear(features["input_features"])}
 
-    def encode(
-        self,
-        sentences: list[str],
-        *,
-        convert_to_tensor: bool = False,
-    ):
-        with torch.no_grad():
-            embeddings = self(self.preprocess(list(sentences)))["sentence_embedding"]
-        if convert_to_tensor:
-            return embeddings
-        return embeddings.numpy()
 
-
-def _load_experiment_module():
-    experiment_path = (
+def _load_benchmark_module():
+    benchmark_path = (
         Path(__file__).parents[1] / "experiments" / "compare_euclidean_poincare.py"
     )
-    spec = importlib.util.spec_from_file_location("neembed_baseline_experiment", experiment_path)
+    spec = importlib.util.spec_from_file_location("neembed_comparison_benchmark", benchmark_path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -72,81 +62,95 @@ def _load_experiment_module():
     return module
 
 
-def test_baseline_experiment_returns_directly_comparable_results(monkeypatch) -> None:
-    experiment = _load_experiment_module()
-    monkeypatch.setattr(experiment, "SentenceTransformer", FakeSentenceTransformer)
+def _patch_benchmark(monkeypatch, benchmark) -> None:
+    monkeypatch.setattr(benchmark, "SentenceTransformer", FakeSentenceTransformer)
     monkeypatch.setattr(model_module, "SentenceTransformer", FakeSentenceTransformer)
+    monkeypatch.setattr(benchmark, "EPOCHS", 2)
+    monkeypatch.setattr(benchmark, "EMBEDDING_DIM", 2)
 
-    result = experiment.run_experiment()
+
+def test_benchmark_returns_directly_comparable_results(monkeypatch) -> None:
+    benchmark = _load_benchmark_module()
+    _patch_benchmark(monkeypatch, benchmark)
+
+    result = benchmark.run_benchmark()
     train_pairs = result["metadata"]["train_pairs"]
     evaluation_pairs = result["metadata"]["evaluation_pairs"]
 
-    assert result["metadata"]["metric"] == "parent_retrieval_accuracy"
+    assert result["metadata"]["benchmark"] == "tiny_hierarchy_retrieval"
     assert result["metadata"]["seed"] == 0
     assert result["metadata"]["model"] == "sentence-transformers/all-MiniLM-L6-v2"
+    assert result["metadata"]["epochs"] == 2
+    assert result["metadata"]["embedding_dim"] == 2
     assert len(train_pairs) == 10
     assert len(evaluation_pairs) == 5
     assert {pair["anchor"] for pair in train_pairs}.isdisjoint(
         {pair["anchor"] for pair in evaluation_pairs}
     )
 
-    euclidean = result["results"]["euclidean_pretrained"]
-    poincare = result["results"]["poincare_finetuned"]
+    results = result["results"]
+    assert set(results) == {"euclidean_finetuned", "poincare_finetuned"}
+    assert results["euclidean_finetuned"]["distance"] == "cosine"
+    assert results["poincare_finetuned"]["distance"] == "poincare_geodesic"
 
-    assert 0.0 <= euclidean["parent_retrieval_accuracy"] <= 1.0
-    assert 0.0 <= poincare["parent_retrieval_accuracy"] <= 1.0
-    assert euclidean["distance"] == "cosine"
-    assert poincare["distance"] == "poincare_geodesic"
-    assert euclidean["training_seconds"] == 0.0
-    assert poincare["training_seconds"] >= 0.0
-    assert torch.isfinite(torch.tensor(poincare["final_training_loss"]))
-    json.dumps(result)
+    for variant in results.values():
+        assert set(variant) == {
+            "distance",
+            "retrieval_accuracy",
+            "mean_positive_distance",
+            "mean_negative_distance",
+            "final_training_loss",
+        }
+        assert 0.0 <= variant["retrieval_accuracy"] <= 1.0
+        assert math.isfinite(variant["mean_positive_distance"])
+        assert math.isfinite(variant["mean_negative_distance"])
+        assert math.isfinite(variant["final_training_loss"])
 
-
-def test_evaluators_synchronize_device_around_timing(monkeypatch) -> None:
-    experiment = _load_experiment_module()
-    monkeypatch.setattr(experiment, "SentenceTransformer", FakeSentenceTransformer)
-    monkeypatch.setattr(model_module, "SentenceTransformer", FakeSentenceTransformer)
-
-    euclidean_model = FakeSentenceTransformer("fake-model")
-    poincare_model = model_module.ManifoldSentenceTransformer(
-        "fake-model",
-        embedding_dim=2,
-    )
-    synchronized_devices: list[torch.device] = []
-
-    monkeypatch.setattr(
-        experiment,
-        "_synchronize_cuda",
-        lambda device: synchronized_devices.append(torch.device(device)),
-    )
-
-    experiment._evaluate_euclidean(euclidean_model)
-    experiment._evaluate_poincare(poincare_model)
-
-    assert synchronized_devices == [
-        euclidean_model.device,
-        euclidean_model.device,
-        poincare_model.encoder.device,
-        poincare_model.encoder.device,
-    ]
+    for _, positives in benchmark._train_batches():
+        assert len(positives) == len(set(positives))
+    json.dumps(result, allow_nan=False)
 
 
-def test_baseline_experiment_cli_emits_json(monkeypatch, capsys) -> None:
-    experiment = _load_experiment_module()
-    monkeypatch.setattr(experiment, "SentenceTransformer", FakeSentenceTransformer)
-    monkeypatch.setattr(model_module, "SentenceTransformer", FakeSentenceTransformer)
+def test_benchmark_is_deterministic_with_fixed_seed(monkeypatch) -> None:
+    benchmark = _load_benchmark_module()
+    _patch_benchmark(monkeypatch, benchmark)
 
-    experiment.main()
+    first = benchmark.run_benchmark()
+    second = benchmark.run_benchmark()
 
+    assert first["metadata"] == second["metadata"]
+    for variant in ("euclidean_finetuned", "poincare_finetuned"):
+        first_result = first["results"][variant]
+        second_result = second["results"][variant]
+        assert first_result["distance"] == second_result["distance"]
+        for metric in (
+            "retrieval_accuracy",
+            "mean_positive_distance",
+            "mean_negative_distance",
+            "final_training_loss",
+        ):
+            assert first_result[metric] == pytest.approx(second_result[metric], abs=1e-8)
+
+
+def test_original_run_experiment_alias_and_cli_emit_benchmark_json(
+    monkeypatch,
+    capsys,
+) -> None:
+    benchmark = _load_benchmark_module()
+    _patch_benchmark(monkeypatch, benchmark)
+
+    assert benchmark.run_experiment() == benchmark.run_benchmark()
+
+    benchmark.main()
     output = json.loads(capsys.readouterr().out)
-    assert set(output["results"]) == {"euclidean_pretrained", "poincare_finetuned"}
+    assert set(output["results"]) == {"euclidean_finetuned", "poincare_finetuned"}
 
 
-def test_experiment_readme_documents_baseline_command() -> None:
+def test_experiment_readme_documents_benchmark_command() -> None:
     readme = (
         Path(__file__).parents[1] / "experiments" / "README.md"
     ).read_text(encoding="utf-8")
 
-    assert "[Euclidean baseline experiment](compare_euclidean_poincare.py)" in readme
+    assert "[v0.2 comparison benchmark](compare_euclidean_poincare.py)" in readme
     assert "python experiments/compare_euclidean_poincare.py" in readme
+    assert "not a leaderboard or a research result" in readme
