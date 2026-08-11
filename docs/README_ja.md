@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [English README](../README.md)
 
-> **Status:** v0.2.0 では evaluation、epoch validation、DataLoader 連携例、再現可能な Euclidean-vs-Poincaré benchmark を追加します。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
+> **Status:** v0.2.0 には evaluation、epoch validation、DataLoader 連携例、再現可能な Euclidean-vs-Poincaré benchmark が含まれます。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
 
 `neembed` は、pretrained Sentence Transformer と manifold-valued representation をつなぐ軽量な integration layer です。pretrained encoder はそのまま利用し、必要に応じて Euclidean embedding を projection したうえで、Poincaré-ball の幾何演算を Geoopt に委譲します。
 
