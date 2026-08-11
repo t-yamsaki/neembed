@@ -17,10 +17,11 @@ class ManifoldSentenceTransformer(nn.Module):
 
     Args:
         model_name_or_path: Sentence Transformer model name or local model path.
-        manifold: Manifold backend name. v0.1 supports only ``"poincare"``.
-        embedding_dim: Optional output dimension for a learned linear projection.
-            If omitted, the encoder embedding dimension is preserved.
-        curvature: Positive, finite Poincaré-ball curvature parameter.
+        manifold: Manifold backend name. Supports ``"poincare"`` and ``"lorentz"``.
+        embedding_dim: Optional intrinsic output dimension for a learned linear
+            projection. If omitted, the encoder embedding dimension is preserved.
+            Lorentz embeddings use one additional ambient coordinate.
+        curvature: Positive, finite magnitude of the negative sectional curvature.
     """
 
     def __init__(
@@ -54,14 +55,16 @@ class ManifoldSentenceTransformer(nn.Module):
         self.manifold.to(self.encoder.device)
 
     def forward(self, sentences: Sequence[str]) -> torch.Tensor:
-        """Encode a batch and map the embeddings from the origin tangent space.
+        """Encode a batch and map embeddings from the origin tangent space.
 
         Args:
             sentences: Batch of input texts.
 
         Returns:
-            A tensor of manifold-valued embeddings with shape
-            ``(batch_size, embedding_dim)``.
+            Manifold-valued embeddings. Poincaré output has shape
+            ``(batch_size, embedding_dim)``. Lorentz output has shape
+            ``(batch_size, embedding_dim + 1)`` because the hyperboloid uses one
+            additional ambient time-like coordinate.
         """
         features = self.encoder.preprocess(list(sentences))
         features = {
@@ -70,6 +73,8 @@ class ManifoldSentenceTransformer(nn.Module):
         }
         encoder_output: dict[str, Any] = self.encoder(features)
         tangent = self.projection(encoder_output["sentence_embedding"])
+        if self.manifold_name == "lorentz":
+            tangent = torch.cat((torch.zeros_like(tangent[..., :1]), tangent), dim=-1)
         return self.manifold.expmap0(tangent)
 
     def encode(
@@ -85,10 +90,10 @@ class ManifoldSentenceTransformer(nn.Module):
             convert_to_tensor: Return a ``torch.Tensor`` instead of a NumPy array.
 
         Returns:
-            A single embedding with shape ``(embedding_dim,)`` for string input,
-            or a batch with shape ``(batch_size, embedding_dim)`` for sequence
-            input. NumPy arrays are returned by default; tensors are returned when
-            ``convert_to_tensor=True``.
+            A single manifold embedding for string input or a batch for sequence
+            input. The last dimension is ``embedding_dim`` for Poincaré and
+            ``embedding_dim + 1`` for Lorentz. NumPy arrays are returned by
+            default; tensors are returned when ``convert_to_tensor=True``.
 
         Notes:
             Encoding switches the model to evaluation mode and runs under
