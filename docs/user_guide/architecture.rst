@@ -110,6 +110,6 @@ This keeps the boundary between responsibilities small:
 Geometry scope
 --------------
 
-The current development API supports ``manifold="poincare"`` and
-``manifold="lorentz"``. Spherical, SPD, product manifolds, learnable curvature,
-and trainable manifold parameters remain outside the current scope.
+The v0.3 API supports ``manifold="poincare"`` and ``manifold="lorentz"``.
+Spherical, SPD, product manifolds, learnable curvature, and trainable manifold
+parameters remain outside the current scope.
