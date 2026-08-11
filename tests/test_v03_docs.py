@@ -35,7 +35,8 @@ def test_v03_docs_cover_save_load_and_three_way_benchmark() -> None:
     assert "curvature" in saving
     assert "Euclidean vs Poincare vs Lorentz" in evaluation
     assert "python experiments/compare_euclidean_poincare.py" in evaluation
-    assert "not evidence that one geometry is generally superior" in evaluation
+    assert "engineering and regression reference" in evaluation
+    assert "generally superior" in evaluation
 
 
 def test_english_and_japanese_readmes_surface_v03_examples() -> None:
