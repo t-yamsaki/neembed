@@ -109,6 +109,25 @@ uses a plain list of aligned text pairs, default PyTorch collation, multi-epoch
 training, and optional validation. Its batches keep positive candidates unique
 so the in-batch-negative objective remains well-defined.
 
+Lorentz example
+---------------
+
+The same model, loss, trainer, and evaluator workflow works with
+``manifold="lorentz"``. Run the small hierarchy-style example from the
+repository root with:
+
+.. code-block:: bash
+
+   python examples/train_lorentz.py
+
+The `Lorentz example
+<https://github.com/t-yamsaki/neembed/blob/main/examples/train_lorentz.py>`_
+prints finite training/evaluation results, a representative geodesic distance,
+and the distinction between the configured intrinsic ``embedding_dim`` and the
+Lorentz ambient output dimension, which has one additional time-like
+coordinate. It is a usage example, not a claim that Lorentz is generally
+better than Poincare geometry.
+
 For argument and return-value details, see
 :class:`neembed.ManifoldMultipleNegativesRankingLoss`,
 :class:`neembed.ManifoldEmbeddingEvaluator`, and
