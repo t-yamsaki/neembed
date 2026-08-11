@@ -115,6 +115,38 @@ def test_save_pretrained_round_trip_preserves_config_and_embeddings(
     assert torch.allclose(before, after)
 
 
+def test_lorentz_save_pretrained_round_trip_preserves_config_and_embeddings(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(model_module, "SentenceTransformer", FakeSentenceTransformer)
+    torch.manual_seed(0)
+    model = ManifoldSentenceTransformer(
+        "fake-model",
+        manifold="lorentz",
+        embedding_dim=2,
+        curvature=2.0,
+    )
+    before = model.encode(["Shiba Inu", "dog"], convert_to_tensor=True)
+    save_path = tmp_path / "saved-lorentz-model"
+
+    model.save_pretrained(save_path)
+    loaded = ManifoldSentenceTransformer.from_pretrained(save_path)
+    after = loaded.encode(["Shiba Inu", "dog"], convert_to_tensor=True)
+
+    config = json.loads((save_path / "neembed_config.json").read_text(encoding="utf-8"))
+    assert config == {
+        "embedding_dim": 2,
+        "manifold": "lorentz",
+        "curvature": 2.0,
+    }
+    assert loaded.embedding_dim == 2
+    assert loaded.manifold_name == "lorentz"
+    assert loaded.curvature == 2.0
+    assert before.shape == after.shape == (2, 3)
+    assert torch.allclose(before, after)
+
+
 def test_save_pretrained_round_trip_preserves_disabled_projection(
     monkeypatch,
     tmp_path,
