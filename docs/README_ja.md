@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [English README](../README.md)
 
-> **Status:** v0.1.0 は PyPI で公開済みです。v0.2 では evaluation、epoch validation、DataLoader 連携例、再現可能な Euclidean-vs-Poincaré benchmark を追加中です。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
+> **Status:** v0.2.0 では evaluation、epoch validation、DataLoader 連携例、再現可能な Euclidean-vs-Poincaré benchmark を追加します。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
 
 `neembed` は、pretrained Sentence Transformer と manifold-valued representation をつなぐ軽量な integration layer です。pretrained encoder はそのまま利用し、必要に応じて Euclidean embedding を projection したうえで、Poincaré-ball の幾何演算を Geoopt に委譲します。
 
@@ -33,9 +33,9 @@ Non-Euclidean embedding
 
 現在のgeometry scopeは広げすぎず、Poincaré ball のみに限定しています。
 
-## v0.1
+## v0.2
 
-最初のリリースには以下を含みます。
+v0.2 には以下を含みます。
 
 - pretrained encoder として Sentence Transformers を利用
 - Geoopt による Poincaré-ball embedding
@@ -45,7 +45,10 @@ Non-Euclidean embedding
 - 通常の `AdamW` による fine-tuning
 - `encode()` / `distance()` inference helper
 - `save_pretrained()` / `from_pretrained()` によるローカル保存・復元
-- 数値安定性テスト、実行例、Euclidean baseline experiment
+- retrieval / distance metrics を返す `ManifoldEmbeddingEvaluator`
+- `ManifoldTrainer` の任意の epoch-end validation
+- 通常の PyTorch `DataLoader` 連携例
+- 再現可能な Euclidean-vs-Poincaré engineering benchmark
 
 詳細な挙動、前提、API signature は [Documentation](https://neembed.readthedocs.io/en/latest/) にまとめています。
 
