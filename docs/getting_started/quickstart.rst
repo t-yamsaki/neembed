@@ -2,11 +2,12 @@ Quick start
 ===========
 
 This example fine-tunes a pretrained Sentence Transformer on a tiny hierarchy
-using Poincare-ball embeddings.
+using Poincare-ball embeddings, then evaluates aligned retrieval pairs.
 
 .. code-block:: python
 
    from neembed import (
+       ManifoldEmbeddingEvaluator,
        ManifoldSentenceTransformer,
        ManifoldMultipleNegativesRankingLoss,
        ManifoldTrainer,
@@ -34,7 +35,18 @@ using Poincare-ball embeddings.
        (["dog", "cat"], ["mammal", "feline"]),
    ]
 
-   trainer.fit(train_batches, epochs=1)
+   evaluator = ManifoldEmbeddingEvaluator(
+       model=model,
+       anchors=["Shiba Inu", "Siamese cat"],
+       positives=["dog", "cat"],
+   )
+
+   history = trainer.fit(
+       train_batches,
+       epochs=1,
+       evaluator=evaluator,
+   )
+   print(history[-1]["validation"])
 
    embeddings = model.encode([
        "Shiba Inu",
@@ -63,8 +75,10 @@ Next steps
 * Read :doc:`../user_guide/architecture` for the Euclidean-to-Poincare mapping.
 * Read :doc:`../user_guide/training` for the geodesic ranking objective and
   optimizer behavior.
+* Read :doc:`../user_guide/evaluation` for metric definitions, epoch validation,
+  DataLoader interoperability, and the Euclidean-vs-Poincare benchmark.
 * Read :doc:`../user_guide/inference` for ``encode()`` and ``distance()``.
 * Read :doc:`../user_guide/saving_loading` for local model persistence.
 
-The repository also contains a complete runnable example in
-``examples/train_poincare.py``.
+The repository also contains complete runnable examples in
+``examples/train_poincare.py`` and ``examples/train_dataloader.py``.
