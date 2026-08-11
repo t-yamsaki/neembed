@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [日本語](docs/README_ja.md)
 
-> **Status:** v0.1 is implemented and being prepared for its first public PyPI release. The API is intentionally small and may still evolve before a stable 1.0 release.
+> **Status:** v0.1.0 is available on PyPI. v0.2 is in development and adds evaluation, epoch validation, DataLoader interoperability examples, and a reproducible Euclidean-vs-Poincaré benchmark. The API remains intentionally small and may still evolve before a stable 1.0 release.
 
 `neembed` is a lightweight integration layer between pretrained Sentence Transformer models and manifold-valued representations. It keeps the pretrained encoder intact, optionally projects its Euclidean output, and delegates Poincaré-ball geometry to Geoopt.
 
@@ -31,7 +31,7 @@ Hierarchical and tree-like relations can be awkward to represent in a flat Eucli
 - hierarchical labels
 - tree-like semantic relations
 
-v0.1 deliberately focuses on one geometry: the Poincaré ball.
+The current geometry scope deliberately remains the Poincaré ball.
 
 ## v0.1
 
@@ -50,8 +50,6 @@ The first release includes:
 Detailed behavior, assumptions, and API signatures live in the [documentation](https://neembed.readthedocs.io/en/latest/).
 
 ## Installation
-
-After `v0.1.0` is published to PyPI:
 
 ```bash
 pip install neembed-geoopt
@@ -112,6 +110,7 @@ The full guide is hosted on Read the Docs:
 - [Quick Start](https://neembed.readthedocs.io/en/latest/getting_started/quickstart.html)
 - [Architecture](https://neembed.readthedocs.io/en/latest/user_guide/architecture.html)
 - [Training](https://neembed.readthedocs.io/en/latest/user_guide/training.html)
+- [Evaluation](https://neembed.readthedocs.io/en/latest/user_guide/evaluation.html)
 - [Inference](https://neembed.readthedocs.io/en/latest/user_guide/inference.html)
 - [Saving and Loading](https://neembed.readthedocs.io/en/latest/user_guide/saving_loading.html)
 - [API Reference](https://neembed.readthedocs.io/en/latest/#api-reference)
@@ -124,8 +123,9 @@ Run the end-to-end example:
 python examples/train_poincare.py
 ```
 
-- [examples/train_poincare.py](examples/train_poincare.py) contains the workflow.
-- [experiments/README.md](experiments/README.md) documents the fixed Euclidean-vs-Poincaré comparison experiment and its interpretation limits.
+- [examples/train_poincare.py](examples/train_poincare.py) contains the minimal workflow.
+- [examples/train_dataloader.py](examples/train_dataloader.py) shows ordinary PyTorch `DataLoader` training and epoch validation.
+- [experiments/README.md](experiments/README.md) documents the reproducible Euclidean-vs-Poincaré benchmark and its interpretation limits.
 
 ## License
 
