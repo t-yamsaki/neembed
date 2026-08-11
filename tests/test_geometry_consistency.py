@@ -12,8 +12,15 @@ from neembed.manifolds import get_manifold
 
 
 CURVATURES = (0.25, 1.0, 2.0)
+# The public Poincare construction accepts a Python float, so Geoopt first creates
+# its inverse-softplus curvature parameter at PyTorch's default dtype (normally
+# float32). Moving the manifold to float64 afterwards cannot recover that initial
+# rounding. The 1e-6 tolerance therefore exercises the real public construction
+# path while remaining far tighter than the 5e-5 float32 regression tolerance.
+FLOAT64_ATOL = 1e-6
+FLOAT64_RTOL = 1e-6
 DTYPE_TOLERANCES = (
-    (torch.float64, 1e-9, 1e-9),
+    (torch.float64, FLOAT64_ATOL, FLOAT64_RTOL),
     (torch.float32, 5e-5, 5e-5),
 )
 
@@ -151,8 +158,8 @@ def test_geodesic_regression_would_detect_euclidean_distance_fallback() -> None:
     assert torch.allclose(
         poincare_geodesic,
         lorentz_geodesic,
-        atol=1e-9,
-        rtol=1e-9,
+        atol=FLOAT64_ATOL,
+        rtol=FLOAT64_RTOL,
     )
     assert not torch.isclose(
         poincare_geodesic,
