@@ -14,8 +14,13 @@ Encoding text
    single = model.encode("Shiba Inu")
    batch = model.encode(["Shiba Inu", "dog", "mammal"])
 
-For a single string, the returned shape is ``(embedding_dim,)``. For a
-sequence, the returned shape is ``(batch_size, embedding_dim)``.
+For ``manifold="poincare"``, a single string has shape ``(embedding_dim,)`` and
+a sequence has shape ``(batch_size, embedding_dim)``.
+
+For ``manifold="lorentz"``, ``embedding_dim`` remains the intrinsic projected
+dimension, while the hyperboloid representation adds one ambient time-like
+coordinate. The corresponding shapes are therefore ``(embedding_dim + 1,)``
+and ``(batch_size, embedding_dim + 1)``.
 
 NumPy and Tensor output
 -----------------------
@@ -35,7 +40,9 @@ Set ``convert_to_tensor=True`` to keep the result as a ``torch.Tensor``:
        convert_to_tensor=True,
    )
 
-The Tensor stays on the model device.
+The Tensor stays on the model device. Lorentz manifold outputs use ``float64``
+for numerical stability; Poincare outputs keep the model's ordinary parameter
+dtype.
 
 Inference mode
 --------------
@@ -59,7 +66,9 @@ encoded manifold embeddings:
    distance = model.distance(embeddings[0], embeddings[1])
    print(float(distance))
 
-Array-like inputs are converted to tensors using the model's device and dtype.
-The distance calculation runs under ``torch.no_grad()`` and returns a Tensor.
+Array-like inputs are converted to tensors on the model device. Poincare
+distance uses the model parameter dtype, while Lorentz distance is evaluated in
+``float64`` to preserve the precision used by the Lorentz manifold path. The
+distance calculation runs under ``torch.no_grad()`` and returns a Tensor.
 This helper is therefore also inference-oriented; the training loss calls the
 manifold distance directly so gradients remain available during optimization.
