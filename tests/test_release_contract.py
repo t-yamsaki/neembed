@@ -1,36 +1,33 @@
 """Release metadata and public API contract tests."""
 
-from pathlib import Path
-import tomllib
+from importlib.metadata import metadata
 
 import neembed
 
 
-ROOT = Path(__file__).parents[1]
-
-
-def _project() -> dict:
-    with (ROOT / "pyproject.toml").open("rb") as file:
-        return tomllib.load(file)["project"]
+def _distribution_metadata():
+    return metadata("neembed-geoopt")
 
 
 def test_distribution_and_import_names_remain_distinct() -> None:
-    project = _project()
+    package_metadata = _distribution_metadata()
 
-    assert project["name"] == "neembed-geoopt"
+    assert package_metadata["Name"] == "neembed-geoopt"
     assert neembed.__name__ == "neembed"
 
 
 def test_python_support_and_documentation_metadata_are_stable() -> None:
-    project = _project()
+    package_metadata = _distribution_metadata()
+    project_urls = package_metadata.get_all("Project-URL") or []
+    classifiers = package_metadata.get_all("Classifier") or []
 
-    assert project["requires-python"] == ">=3.10"
-    assert project["urls"]["Documentation"] == "https://neembed.readthedocs.io/en/latest/"
+    assert package_metadata["Requires-Python"] == ">=3.10"
+    assert "Documentation, https://neembed.readthedocs.io/en/latest/" in project_urls
     assert {
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
-    }.issubset(project["classifiers"])
+    }.issubset(classifiers)
 
 
 def test_v02_evaluator_is_part_of_the_public_api() -> None:
