@@ -31,7 +31,7 @@ Non-Euclidean embedding
 - 階層ラベル
 - 木構造に近い意味関係
 
-現在の開発版 API は Poincaré ball と Lorentz / Hyperboloid をサポートします。公開済みの v0.2.0 は Poincaré のみで、Lorentz 対応は v0.3.0 を対象としています。
+現在の開発版 API は、Poincaré ball と Lorentz / Hyperboloid を同じ model・loss・trainer・evaluator・save/load workflow で扱えます。公開済みの v0.2.0 は Poincaré のみで、Lorentz 対応は v0.3.0 を対象としています。
 
 ## v0.2
 
@@ -103,7 +103,7 @@ distance = model.distance(embeddings[0], embeddings[1])
 print(float(distance))
 ```
 
-各 anchor は同じ batch index の positive と対応します。off-diagonal candidate は in-batch negative になるため、同じ batch 内で positive を重複させないでください。目的関数とbatchingの詳細は [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html) を参照してください。
+各 anchor は同じ batch index の positive と対応します。off-diagonal candidate は in-batch negative になるため、同じ batch 内で positive を重複させないでください。目的関数と batching の詳細は [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html)、Poincaré / Lorentz の次元・curvature・precision semantics は [Architecture guide](https://neembed.readthedocs.io/en/latest/user_guide/architecture.html) を参照してください。
 
 ## ドキュメント
 
@@ -120,15 +120,17 @@ print(float(distance))
 
 ## 実行例と検証
 
-end-to-end の実行例：
+repository root から geometry-specific example を実行できます。
 
 ```bash
 python examples/train_poincare.py
+python examples/train_lorentz.py
 ```
 
-- [examples/train_poincare.py](../examples/train_poincare.py) に最小workflowがあります。
+- [examples/train_poincare.py](../examples/train_poincare.py) に最小の Poincaré workflow があります。
+- [examples/train_lorentz.py](../examples/train_lorentz.py) では同じ train / evaluate / inference workflow を Lorentz geometry で実行し、intrinsic dimension と ambient dimension の違いも確認できます。
 - [examples/train_dataloader.py](../examples/train_dataloader.py) で通常の PyTorch `DataLoader` と epoch validation を確認できます。
-- [experiments/README.md](../experiments/README.md) に再現可能な Euclidean-vs-Poincaré benchmark と結果の解釈上の注意をまとめています。
+- [experiments/README.md](../experiments/README.md) に再現可能な Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark と結果の解釈上の注意をまとめています。
 
 ## License
 

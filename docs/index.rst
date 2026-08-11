@@ -6,11 +6,13 @@ spaces while delegating manifold geometry to Geoopt.
 
 The public API is intentionally small: a sentence model, a manifold-aware
 multiple-negatives ranking loss, a minimal trainer, and an embedding evaluator.
-The current geometry scope remains the Poincare ball only.
+The current development API supports Poincare and Lorentz hyperbolic models
+through the same model, loss, trainer, evaluator, and save/load workflow.
 
-Start with :doc:`getting_started/quickstart` if you want to train a model, or
-jump to the :ref:`api-reference` for class and method details generated from
-the public docstrings.
+Start with :doc:`getting_started/quickstart` if you want to train a model. Read
+:doc:`user_guide/architecture` for manifold selection, curvature, dimensions,
+and Lorentz precision behavior, or jump to the :ref:`api-reference` for class
+and method details generated from the public docstrings.
 
 .. toctree::
    :maxdepth: 2
