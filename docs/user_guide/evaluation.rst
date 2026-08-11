@@ -1,7 +1,8 @@
 Evaluation
 ==========
 
-v0.2 adds a small evaluation workflow around the existing training path:
+v0.2 introduced a small evaluation workflow around the training path, and the
+same evaluator now works with both supported hyperbolic manifolds:
 
 .. code-block:: text
 
@@ -58,11 +59,11 @@ Metrics
    Mean distance across all off-diagonal anchor-candidate pairs. Higher means
    the non-matching candidates are farther away on average.
 
-Distance magnitudes are geometry- and configuration-dependent. In particular,
-curvature and the learned representation can change the scale of Poincare
-geodesic distances. Compare distance values only when the evaluation setup is
+Distance magnitudes are geometry- and configuration-dependent. Curvature,
+coordinate model, and the learned representation can all change the distance
+scale. Compare raw distance values only when the evaluation setup is
 meaningfully comparable; do not treat their absolute scale as a universal
-quality score.
+quality score across cosine, Poincare, and Lorentz geometry.
 
 Validation during training
 --------------------------
@@ -83,8 +84,9 @@ With validation enabled, each history entry contains the epoch's mean
 metrics. Without an evaluator, ``fit()`` keeps the original ``list[float]``
 return shape.
 
-See :doc:`training` for the training contract and optimizer behavior, and
-:class:`neembed.ManifoldTrainer` for the generated API details.
+See :doc:`training` for the training contract, optimizer behavior, and runnable
+Lorentz example, and :class:`neembed.ManifoldTrainer` for the generated API
+details.
 
 PyTorch DataLoader interoperability
 -----------------------------------
@@ -100,8 +102,8 @@ shows default PyTorch collation, multi-epoch training, and epoch-end validation.
 Keep positive candidates unique within each batch because the ranking loss uses
 off-diagonal positives as in-batch negatives.
 
-Euclidean vs Poincare benchmark
--------------------------------
+Euclidean vs Poincare vs Lorentz benchmark
+-----------------------------------------
 
 The repository includes a deterministic, tiny hierarchy-retrieval benchmark:
 
@@ -109,10 +111,17 @@ The repository includes a deterministic, tiny hierarchy-retrieval benchmark:
 
    python experiments/compare_euclidean_poincare.py
 
-The benchmark fine-tunes Euclidean and Poincare variants under matched data and
-training conditions, then reports the shared v0.2 metrics plus
-``final_training_loss`` for each variant. The JSON output also records the seed,
-model name, task pairs, and key hyperparameters needed to reproduce the run.
+The benchmark fine-tunes Euclidean, Poincare, and Lorentz variants under
+matched data and training conditions. The two hyperbolic variants use the same
+intrinsic projection dimension and the same public curvature magnitude. Each
+variant reports the shared evaluator metrics plus ``final_training_loss``.
+
+The JSON output records the seed, model name, task pairs, and key
+hyperparameters needed to reproduce the run. It also records ambient dimensions
+explicitly: for intrinsic dimension :math:`D`, Euclidean and Poincare use
+:math:`D` output coordinates while Lorentz uses :math:`D + 1`. The extra
+Lorentz coordinate is part of the hyperboloid representation, not additional
+intrinsic model capacity.
 
 See the `experiment documentation
 <https://github.com/t-yamsaki/neembed/blob/main/experiments/README.md>`_ for the
@@ -121,7 +130,9 @@ fixed configuration and output contract.
 This benchmark is an engineering and regression reference, not evidence that
 one geometry is generally superior. It uses a tiny controlled task, does not
 perform hyperparameter search, and should not be interpreted as a research
-leaderboard result.
+leaderboard result. Raw distance magnitudes also use different geometry-specific
+metrics and should not be ranked directly across variants as universal quality
+scores.
 
 API reference
 -------------
