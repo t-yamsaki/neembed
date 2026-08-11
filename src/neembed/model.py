@@ -64,7 +64,8 @@ class ManifoldSentenceTransformer(nn.Module):
             Manifold-valued embeddings. Poincaré output has shape
             ``(batch_size, embedding_dim)``. Lorentz output has shape
             ``(batch_size, embedding_dim + 1)`` because the hyperboloid uses one
-            additional ambient time-like coordinate.
+            additional ambient time-like coordinate. Lorentz geometry is computed
+            in double precision for numerical stability.
         """
         features = self.encoder.preprocess(list(sentences))
         features = {
@@ -74,6 +75,7 @@ class ManifoldSentenceTransformer(nn.Module):
         encoder_output: dict[str, Any] = self.encoder(features)
         tangent = self.projection(encoder_output["sentence_embedding"])
         if self.manifold_name == "lorentz":
+            tangent = tangent.to(dtype=torch.float64)
             tangent = torch.cat((torch.zeros_like(tangent[..., :1]), tangent), dim=-1)
         return self.manifold.expmap0(tangent)
 
@@ -93,7 +95,8 @@ class ManifoldSentenceTransformer(nn.Module):
             A single manifold embedding for string input or a batch for sequence
             input. The last dimension is ``embedding_dim`` for Poincaré and
             ``embedding_dim + 1`` for Lorentz. NumPy arrays are returned by default;
-            tensors are returned when ``convert_to_tensor=True``.
+            tensors are returned when ``convert_to_tensor=True``. Lorentz outputs
+            use ``float64`` for the manifold geometry path.
 
         Notes:
             Encoding switches the model to evaluation mode and runs under
@@ -125,11 +128,24 @@ class ManifoldSentenceTransformer(nn.Module):
 
         Notes:
             This is an inference helper. Inputs are moved to the model device and
-            dtype, and the distance is computed under ``torch.no_grad()``.
+            geometry dtype, and the distance is computed under ``torch.no_grad()``.
+            Lorentz distance is evaluated in ``float64``; Poincaré keeps the model
+            parameter dtype.
         """
         reference = next(self.parameters())
-        a_tensor = torch.as_tensor(a, device=reference.device, dtype=reference.dtype)
-        b_tensor = torch.as_tensor(b, device=reference.device, dtype=reference.dtype)
+        geometry_dtype = (
+            torch.float64 if self.manifold_name == "lorentz" else reference.dtype
+        )
+        a_tensor = torch.as_tensor(
+            a,
+            device=reference.device,
+            dtype=geometry_dtype,
+        )
+        b_tensor = torch.as_tensor(
+            b,
+            device=reference.device,
+            dtype=geometry_dtype,
+        )
 
         with torch.no_grad():
             return self.manifold.dist(a_tensor, b_tensor)
