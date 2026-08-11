@@ -64,9 +64,33 @@ hyperboloid radius ``k``, so neembed maps the same public value :math:`c` to
 ``k = 1 / c``.
 
 Lorentz geometry is evaluated in ``float64`` while the pretrained encoder and
-ordinary Euclidean projection parameters keep their normal dtype. Geoopt
-recommends double precision for the Lorentz model because its Minkowski-space
-operations are sensitive to floating-point error.
+ordinary Euclidean projection parameters keep their normal dtype. This keeps
+the extra precision cost confined to the geometry path and follows Geoopt's
+numerical guidance for the Lorentz model.
+
+Choosing a manifold
+-------------------
+
+Both supported manifolds use the same pretrained encoder, optional projection,
+multiple-negatives loss, trainer, evaluator, and save/load API. The choice is a
+coordinate-model choice rather than a different training framework.
+
+``poincare``
+   Produces :math:`D` coordinates for an intrinsic dimension :math:`D`. The
+   geometry path keeps the model's ordinary parameter dtype.
+
+``lorentz``
+   Represents the same intrinsic dimension :math:`D` with :math:`D + 1`
+   ambient hyperboloid coordinates and evaluates the geometry path in
+   ``float64``.
+
+Use the same public curvature magnitude when comparing the two hyperbolic
+models. Do not infer that the extra Lorentz coordinate is extra intrinsic model
+capacity, and do not assume either coordinate model is generally superior.
+Choose based on the representation and numerical trade-offs that matter for
+your application, then compare task metrics under matched conditions. The
+repository benchmark documents one small matched engineering comparison; see
+:doc:`evaluation` for its limits.
 
 Why map from the tangent space?
 -------------------------------
@@ -87,6 +111,5 @@ Geometry scope
 --------------
 
 The current development API supports ``manifold="poincare"`` and
-``manifold="lorentz"``. The published v0.2.0 release is Poincare-only; Lorentz
-support is targeted for v0.3.0. Spherical, SPD, product manifolds, learnable
-curvature, and trainable manifold parameters remain outside the current scope.
+``manifold="lorentz"``. Spherical, SPD, product manifolds, learnable curvature,
+and trainable manifold parameters remain outside the current scope.
