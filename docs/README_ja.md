@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [English README](../README.md)
 
-> **Status:** v0.3.0 では、2つ目の双曲幾何として Lorentz / Hyperboloid embedding、Poincaré–Lorentz の幾何整合性 regression、Lorentz の train / evaluate example、再現可能な Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark を追加します。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
+> **Status:** v0.3.0 には、2つ目の双曲幾何である Lorentz / Hyperboloid embedding、Poincaré–Lorentz の幾何整合性 regression、Lorentz の train / evaluate example、再現可能な Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark が含まれます。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
 
 `neembed` は、pretrained Sentence Transformer と manifold-valued representation をつなぐ軽量な integration layer です。pretrained encoder はそのまま利用し、必要に応じて Euclidean embedding を projection したうえで、双曲幾何の演算を Geoopt に委譲します。
 
