@@ -126,9 +126,12 @@ def test_real_lorentz_geometry_gradients_and_adamw_update() -> None:
     distance = model.distance(embeddings[0], embeddings[1])
 
     assert isinstance(model.manifold, geoopt.Lorentz)
+    assert model.manifold.k.dtype == torch.float64
     assert embeddings.shape == (4, 33)
+    assert embeddings.dtype == torch.float64
     assert torch.isfinite(embeddings).all()
-    assert torch.allclose(quad_form, expected_quad_form, atol=5e-4, rtol=5e-4)
+    assert torch.allclose(quad_form, expected_quad_form, atol=1e-7, rtol=1e-7)
+    assert distance.dtype == torch.float64
     assert torch.isfinite(distance)
     assert float(distance) >= 0.0
 
