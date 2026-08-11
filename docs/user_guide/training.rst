@@ -97,6 +97,17 @@ With an evaluator, each history entry has a mean ``train_loss`` and a nested
 no-evaluator return behavior backward-compatible while making epoch validation
 results explicit.
 
+PyTorch DataLoader
+------------------
+
+An ordinary ``torch.utils.data.DataLoader`` can feed ``ManifoldTrainer``
+directly; neembed does not require a custom Dataset or DataModule abstraction.
+The runnable `DataLoader example
+<https://github.com/t-yamsaki/neembed/blob/main/examples/train_dataloader.py>`_
+uses a plain list of aligned text pairs, default PyTorch collation, multi-epoch
+training, and optional validation. Its batches keep positive candidates unique
+so the in-batch-negative objective remains well-defined.
+
 For argument and return-value details, see
 :class:`neembed.ManifoldMultipleNegativesRankingLoss`,
 :class:`neembed.ManifoldEmbeddingEvaluator`, and
