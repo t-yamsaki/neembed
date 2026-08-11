@@ -23,6 +23,7 @@ def test_get_manifold_constructs_lorentz_with_matching_public_curvature() -> Non
     # Geoopt's Lorentz ``k`` is the squared hyperboloid radius, so sectional
     # curvature -2 corresponds to k = 1 / 2.
     assert float(manifold.k) == pytest.approx(0.5)
+    assert manifold.k.dtype == torch.float64
 
 
 def test_poincare_ball_exposes_expmap0_and_geodesic_distance() -> None:
