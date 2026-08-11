@@ -103,7 +103,7 @@ Keep positive candidates unique within each batch because the ranking loss uses
 off-diagonal positives as in-batch negatives.
 
 Euclidean vs Poincare vs Lorentz benchmark
------------------------------------------
+------------------------------------------
 
 The repository includes a deterministic, tiny hierarchy-retrieval benchmark:
 
