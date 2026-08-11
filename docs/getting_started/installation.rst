@@ -4,7 +4,7 @@ Installation
 Python support
 --------------
 
-neembed v0.1 requires Python 3.10 or newer and is tested on Python 3.10,
+neembed v0.2 requires Python 3.10 or newer and is tested on Python 3.10,
 3.11, and 3.12.
 
 Install from PyPI

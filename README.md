@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [日本語](docs/README_ja.md)
 
-> **Status:** v0.1.0 is available on PyPI. v0.2 is in development and adds evaluation, epoch validation, DataLoader interoperability examples, and a reproducible Euclidean-vs-Poincaré benchmark. The API remains intentionally small and may still evolve before a stable 1.0 release.
+> **Status:** v0.2.0 adds evaluation, epoch validation, DataLoader interoperability examples, and a reproducible Euclidean-vs-Poincaré benchmark. The API remains intentionally small and may still evolve before a stable 1.0 release.
 
 `neembed` is a lightweight integration layer between pretrained Sentence Transformer models and manifold-valued representations. It keeps the pretrained encoder intact, optionally projects its Euclidean output, and delegates Poincaré-ball geometry to Geoopt.
 
@@ -33,9 +33,9 @@ Hierarchical and tree-like relations can be awkward to represent in a flat Eucli
 
 The current geometry scope deliberately remains the Poincaré ball.
 
-## v0.1
+## v0.2
 
-The first release includes:
+The v0.2 release includes:
 
 - Sentence Transformers as the pretrained encoder backend
 - Poincaré-ball embeddings through Geoopt
@@ -45,7 +45,10 @@ The first release includes:
 - ordinary `AdamW` fine-tuning
 - `encode()` and `distance()` inference helpers
 - `save_pretrained()` / `from_pretrained()` local persistence
-- numerical-stability tests, a runnable example, and a Euclidean baseline experiment
+- `ManifoldEmbeddingEvaluator` with retrieval and distance metrics
+- optional epoch-end validation in `ManifoldTrainer`
+- ordinary PyTorch `DataLoader` interoperability example
+- a reproducible Euclidean-vs-Poincaré engineering benchmark
 
 Detailed behavior, assumptions, and API signatures live in the [documentation](https://neembed.readthedocs.io/en/latest/).
 
