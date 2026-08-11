@@ -31,7 +31,7 @@ Hierarchical and tree-like relations can be awkward to represent in a flat Eucli
 - hierarchical labels
 - tree-like semantic relations
 
-The current development API supports the Poincaré ball and Lorentz / Hyperboloid models. The published v0.2.0 release remains Poincaré-only; Lorentz support is targeted for v0.3.0.
+The current development API supports the Poincaré ball and Lorentz / Hyperboloid models through the same model, loss, trainer, evaluator, and save/load workflow. The published v0.2.0 release remains Poincaré-only; Lorentz support is targeted for v0.3.0.
 
 ## v0.2
 
@@ -103,7 +103,7 @@ distance = model.distance(embeddings[0], embeddings[1])
 print(float(distance))
 ```
 
-Each anchor is paired with the positive at the same batch index. Because off-diagonal candidates become in-batch negatives, avoid duplicate positives within one batch. See the [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html) for the objective and batching details.
+Each anchor is paired with the positive at the same batch index. Because off-diagonal candidates become in-batch negatives, avoid duplicate positives within one batch. See the [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html) for the objective and batching details, and the [Architecture guide](https://neembed.readthedocs.io/en/latest/user_guide/architecture.html) for Poincaré/Lorentz dimension, curvature, and precision semantics.
 
 ## Documentation
 
@@ -120,15 +120,17 @@ The full guide is hosted on Read the Docs:
 
 ## Examples and validation
 
-Run the end-to-end example:
+Run the geometry-specific examples from the repository root:
 
 ```bash
 python examples/train_poincare.py
+python examples/train_lorentz.py
 ```
 
-- [examples/train_poincare.py](examples/train_poincare.py) contains the minimal workflow.
+- [examples/train_poincare.py](examples/train_poincare.py) contains the minimal Poincaré workflow.
+- [examples/train_lorentz.py](examples/train_lorentz.py) shows the same train/evaluate/inference workflow with Lorentz geometry and makes the intrinsic-vs-ambient dimension difference explicit.
 - [examples/train_dataloader.py](examples/train_dataloader.py) shows ordinary PyTorch `DataLoader` training and epoch validation.
-- [experiments/README.md](experiments/README.md) documents the reproducible Euclidean-vs-Poincaré benchmark and its interpretation limits.
+- [experiments/README.md](experiments/README.md) documents the reproducible Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark and its interpretation limits.
 
 ## License
 
