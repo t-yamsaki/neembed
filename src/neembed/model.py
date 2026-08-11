@@ -92,8 +92,8 @@ class ManifoldSentenceTransformer(nn.Module):
         Returns:
             A single manifold embedding for string input or a batch for sequence
             input. The last dimension is ``embedding_dim`` for Poincaré and
-            ``embedding_dim + 1`` for Lorentz. NumPy arrays are returned by
-            default; tensors are returned when ``convert_to_tensor=True``.
+            ``embedding_dim + 1`` for Lorentz. NumPy arrays are returned by default;
+            tensors are returned when ``convert_to_tensor=True``.
 
         Notes:
             Encoding switches the model to evaluation mode and runs under
