@@ -1,5 +1,7 @@
 """Manifold integration points for neembed."""
 
+from __future__ import annotations
+
 import math
 
 import geoopt
