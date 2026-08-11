@@ -10,7 +10,7 @@ neembed v0.1 requires Python 3.10 or newer and is tested on Python 3.10,
 Install from PyPI
 -----------------
 
-After ``neembed-geoopt==0.1.0`` is published to PyPI, install it with:
+Install the published release from PyPI with:
 
 .. code-block:: bash
 
