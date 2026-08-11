@@ -52,12 +52,16 @@ def set_seed(seed: int) -> None:
     torch.manual_seed(seed)
 
 
-def make_model(seed: int) -> ManifoldSentenceTransformer:
-    """Construct the real model with the fixed pre-#8 gate configuration."""
+def make_model(
+    seed: int,
+    *,
+    manifold: str = "poincare",
+) -> ManifoldSentenceTransformer:
+    """Construct the real model with the fixed acceptance configuration."""
     set_seed(seed)
     return ManifoldSentenceTransformer(
         MODEL_NAME,
-        manifold="poincare",
+        manifold=manifold,
         embedding_dim=32,
         curvature=1.0,
     )
@@ -111,6 +115,50 @@ def test_gate_3_real_model_geometry() -> None:
         f"distance_ab={float(distance_ab):.9f} "
         f"symmetry_error={float((distance_ab - distance_ba).abs()):.9f} "
         f"self_distance={float(distance_aa):.9f}"
+    )
+
+
+def test_real_lorentz_geometry_gradients_and_adamw_update() -> None:
+    model = make_model(0, manifold="lorentz")
+    embeddings = model.encode(GEOMETRY_TERMS, convert_to_tensor=True)
+    quad_form = -embeddings[:, 0].square() + embeddings[:, 1:].square().sum(dim=-1)
+    expected_quad_form = torch.full_like(quad_form, -float(model.manifold.k))
+    distance = model.distance(embeddings[0], embeddings[1])
+
+    assert isinstance(model.manifold, geoopt.Lorentz)
+    assert embeddings.shape == (4, 33)
+    assert torch.isfinite(embeddings).all()
+    assert torch.allclose(quad_form, expected_quad_form, atol=5e-4, rtol=5e-4)
+    assert torch.isfinite(distance)
+    assert float(distance) >= 0.0
+
+    model.train()
+    loss_fn = ManifoldMultipleNegativesRankingLoss(model=model, temperature=0.1)
+    trainer = ManifoldTrainer(
+        model=model,
+        loss=loss_fn,
+        learning_rate=2e-5,
+        verbose=False,
+    )
+    projection_before = model.projection.weight.detach().clone()
+    loss = loss_fn(*TRAIN_BATCHES[0])
+    trainer.optimizer.zero_grad()
+    loss.backward()
+
+    assert torch.isfinite(loss)
+    assert model.projection.weight.grad is not None
+    assert torch.isfinite(model.projection.weight.grad).all()
+    assert torch.count_nonzero(model.projection.weight.grad) > 0
+    assert isinstance(trainer.optimizer, torch.optim.AdamW)
+
+    trainer.optimizer.step()
+
+    assert not torch.equal(projection_before, model.projection.weight.detach())
+    print(
+        "lorentz "
+        f"distance={float(distance):.9f} "
+        f"loss={float(loss):.9f} "
+        "projection_changed=True optimizer=AdamW"
     )
 
 
