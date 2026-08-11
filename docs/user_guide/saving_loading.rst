@@ -1,8 +1,8 @@
 Saving and loading
 ==================
 
-``ManifoldSentenceTransformer`` can save and reload the local state required by
-neembed v0.1.
+``ManifoldSentenceTransformer`` saves and reloads the local state required to
+reconstruct either supported manifold configuration.
 
 Save a model
 ------------
@@ -21,8 +21,12 @@ The target directory contains:
    └── projection.pt
 
 ``encoder/`` is written by Sentence Transformers. ``neembed_config.json``
-stores the manifold name, curvature, and configured projection dimension.
-``projection.pt`` stores the projection state dictionary.
+stores the configured ``manifold`` name, public ``curvature`` magnitude, and
+projection dimension. ``projection.pt`` stores the projection state dictionary.
+
+The same layout is used for Poincare and Lorentz models. Lorentz does not add a
+separate geometry checkpoint because the Geoopt manifold is reconstructed from
+the saved configuration rather than trained as an independent parameter set.
 
 Load a model
 ------------
@@ -34,8 +38,14 @@ Load a model
    loaded = ManifoldSentenceTransformer.from_pretrained("./saved_model")
 
 ``from_pretrained()`` reconstructs the Sentence Transformer from the saved
-``encoder/`` directory, rebuilds the configured Poincare manifold and optional
-projection, and then restores the projection state.
+``encoder/`` directory, rebuilds the configured Poincare or Lorentz manifold,
+recreates the optional projection, and then restores the projection state.
 
-The save/load helpers are local filesystem helpers in v0.1. They do not add a
-separate model registry or Hugging Face Hub integration.
+The loaded model therefore preserves the saved manifold choice, public
+curvature magnitude, and intrinsic projection dimension. For Lorentz, the
+usual output contract also remains unchanged: an intrinsic dimension :math:`D`
+is represented with :math:`D + 1` ambient coordinates and the geometry path
+uses ``float64``.
+
+The save/load helpers are local filesystem helpers. They do not add a separate
+model registry or Hugging Face Hub integration.
