@@ -63,8 +63,11 @@ def _make_mixed_trainer(monkeypatch, manifold_name: str):
     )
     prototypes = ManifoldPrototypes(model, num_prototypes=3, init_std=0.05)
     loss = PrototypeAugmentedLoss(model, prototypes)
+    trainable_parameters = [
+        parameter for parameter in loss.parameters() if parameter.requires_grad
+    ]
     optimizer = geoopt.optim.RiemannianAdam(
-        loss.parameters(),
+        trainable_parameters,
         lr=1e-2,
         stabilize=1,
     )
@@ -88,7 +91,9 @@ def test_supplied_riemannian_optimizer_covers_and_updates_mixed_parameters(
         manifold_name,
     )
 
-    expected_parameters = {id(parameter) for parameter in loss.parameters()}
+    expected_parameters = {
+        id(parameter) for parameter in loss.parameters() if parameter.requires_grad
+    }
     optimized_parameters = {
         id(parameter)
         for group in optimizer.param_groups
@@ -123,6 +128,7 @@ def test_supplied_riemannian_optimizer_covers_and_updates_mixed_parameters(
         parameter
         for group in optimizer.param_groups
         for parameter in group["params"]
+        if parameter.requires_grad
     ]
     assert all(parameter.grad is not None for parameter in participating_parameters)
     assert all(
