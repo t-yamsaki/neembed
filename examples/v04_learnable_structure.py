@@ -67,6 +67,13 @@ def run_configuration(
     learning_rate: float,
 ) -> dict[str, Any]:
     """Run one matched tiny-hierarchy configuration and return diagnostics."""
+    if epochs <= 0:
+        raise ValueError("epochs must be positive")
+    if embedding_dim <= 0:
+        raise ValueError("embedding_dim must be positive")
+    if learning_rate <= 0 or not math.isfinite(learning_rate):
+        raise ValueError("learning_rate must be positive and finite")
+
     torch.manual_seed(seed)
     model = ManifoldSentenceTransformer(
         model_name_or_path,
@@ -178,6 +185,24 @@ def run_benchmark(
     }
 
 
+def _validate_regression(results: dict[str, dict[str, Any]]) -> None:
+    for name, result in results.items():
+        if not math.isfinite(result["final_training_loss"]):
+            raise RuntimeError(f"{name} training loss became non-finite")
+        if not result["finite_distances"]:
+            raise RuntimeError(f"{name} produced non-finite distances")
+        if not result["prototypes_valid"]:
+            raise RuntimeError(f"{name} prototypes left the manifold")
+
+    learnable = results["learnable_structure"]
+    if not math.isfinite(learnable["curvature_delta"]):
+        raise RuntimeError("learnable curvature became non-finite")
+    if abs(learnable["curvature_delta"]) == 0.0:
+        raise RuntimeError("learnable curvature did not change")
+    if learnable["prototype_shift"] <= 0.0:
+        raise RuntimeError("learnable prototypes did not update")
+
+
 def _print_results(results: dict[str, dict[str, Any]]) -> None:
     for name, result in results.items():
         print(name)
@@ -209,9 +234,7 @@ def main() -> None:
     args = parser.parse_args()
 
     results = run_benchmark(args.model, epochs=args.epochs)
-    learnable = results["learnable_structure"]
-    if not math.isfinite(learnable["curvature_delta"]):
-        raise RuntimeError("learnable curvature became non-finite")
+    _validate_regression(results)
     _print_results(results)
 
 
