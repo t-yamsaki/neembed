@@ -126,7 +126,13 @@ print(float(distance))
 
 ## 実行例と検証
 
-主な runnable reference は以下です。
+repository root から主な reference を実行できます。
+
+```bash
+python examples/train_poincare.py
+python examples/train_lorentz.py
+python examples/v04_learnable_structure.py
+```
 
 - [examples/train_poincare.py](../examples/train_poincare.py) — 最小の Poincaré workflow
 - [examples/train_lorentz.py](../examples/train_lorentz.py) — Lorentz の train / evaluate / inference と intrinsic-vs-ambient dimension
