@@ -1,5 +1,7 @@
 """Minimal training loop for neembed."""
 
+from __future__ import annotations
+
 from collections.abc import Iterable, Sequence
 
 import torch
