@@ -6,8 +6,8 @@ spaces while delegating manifold geometry to Geoopt.
 
 The public API is intentionally small: a sentence model, a manifold-aware
 multiple-negatives ranking loss, a minimal trainer, an embedding evaluator, and
-an opt-in manifold prototype module. The current API supports Poincare and
-Lorentz hyperbolic models through the same sentence-model geometry semantics.
+an opt-in manifold prototype module. The current API supports Poincare and Lorentz
+hyperbolic models through the same sentence-model geometry semantics.
 
 Start with :doc:`getting_started/quickstart` if you want to train a model. Read
 :doc:`user_guide/architecture` for manifold selection, curvature, dimensions,
