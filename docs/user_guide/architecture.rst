@@ -57,55 +57,71 @@ tangent coordinate before calling Geoopt's Lorentz ``expmap0``. If the intrinsic
 ``embedding_dim`` is :math:`D`, the resulting Lorentz point therefore has
 ambient dimension :math:`D + 1`.
 
+Output geometry vs parameter geometry
+-------------------------------------
+
+The forward output being manifold-valued does not mean that every trainable
+parameter lives on a manifold. The pretrained encoder weights and optional
+projection are ordinary Euclidean PyTorch parameters. ``learnable_curvature``
+adds a trainable positive scalar geometry parameter, which is also not a
+manifold-valued point.
+
+``ManifoldPrototypes`` is different: its coordinates are true
+``geoopt.ManifoldParameter`` values. That distinction determines optimizer
+requirements. The ordinary model-only path can keep using AdamW, while updating
+prototype points requires a Geoopt Riemannian optimizer. See
+:doc:`learnable_structure` for the complete parameter and optimizer matrix.
+
+Curvature semantics
+-------------------
+
 The public ``curvature`` argument is the positive magnitude of the negative
 sectional curvature for both geometries. Poincare passes this value to
 ``geoopt.PoincareBall(c=...)``. Geoopt's Lorentz model uses the squared
 hyperboloid radius ``k``, so neembed maps the same public value :math:`c` to
 ``k = 1 / c``.
 
-Lorentz geometry is evaluated in ``float64`` while the pretrained encoder and
-ordinary Euclidean projection parameters keep their normal dtype. This keeps
-the extra precision cost confined to the geometry path and follows Geoopt's
-numerical guidance for the Lorentz model.
-
-Learnable curvature
--------------------
-
 Curvature remains fixed by default. Setting ``learnable_curvature=True`` makes
-the same public curvature magnitude trainable together with the ordinary model
-parameters. Poincare uses Geoopt's constrained learnable ``c`` parameter. The
-Lorentz backend exposes an unconstrained squared radius ``k``, so neembed adds a
-small positive PyTorch parametrization around ``k`` while continuing to use
-Geoopt for all manifold operations.
+the same public curvature magnitude trainable. Poincare uses Geoopt's
+constrained learnable ``c`` parameter. The Lorentz backend exposes an
+unconstrained squared radius ``k``, so neembed adds a small positive PyTorch
+parametrization around ``k`` while continuing to use Geoopt for all manifold
+operations.
 
-The model's ``curvature`` property reports the current public curvature
-magnitude, including after optimizer updates. Learnable curvature is an ordinary
-scalar parameter, not a manifold-valued point, so this option does not by itself
-require a Riemannian optimizer.
+The model's ``curvature`` property always reports the current public curvature
+magnitude, including after optimizer updates. Learnable curvature alone does not
+require a Riemannian optimizer because the curvature state is a scalar geometry
+parameter, not a manifold-valued coordinate.
 
 Choosing a manifold
 -------------------
 
 Both supported manifolds use the same pretrained encoder, optional projection,
-multiple-negatives loss, trainer, evaluator, and save/load API. The choice is a
+losses, trainer, evaluator, and sentence-model save/load API. The choice is a
 coordinate-model choice rather than a different training framework.
 
 ``poincare``
    Produces :math:`D` coordinates for an intrinsic dimension :math:`D`. The
-   geometry path keeps the model's ordinary parameter dtype.
+   geometry path keeps the model's ordinary parameter dtype. Poincare prototype
+   points also use :math:`D` coordinates.
 
 ``lorentz``
    Represents the same intrinsic dimension :math:`D` with :math:`D + 1`
-   ambient hyperboloid coordinates and evaluates the geometry path in
-   ``float64``.
+   ambient hyperboloid coordinates. The same ambient rule applies to Lorentz
+   prototype points.
 
-Use the same public curvature magnitude when comparing the two hyperbolic
-models. Do not infer that the extra Lorentz coordinate is extra intrinsic model
-capacity, and do not assume either coordinate model is generally superior.
-Choose based on the representation and numerical trade-offs that matter for
-your application, then compare task metrics under matched conditions. The
-repository benchmark documents one small matched engineering comparison; see
-:doc:`evaluation` for its limits.
+Lorentz geometry is evaluated in ``float64`` while the pretrained encoder and
+ordinary Euclidean projection parameters keep their normal dtype. This keeps
+the extra precision cost confined to the geometry path and follows Geoopt's
+numerical guidance for the Lorentz model.
+
+Use the same public curvature magnitude and intrinsic dimension when comparing
+the two hyperbolic models. Do not infer that the extra Lorentz coordinate is
+extra intrinsic model capacity, and do not assume either coordinate model is
+generally superior. Choose based on the representation and numerical
+trade-offs that matter for your application, then compare task metrics under
+matched conditions. See :doc:`evaluation` for the repository benchmark and its
+limits.
 
 Why map from the tangent space?
 -------------------------------
@@ -118,14 +134,19 @@ with a Euclidean linear layer, and then uses Geoopt's differentiable
 This keeps the boundary between responsibilities small:
 
 * Sentence Transformers owns text encoding.
-* PyTorch owns the trainable Euclidean parameters.
-* Geoopt owns the Poincare and Lorentz geometry.
+* PyTorch owns the ordinary Euclidean trainable parameters and the small
+  positive Lorentz-curvature parametrization.
+* Geoopt owns Poincare/Lorentz geometry and manifold-parameter optimization.
 * neembed connects those pieces for sentence-embedding fine-tuning.
 
 Geometry scope
 --------------
 
-The v0.3 API supports ``manifold="poincare"`` and ``manifold="lorentz"``. The
-v0.4 development API adds opt-in learnable curvature for those two geometries.
-Spherical, SPD, product manifolds, and trainable manifold-valued parameters
-remain outside the current scope.
+The v0.4 development API supports ``manifold="poincare"`` and
+``manifold="lorentz"`` with fixed or opt-in learnable curvature. It also
+supports opt-in trainable manifold prototypes and the focused hierarchy-aware
+objective described in :doc:`learnable_structure` and :doc:`training`.
+
+Spherical, SPD, product manifolds, mixed-curvature manifold products, automatic
+prototype discovery, and a generalized optimizer framework remain outside the
+current scope.

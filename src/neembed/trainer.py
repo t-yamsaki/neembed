@@ -22,15 +22,21 @@ class ManifoldTrainer:
         weight_decay: AdamW weight decay used when ``optimizer`` is omitted.
         optimizer: Optional caller-owned optimizer. Pass a Geoopt Riemannian
             optimizer here when the loss also depends on manifold-valued
-            parameters such as :class:`neembed.ManifoldPrototypes`.
+            parameters such as :class:`neembed.ManifoldPrototypes`. Learnable
+            curvature alone remains compatible with the default AdamW path.
         verbose: Print one mean-loss line after each epoch when ``True``.
 
     Notes:
         When ``optimizer`` is omitted, the existing AdamW path is preserved
-        unchanged and only ``model.parameters()`` are optimized. A supplied
-        optimizer is used as-is, so callers can explicitly include both the
-        model's ordinary parameters and external manifold-valued parameters in
-        one Geoopt optimizer without neembed reimplementing optimizer logic.
+        unchanged and only ``model.parameters()`` are optimized. This remains
+        valid when ``model.learnable_curvature`` is enabled because curvature is
+        a scalar geometry parameter rather than a manifold-valued point.
+
+        A supplied optimizer is used as-is, so callers can explicitly include
+        both the model's ordinary parameters and external manifold-valued
+        parameters in one Geoopt optimizer without neembed reimplementing
+        optimizer logic. Callers are responsible for including every trainable
+        parameter that participates in the configured loss.
     """
 
     def __init__(

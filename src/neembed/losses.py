@@ -80,10 +80,12 @@ class ManifoldPrototypeHierarchyLoss(nn.Module):
         hierarchy_weight: Non-negative, finite multiplier for the hierarchy term.
 
     Notes:
-        For a child ``c``, parent ``p``, and unrelated prototype ``n``, the
-        hierarchy penalty is ``relu(margin + d(c, p) - d(c, n))``. The loss
-        averages this penalty over all unrelated prototypes and declared
-        relations. A relation with no unrelated prototype contributes no ranking
+        For a child ``c`` and direct parent ``p``, every prototype ``n`` other
+        than ``c`` and ``p`` is used as a negative in
+        ``relu(margin + d(c, p) - d(c, n))``. The loss averages this penalty over
+        those negatives and declared relations. In deeper hierarchies, ancestors,
+        descendants, and other connected prototypes are not relation-aware
+        exclusions. A relation with no remaining negative contributes no ranking
         penalty.
     """
 

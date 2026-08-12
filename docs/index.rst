@@ -4,15 +4,17 @@ neembed
 **neembed** fine-tunes pretrained sentence embedding models in non-Euclidean
 spaces while delegating manifold geometry to Geoopt.
 
-The public API is intentionally small: a sentence model, a manifold-aware
-multiple-negatives ranking loss, a minimal trainer, an embedding evaluator, and
-an opt-in manifold prototype module. The current API supports Poincare and Lorentz
-hyperbolic models through the same sentence-model geometry semantics.
+The public API is intentionally small: a sentence model, manifold-aware losses,
+a minimal trainer, an embedding evaluator, and opt-in manifold prototypes. The
+current development API supports Poincare and Lorentz hyperbolic models, fixed
+or learnable curvature, and true manifold-valued prototype parameters while
+preserving the original model-only AdamW path.
 
-Start with :doc:`getting_started/quickstart` if you want to train a model. Read
-:doc:`user_guide/architecture` for manifold selection, curvature, dimensions,
-and Lorentz precision behavior, or jump to the :ref:`api-reference` for class
-and method details generated from the public docstrings.
+Start with :doc:`getting_started/quickstart` if you want the ordinary training
+workflow. Read :doc:`user_guide/learnable_structure` to distinguish Euclidean
+trainable parameters, learnable curvature, and manifold-valued prototypes, or
+jump to the :ref:`api-reference` for class and method details generated from the
+public docstrings.
 
 .. toctree::
    :maxdepth: 2
@@ -26,6 +28,7 @@ and method details generated from the public docstrings.
    :caption: User guide
 
    user_guide/architecture
+   user_guide/learnable_structure
    user_guide/training
    user_guide/evaluation
    user_guide/inference
