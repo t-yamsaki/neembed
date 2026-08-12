@@ -126,7 +126,13 @@ The full guide is hosted on Read the Docs:
 
 ## Examples and validation
 
-Runnable references include:
+Run the main references from the repository root:
+
+```bash
+python examples/train_poincare.py
+python examples/train_lorentz.py
+python examples/v04_learnable_structure.py
+```
 
 - [examples/train_poincare.py](examples/train_poincare.py) — minimal Poincaré workflow
 - [examples/train_lorentz.py](examples/train_lorentz.py) — Lorentz train/evaluate/inference with intrinsic-vs-ambient dimensions
