@@ -45,14 +45,18 @@ trainable ``ManifoldPrototypes``. It combines two interpretable terms:
 
 - each sentence embedding is attracted to its assigned prototype;
 - each child prototype should be at least ``margin`` closer to its declared
-  parent than to an unrelated prototype.
+  parent than to every other prototype except that child and direct parent.
 
-For child :math:`c`, parent :math:`p`, and unrelated prototype :math:`n`, the
-hierarchy penalty is
+For child :math:`c`, direct parent :math:`p`, and any other prototype
+:math:`n`, the hierarchy penalty is
 
 .. math::
 
    \max(0, m + d_{\mathcal M}(c,p) - d_{\mathcal M}(c,n)).
+
+The negative set excludes only the current child and its direct parent. In a
+deeper hierarchy, ancestors, descendants, and other connected prototypes can
+therefore participate as negatives.
 
 Prototype identifiers and hierarchy edges stay as ordinary Python values; no
 graph Dataset or DataModule is required. For example:
