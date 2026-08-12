@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [English README](../README.md)
 
-> **Status:** 最新の tag / PyPI release は v0.3.0 です。`main` には v0.4 開発機能として、opt-in の learnable curvature、trainable manifold prototype、hierarchy-aware objective、manifold-valued parameter 用の caller-supplied Riemannian optimization、learnable-structure regression example も含まれています。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
+> **Status:** 最新の tag / PyPI release は v0.4.0 です。opt-in の learnable curvature、trainable manifold prototype、hierarchy-aware objective、manifold-valued parameter 用の caller-supplied Riemannian optimization、learnable-structure regression example を追加しつつ、fixed-curvature の model-only path は維持しています。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
 
 `neembed` は、pretrained Sentence Transformer と manifold-valued representation をつなぐ軽量な integration layer です。pretrained encoder はそのまま利用し、必要に応じて Euclidean embedding を projection したうえで、双曲幾何の演算を Geoopt に委譲します。
 
@@ -31,11 +31,11 @@ Non-Euclidean embedding
 - 階層ラベル
 - 木構造に近い意味関係
 
-現在の development API は、Poincaré ball と Lorentz / Hyperboloid を同じ model・loss・trainer・evaluator・sentence-model save/load workflow で扱えます。
+現在の API は、Poincaré ball と Lorentz / Hyperboloid を同じ model・loss・trainer・evaluator・sentence-model save/load workflow で扱えます。
 
 ## 現在のスコープ
 
-release 済みの v0.3 path には以下を含みます。
+v0.4 は fixed-curvature の v0.3 path と後方互換です。
 
 - pretrained encoder として Sentence Transformers を利用
 - Geoopt による Poincaré-ball と Lorentz / Hyperboloid embedding
@@ -44,9 +44,9 @@ release 済みの v0.3 path には以下を含みます。
 - geodesic distance と manifold-aware multiple-negatives ranking loss
 - model-only path での通常の `AdamW` fine-tuning
 - `encode()` / `distance()`、`ManifoldEmbeddingEvaluator`、DataLoader 連携、ローカル save/load
-- geometry consistency regression と matched Euclidean/Poincaré/Lorentz engineering benchmark
+- geometry consistency regression と matched Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark
 
-v0.4 development API ではさらに以下を追加しています。
+v0.4 ではさらに以下を追加しています。
 
 - Poincaré / Lorentz の fixed curvature と opt-in learnable curvature
 - 真の manifold-valued trainable parameter である `ManifoldPrototypes`
