@@ -68,6 +68,21 @@ ordinary Euclidean projection parameters keep their normal dtype. This keeps
 the extra precision cost confined to the geometry path and follows Geoopt's
 numerical guidance for the Lorentz model.
 
+Learnable curvature
+-------------------
+
+Curvature remains fixed by default. Setting ``learnable_curvature=True`` makes
+the same public curvature magnitude trainable together with the ordinary model
+parameters. Poincare uses Geoopt's constrained learnable ``c`` parameter. The
+Lorentz backend exposes an unconstrained squared radius ``k``, so neembed adds a
+small positive PyTorch parametrization around ``k`` while continuing to use
+Geoopt for all manifold operations.
+
+The model's ``curvature`` property reports the current public curvature
+magnitude, including after optimizer updates. Learnable curvature is an ordinary
+scalar parameter, not a manifold-valued point, so this option does not by itself
+require a Riemannian optimizer.
+
 Choosing a manifold
 -------------------
 
@@ -110,6 +125,7 @@ This keeps the boundary between responsibilities small:
 Geometry scope
 --------------
 
-The v0.3 API supports ``manifold="poincare"`` and ``manifold="lorentz"``.
-Spherical, SPD, product manifolds, learnable curvature, and trainable manifold
-parameters remain outside the current scope.
+The v0.3 API supports ``manifold="poincare"`` and ``manifold="lorentz"``. The
+v0.4 development API adds opt-in learnable curvature for those two geometries.
+Spherical, SPD, product manifolds, and trainable manifold-valued parameters
+remain outside the current scope.
