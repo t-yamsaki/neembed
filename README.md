@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [日本語](docs/README_ja.md)
 
-> **Status:** The latest tagged / PyPI release is v0.3.0. `main` also contains the v0.4 development features: opt-in learnable curvature, trainable manifold prototypes, a hierarchy-aware objective, caller-supplied Riemannian optimization for manifold-valued parameters, and a learnable-structure regression example. The API remains intentionally small and may still evolve before a stable 1.0 release.
+> **Status:** The latest tagged / PyPI release is v0.4.0. It adds opt-in learnable curvature, trainable manifold prototypes, a hierarchy-aware objective, caller-supplied Riemannian optimization for manifold-valued parameters, and a learnable-structure regression example while preserving the fixed-curvature model-only path. The API remains intentionally small and may still evolve before a stable 1.0 release.
 
 `neembed` is a lightweight integration layer between pretrained Sentence Transformer models and manifold-valued representations. It keeps the pretrained encoder intact, optionally projects its Euclidean output, and delegates hyperbolic geometry to Geoopt.
 
@@ -31,11 +31,11 @@ Hierarchical and tree-like relations can be awkward to represent in a flat Eucli
 - hierarchical labels
 - tree-like semantic relations
 
-The current development API supports the Poincaré ball and Lorentz / Hyperboloid models through the same model, loss, trainer, evaluator, and sentence-model save/load workflow.
+The current API supports the Poincaré ball and Lorentz / Hyperboloid models through the same model, loss, trainer, evaluator, and sentence-model save/load workflow.
 
 ## Current scope
 
-The released v0.3 path includes:
+v0.4 keeps the fixed-curvature v0.3 path backward-compatible:
 
 - Sentence Transformers as the pretrained encoder backend
 - Poincaré-ball and Lorentz / Hyperboloid embeddings through Geoopt
@@ -44,9 +44,9 @@ The released v0.3 path includes:
 - geodesic distance and manifold-aware multiple-negatives ranking loss
 - ordinary `AdamW` fine-tuning for the model-only path
 - `encode()` / `distance()`, `ManifoldEmbeddingEvaluator`, DataLoader interoperability, and local save/load
-- geometry-consistency regressions and a matched Euclidean/Poincaré/Lorentz engineering benchmark
+- geometry-consistency regressions and a matched Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark
 
-The v0.4 development API adds:
+v0.4 also adds:
 
 - opt-in fixed vs learnable curvature for Poincaré and Lorentz
 - true trainable manifold-valued `ManifoldPrototypes`

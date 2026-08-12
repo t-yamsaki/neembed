@@ -1,4 +1,4 @@
-"""Release-readiness checks for public v0.3 metadata and geometry contracts."""
+"""Release-readiness checks for public v0.4 metadata and training contracts."""
 
 from importlib.metadata import metadata
 from pathlib import Path
@@ -10,12 +10,12 @@ ROOT = Path(__file__).parents[1]
 DOCUMENTATION_URL = "https://neembed.readthedocs.io/en/latest/"
 
 
-def test_pyproject_declares_v03_public_metadata() -> None:
+def test_pyproject_declares_v04_public_metadata() -> None:
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
     assert 'requires = ["setuptools>=77.0.3"]' in pyproject
     assert 'name = "neembed-geoopt"' in pyproject
-    assert 'version = "0.3.0"' in pyproject
+    assert 'version = "0.4.0"' in pyproject
     assert 'requires-python = ">=3.10"' in pyproject
     assert 'license = "MIT"' in pyproject
     assert 'license-files = ["LICENSE"]' in pyproject
@@ -38,7 +38,7 @@ def test_installed_distribution_exposes_release_metadata() -> None:
     project_urls = package_metadata.get_all("Project-URL") or []
 
     assert package_metadata["Name"] == "neembed-geoopt"
-    assert package_metadata["Version"] == "0.3.0"
+    assert package_metadata["Version"] == "0.4.0"
     assert package_metadata["Requires-Python"] == ">=3.10"
     assert f"Documentation, {DOCUMENTATION_URL}" in project_urls
 
@@ -60,20 +60,27 @@ def test_distribution_name_keeps_neembed_import_package() -> None:
     assert "from neembed import (" in japanese
 
 
-def test_readmes_describe_the_implemented_v03_release() -> None:
+def test_readmes_describe_v04_release_and_v03_compatibility() -> None:
     english = (ROOT / "README.md").read_text(encoding="utf-8")
     japanese = (ROOT / "docs" / "README_ja.md").read_text(encoding="utf-8")
 
     for readme in (english, japanese):
         assert "TBD" not in readme
         assert "<YOUR_USERNAME>" not in readme
-        assert "0.3.0" in readme
+        assert "v0.4.0" in readme
+        assert "v0.3" in readme
         assert "Lorentz" in readme
         assert "ManifoldEmbeddingEvaluator" in readme
+        assert "ManifoldPrototypes" in readme
+        assert "ManifoldPrototypeHierarchyLoss" in readme
         assert "Euclidean-vs-Poincaré-vs-Lorentz" in readme
         assert "MIT License" in readme
         assert DOCUMENTATION_URL in readme
 
+    assert "latest tagged / PyPI release is v0.4.0" in english
+    assert "最新の tag / PyPI release は v0.4.0" in japanese
+    assert "fixed-curvature v0.3 path backward-compatible" in english
+    assert "fixed-curvature の v0.3 path と後方互換" in japanese
     assert "https://github.com/t-yamsaki/neembed.git" in english
     assert "https://github.com/t-yamsaki/neembed.git" in japanese
 
@@ -102,7 +109,7 @@ def test_quick_start_avoids_duplicate_in_batch_positives() -> None:
     assert '(["犬", "猫"], ["哺乳類", "ネコ科"])' in japanese
 
 
-def test_public_api_and_persistence_cover_v03_geometry_contracts() -> None:
+def test_public_api_and_persistence_cover_v04_geometry_contracts() -> None:
     public_api = (ROOT / "src" / "neembed" / "__init__.py").read_text(encoding="utf-8")
     model = (ROOT / "src" / "neembed" / "model.py").read_text(encoding="utf-8")
     losses = (ROOT / "src" / "neembed" / "losses.py").read_text(encoding="utf-8")
@@ -111,10 +118,16 @@ def test_public_api_and_persistence_cover_v03_geometry_contracts() -> None:
 
     normalized_losses = " ".join(losses.split())
 
-    assert "ManifoldSentenceTransformer" in neembed.__all__
-    assert "ManifoldMultipleNegativesRankingLoss" in neembed.__all__
-    assert "ManifoldTrainer" in neembed.__all__
-    assert "ManifoldEmbeddingEvaluator" in neembed.__all__
+    for public_name in (
+        "ManifoldSentenceTransformer",
+        "ManifoldMultipleNegativesRankingLoss",
+        "ManifoldPrototypeHierarchyLoss",
+        "ManifoldPrototypes",
+        "ManifoldTrainer",
+        "ManifoldEmbeddingEvaluator",
+    ):
+        assert public_name in neembed.__all__
+
     assert "LorentzTrainer" not in public_api
     assert "LorentzEvaluator" not in public_api
 
@@ -134,13 +147,36 @@ def test_public_api_and_persistence_cover_v03_geometry_contracts() -> None:
     assert "torch.inference_mode()" in model
     assert "torch.no_grad()" in model
     assert "duplicate positives within one batch should be avoided" in normalized_losses
+    assert "every other prototype" in normalized_losses
     assert "Iterable yielding ``(anchors, positives)`` batches" in trainer
+    assert "caller-owned optimizer" in trainer
+
     for metric in (
         "retrieval_accuracy",
         "mean_positive_distance",
         "mean_negative_distance",
     ):
         assert metric in evaluator
+
+
+def test_release_suite_covers_v04_learnable_structure_contracts() -> None:
+    prototypes = (ROOT / "tests" / "test_prototypes.py").read_text(encoding="utf-8")
+    riemannian = (ROOT / "tests" / "test_riemannian_training.py").read_text(
+        encoding="utf-8"
+    )
+    hierarchy = (ROOT / "tests" / "test_hierarchy_loss.py").read_text(encoding="utf-8")
+    v04_example = (ROOT / "tests" / "test_v04_learnable_structure.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "test_state_dict_round_trip_preserves_prototype_points" in prototypes
+    assert "test_joint_learnable_curvature_and_prototypes_stay_valid_with_stabilization" in prototypes
+    assert "geoopt.optim.RiemannianAdam" in riemannian
+    assert "optimized_parameters == expected_parameters" in riemannian
+    assert 'pytest.mark.parametrize("manifold_name", ["poincare", "lorentz"])' in hierarchy
+    assert "correct" in hierarchy and "corrupt" in hierarchy
+    assert "test_v04_example_reports_deterministic_learnable_structure_diagnostics" in v04_example
+    assert "learnable[\"prototype_shift\"] > 0.0" in v04_example
 
 
 def test_release_real_stack_covers_fixed_and_learnable_geometries() -> None:
@@ -165,7 +201,23 @@ def test_release_real_stack_covers_fixed_and_learnable_geometries() -> None:
     assert "trainer.optimizer.step()" in learnable_stack
 
 
-def test_release_workflow_restricts_production_publish_to_tag_pushes() -> None:
+def test_release_workflow_builds_checks_and_smokes_published_packages() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "python -m build" in workflow
+    assert "python -m twine check dist/*" in workflow
+    assert "python-package-distributions" in workflow
+    assert "smoke-testpypi:" in workflow
+    assert "smoke-pypi:" in workflow
+    assert "--index-url https://test.pypi.org/simple/" in workflow
+    assert "neembed-geoopt==${PACKAGE_VERSION}" in workflow
+    assert "tests/test_import.py tests/test_v04_learnable_structure.py" in workflow
+    assert "from importlib.metadata import version; import neembed" in workflow
+
+
+def test_release_workflow_keeps_trusted_publish_and_tag_boundaries() -> None:
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
         encoding="utf-8"
     )
@@ -184,6 +236,11 @@ def test_release_workflow_restricts_production_publish_to_tag_pushes() -> None:
     assert "pypa/gh-action-pypi-publish@release/v1" in workflow
     assert "https://test.pypi.org/p/neembed-geoopt" in workflow
     assert "https://pypi.org/p/neembed-geoopt" in workflow
+    assert "create-github-release:" in workflow
+    assert "needs: smoke-pypi" in workflow
+    assert "contents: write" in workflow
+    assert 'gh release create "${GITHUB_REF_NAME}"' in workflow
+    assert "not a claim that learnable structure is generally superior" in workflow
 
 
 def test_gitignore_protects_common_public_release_artifacts() -> None:
