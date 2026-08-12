@@ -28,9 +28,12 @@ class ManifoldPrototypes(nn.Module):
         parameters and these prototype parameters, then pass it explicitly to
         :class:`neembed.ManifoldTrainer`.
 
-        This prototype API requires fixed curvature. Jointly changing a
-        manifold's curvature and its manifold-valued coordinates requires a
-        coordinated optimization path rather than independent parameter updates.
+        Prototypes may share a manifold whose curvature is learnable. In that
+        joint path, use Geoopt optimizer stabilization after every step (for
+        example ``geoopt.optim.RiemannianAdam(..., stabilize=1)``) so prototype
+        coordinates are projected back onto the manifold after the curvature
+        parameter changes. neembed delegates both the Riemannian update and the
+        stabilization projection to Geoopt.
     """
 
     def __init__(
@@ -45,12 +48,6 @@ class ManifoldPrototypes(nn.Module):
             raise ValueError("num_prototypes must be positive")
         if init_std <= 0 or not math.isfinite(init_std):
             raise ValueError("init_std must be positive and finite")
-        if model.learnable_curvature:
-            raise ValueError(
-                "ManifoldPrototypes currently requires fixed curvature; joint "
-                "learnable-curvature and manifold-parameter optimization is not "
-                "yet supported"
-            )
 
         self.num_prototypes = int(num_prototypes)
         self.embedding_dim = model.embedding_dim
