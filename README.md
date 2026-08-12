@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [日本語](docs/README_ja.md)
 
-> **Status:** v0.3.0 adds Lorentz / Hyperboloid embeddings as the second supported hyperbolic geometry, geometry-consistency regressions, a Lorentz train/evaluate example, and a reproducible Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark. The API remains intentionally small and may still evolve before a stable 1.0 release.
+> **Status:** The latest tagged / PyPI release is v0.3.0. `main` also contains the v0.4 development features: opt-in learnable curvature, trainable manifold prototypes, a hierarchy-aware objective, caller-supplied Riemannian optimization for manifold-valued parameters, and a learnable-structure regression example. The API remains intentionally small and may still evolve before a stable 1.0 release.
 
 `neembed` is a lightweight integration layer between pretrained Sentence Transformer models and manifold-valued representations. It keeps the pretrained encoder intact, optionally projects its Euclidean output, and delegates hyperbolic geometry to Geoopt.
 
@@ -31,29 +31,31 @@ Hierarchical and tree-like relations can be awkward to represent in a flat Eucli
 - hierarchical labels
 - tree-like semantic relations
 
-The current API supports the Poincaré ball and Lorentz / Hyperboloid models through the same model, loss, trainer, evaluator, and save/load workflow.
+The current development API supports the Poincaré ball and Lorentz / Hyperboloid models through the same model, loss, trainer, evaluator, and sentence-model save/load workflow.
 
-## v0.3
+## Current scope
 
-The v0.3 release includes:
+The released v0.3 path includes:
 
 - Sentence Transformers as the pretrained encoder backend
 - Poincaré-ball and Lorentz / Hyperboloid embeddings through Geoopt
 - optional lower-dimensional tangent-space projection
 - shared public curvature semantics across the two hyperbolic models
-- geodesic distance
-- manifold-aware multiple-negatives ranking / InfoNCE-style loss
-- ordinary `AdamW` fine-tuning
-- `encode()` and `distance()` inference helpers
-- `save_pretrained()` / `from_pretrained()` local persistence for both manifolds
-- `ManifoldEmbeddingEvaluator` with retrieval and distance metrics
-- optional epoch-end validation in `ManifoldTrainer`
-- ordinary PyTorch `DataLoader` interoperability example
-- Poincaré–Lorentz geometry-consistency regression tests
-- a runnable Lorentz train/evaluate/inference example
-- a reproducible Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark
+- geodesic distance and manifold-aware multiple-negatives ranking loss
+- ordinary `AdamW` fine-tuning for the model-only path
+- `encode()` / `distance()`, evaluation, DataLoader interoperability, and local save/load
+- geometry-consistency regressions and a matched Euclidean/Poincaré/Lorentz engineering benchmark
 
-Detailed behavior, assumptions, and API signatures live in the [documentation](https://neembed.readthedocs.io/en/latest/).
+The v0.4 development API adds:
+
+- opt-in fixed vs learnable curvature for Poincaré and Lorentz
+- true trainable manifold-valued `ManifoldPrototypes`
+- `ManifoldPrototypeHierarchyLoss` for sentence assignments plus parent-child structure
+- an explicit caller-supplied Geoopt Riemannian optimizer path for manifold parameters
+- joint learnable-curvature / prototype training through Geoopt stabilization
+- a compact fixed-vs-learnable structure regression example
+
+A manifold-valued **output** does not by itself require Riemannian optimization: encoder/projection parameters and learnable curvature are not manifold-valued points. Detailed parameter, optimizer, persistence, and numerical behavior lives in the [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html).
 
 ## Installation
 
@@ -106,7 +108,7 @@ distance = model.distance(embeddings[0], embeddings[1])
 print(float(distance))
 ```
 
-Each anchor is paired with the positive at the same batch index. Because off-diagonal candidates become in-batch negatives, avoid duplicate positives within one batch. See the [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html) for the objective and batching details, and the [Architecture guide](https://neembed.readthedocs.io/en/latest/user_guide/architecture.html) for Poincaré/Lorentz dimension, curvature, and precision semantics.
+Each anchor is paired with the positive at the same batch index. Because off-diagonal candidates become in-batch negatives, avoid duplicate positives within one batch. This model-only path keeps the ordinary AdamW behavior even though its outputs lie on a manifold. See the [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html) for the objective and batching details, and the [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) before adding trainable manifold prototypes.
 
 ## Documentation
 
@@ -115,6 +117,7 @@ The full guide is hosted on Read the Docs:
 - [Installation](https://neembed.readthedocs.io/en/latest/getting_started/installation.html)
 - [Quick Start](https://neembed.readthedocs.io/en/latest/getting_started/quickstart.html)
 - [Architecture](https://neembed.readthedocs.io/en/latest/user_guide/architecture.html)
+- [Learnable structure](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html)
 - [Training](https://neembed.readthedocs.io/en/latest/user_guide/training.html)
 - [Evaluation](https://neembed.readthedocs.io/en/latest/user_guide/evaluation.html)
 - [Inference](https://neembed.readthedocs.io/en/latest/user_guide/inference.html)
@@ -123,17 +126,14 @@ The full guide is hosted on Read the Docs:
 
 ## Examples and validation
 
-Run the geometry-specific examples from the repository root:
+Runnable references include:
 
-```bash
-python examples/train_poincare.py
-python examples/train_lorentz.py
-```
-
-- [examples/train_poincare.py](examples/train_poincare.py) contains the minimal Poincaré workflow.
-- [examples/train_lorentz.py](examples/train_lorentz.py) shows the same train/evaluate/inference workflow with Lorentz geometry and makes the intrinsic-vs-ambient dimension difference explicit.
-- [examples/train_dataloader.py](examples/train_dataloader.py) shows ordinary PyTorch `DataLoader` training and epoch validation.
-- [experiments/README.md](experiments/README.md) documents the reproducible Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark and its interpretation limits.
+- [examples/train_poincare.py](examples/train_poincare.py) — minimal Poincaré workflow
+- [examples/train_lorentz.py](examples/train_lorentz.py) — Lorentz train/evaluate/inference with intrinsic-vs-ambient dimensions
+- [examples/train_dataloader.py](examples/train_dataloader.py) — ordinary PyTorch `DataLoader` training and epoch validation
+- [examples/train_hierarchy.py](examples/train_hierarchy.py) — minimal hierarchy-aware prototype objective
+- [examples/v04_learnable_structure.py](examples/v04_learnable_structure.py) — fixed-vs-learnable structure regression diagnostics; not a superiority benchmark
+- [experiments/README.md](experiments/README.md) — reproducible Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark and interpretation limits
 
 ## License
 
