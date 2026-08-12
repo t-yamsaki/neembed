@@ -77,7 +77,7 @@ Save trainable prototypes separately
 
 To restore the full structure, reload the sentence model first, construct a
 compatible prototype module on that reconstructed manifold, and then load the
-prototype state:
+prototype state onto the reconstructed model device:
 
 .. code-block:: python
 
@@ -90,10 +90,17 @@ prototype state:
        loaded_model,
        num_prototypes=len(prototype_ids),
    )
+   device = next(loaded_model.parameters()).device
    loaded_prototypes.load_state_dict(
-       torch.load("./saved_model/prototypes.pt", weights_only=True)
+       torch.load(
+           "./saved_model/prototypes.pt",
+           map_location=device,
+           weights_only=True,
+       )
    )
 
+Using ``map_location`` keeps this example portable when a checkpoint saved on
+one device (for example CUDA) is restored on another device (for example CPU).
 The prototype count, intrinsic dimension, manifold type, and learned curvature
 must be compatible with the saved coordinates. Reloading the model first is
 especially important when curvature was learned jointly with prototypes,
