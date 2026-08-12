@@ -23,11 +23,12 @@ class ManifoldPrototypes(nn.Module):
 
     Notes:
         Prototype points are true :class:`geoopt.ManifoldParameter` values. They
-        therefore require a Geoopt Riemannian optimizer for safe updates. The
-        existing :class:`neembed.ManifoldTrainer` integration for mixed ordinary
-        and manifold-valued parameters is separate v0.4 work.
+        therefore require a Geoopt Riemannian optimizer for safe updates. For
+        mixed training, build one Geoopt optimizer over the ordinary model
+        parameters and these prototype parameters, then pass it explicitly to
+        :class:`neembed.ManifoldTrainer`.
 
-        This initial prototype API requires fixed curvature. Jointly changing a
+        This prototype API requires fixed curvature. Jointly changing a
         manifold's curvature and its manifold-valued coordinates requires a
         coordinated optimization path rather than independent parameter updates.
     """
