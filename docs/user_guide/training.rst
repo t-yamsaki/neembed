@@ -84,7 +84,11 @@ graph Dataset or DataModule is required. For example:
    parameters = [
        parameter for parameter in loss.parameters() if parameter.requires_grad
    ]
-   optimizer = geoopt.optim.RiemannianAdam(parameters, lr=1e-3)
+   optimizer = geoopt.optim.RiemannianAdam(
+       parameters,
+       lr=1e-3,
+       stabilize=1,
+   )
    trainer = ManifoldTrainer(model, loss, optimizer=optimizer)
 
    train_batches = [
@@ -129,11 +133,50 @@ use one mixed optimizer:
        for parameter in (*model.parameters(), *prototypes.parameters())
        if parameter.requires_grad
    ]
-   optimizer = geoopt.optim.RiemannianAdam(parameters, lr=1e-3)
+   optimizer = geoopt.optim.RiemannianAdam(
+       parameters,
+       lr=1e-3,
+       stabilize=1,
+   )
    trainer = ManifoldTrainer(model, loss, optimizer=optimizer)
 
 The loss must actually depend on the prototype values for those parameters to
-receive gradients.
+receive gradients. When curvature and manifold-valued prototypes are both
+learnable, ``stabilize=1`` is part of the supported joint path: Geoopt projects
+manifold parameters back onto the current manifold after each optimizer step.
+neembed does not implement a separate retraction or projection rule.
+
+v0.4 learnable-structure regression example
+--------------------------------------------
+
+Run the compact end-to-end v0.4 reference from the repository root with:
+
+.. code-block:: bash
+
+   python examples/v04_learnable_structure.py
+
+The example uses a tiny ``animal -> {dog, cat}`` hierarchy and the public
+``ManifoldSentenceTransformer``, ``ManifoldPrototypes``,
+``ManifoldPrototypeHierarchyLoss``, and ``ManifoldTrainer`` APIs. It runs two
+matched Poincare configurations with the same seed, data, intrinsic dimension,
+and initial public curvature:
+
+- ``fixed_structure`` keeps curvature and prototype coordinates fixed while the
+  ordinary sentence-model parameters train;
+- ``learnable_structure`` enables learnable curvature and trainable prototypes
+  and supplies ``geoopt.optim.RiemannianAdam(..., stabilize=1)``.
+
+The command reports final training loss, sentence-to-prototype assignment
+accuracy on the tiny hierarchy, initial/final public curvature, curvature
+change, prototype movement, manifold validity, and finite embedding/prototype
+distance diagnostics. The learnable path also fails loudly if curvature does
+not change, prototypes do not update, distances become non-finite, or prototype
+points leave the manifold.
+
+This is a deterministic engineering regression example, not evidence that
+learnable curvature or trainable prototypes outperform fixed structure. Normal
+CI exercises the same example logic with a tiny fake encoder, so CI does not
+need to download a Sentence Transformer model repeatedly.
 
 Minimal training loop
 ---------------------
