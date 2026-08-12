@@ -66,10 +66,11 @@ class ManifoldTrainer:
         """Train on two-sequence batches with optional epoch validation.
 
         Args:
-            train_dataloader: Iterable yielding two aligned string sequences per
-                batch. Their exact meaning is defined by the configured loss. For
-                ``epochs > 1``, the iterable must be re-iterable; a one-shot
-                iterator or generator is suitable only for a single epoch.
+            train_dataloader: Iterable yielding ``(anchors, positives)`` batches
+                for the existing ranking loss, or two analogous aligned string
+                sequences interpreted by the configured loss. For ``epochs > 1``,
+                the iterable must be re-iterable; a one-shot iterator or generator
+                is suitable only for a single epoch.
             epochs: Number of full passes over ``train_dataloader``.
             evaluator: Optional manifold embedding evaluator called once after
                 each completed epoch.
