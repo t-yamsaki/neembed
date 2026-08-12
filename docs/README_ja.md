@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [English README](../README.md)
 
-> **Status:** v0.3.0 には、2つ目の双曲幾何である Lorentz / Hyperboloid embedding、Poincaré–Lorentz の幾何整合性 regression、Lorentz の train / evaluate example、再現可能な Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark が含まれます。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
+> **Status:** 最新の tag / PyPI release は v0.3.0 です。`main` には v0.4 開発機能として、opt-in の learnable curvature、trainable manifold prototype、hierarchy-aware objective、manifold-valued parameter 用の caller-supplied Riemannian optimization、learnable-structure regression example も含まれています。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
 
 `neembed` は、pretrained Sentence Transformer と manifold-valued representation をつなぐ軽量な integration layer です。pretrained encoder はそのまま利用し、必要に応じて Euclidean embedding を projection したうえで、双曲幾何の演算を Geoopt に委譲します。
 
@@ -31,29 +31,31 @@ Non-Euclidean embedding
 - 階層ラベル
 - 木構造に近い意味関係
 
-現在の API は、Poincaré ball と Lorentz / Hyperboloid を同じ model・loss・trainer・evaluator・save/load workflow で扱えます。
+現在の development API は、Poincaré ball と Lorentz / Hyperboloid を同じ model・loss・trainer・evaluator・sentence-model save/load workflow で扱えます。
 
-## v0.3
+## 現在のスコープ
 
-v0.3 には以下を含みます。
+release 済みの v0.3 path には以下を含みます。
 
 - pretrained encoder として Sentence Transformers を利用
 - Geoopt による Poincaré-ball と Lorentz / Hyperboloid embedding
 - 任意の低次元 tangent-space projection
 - 2つの双曲モデルで統一した public curvature semantics
-- geodesic distance
-- manifold-aware な multiple-negatives ranking / InfoNCE-style loss
-- 通常の `AdamW` による fine-tuning
-- `encode()` / `distance()` inference helper
-- 両 manifold の `save_pretrained()` / `from_pretrained()` ローカル保存・復元
-- retrieval / distance metrics を返す `ManifoldEmbeddingEvaluator`
-- `ManifoldTrainer` の任意の epoch-end validation
-- 通常の PyTorch `DataLoader` 連携例
-- Poincaré–Lorentz geometry consistency regression test
-- Lorentz の train / evaluate / inference 実行例
-- 再現可能な Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark
+- geodesic distance と manifold-aware multiple-negatives ranking loss
+- model-only path での通常の `AdamW` fine-tuning
+- `encode()` / `distance()`、evaluation、DataLoader 連携、ローカル save/load
+- geometry consistency regression と matched Euclidean/Poincaré/Lorentz engineering benchmark
 
-詳細な挙動、前提、API signature は [Documentation](https://neembed.readthedocs.io/en/latest/) にまとめています。
+v0.4 development API ではさらに以下を追加しています。
+
+- Poincaré / Lorentz の fixed curvature と opt-in learnable curvature
+- 真の manifold-valued trainable parameter である `ManifoldPrototypes`
+- sentence assignment と parent-child structure を扱う `ManifoldPrototypeHierarchyLoss`
+- manifold parameter 用の明示的な caller-supplied Geoopt Riemannian optimizer path
+- Geoopt stabilization を使った learnable curvature + prototype の共同学習
+- fixed-vs-learnable structure の compact regression example
+
+manifold-valued な **出力** を返すだけでは Riemannian optimization は必要ありません。encoder / projection parameter と learnable curvature は manifold 上の点ではありません。parameter・optimizer・persistence・numerical behavior の詳細は [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) を参照してください。
 
 ## インストール
 
@@ -106,7 +108,7 @@ distance = model.distance(embeddings[0], embeddings[1])
 print(float(distance))
 ```
 
-各 anchor は同じ batch index の positive と対応します。off-diagonal candidate は in-batch negative になるため、同じ batch 内で positive を重複させないでください。目的関数と batching の詳細は [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html)、Poincaré / Lorentz の次元・curvature・precision semantics は [Architecture guide](https://neembed.readthedocs.io/en/latest/user_guide/architecture.html) を参照してください。
+各 anchor は同じ batch index の positive と対応します。off-diagonal candidate は in-batch negative になるため、同じ batch 内で positive を重複させないでください。この model-only path は出力が manifold-valued でも通常の AdamW behavior のままです。目的関数と batching の詳細は [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html)、trainable manifold prototype を追加する前には [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) を参照してください。
 
 ## ドキュメント
 
@@ -115,6 +117,7 @@ print(float(distance))
 - [Installation](https://neembed.readthedocs.io/en/latest/getting_started/installation.html)
 - [Quick Start](https://neembed.readthedocs.io/en/latest/getting_started/quickstart.html)
 - [Architecture](https://neembed.readthedocs.io/en/latest/user_guide/architecture.html)
+- [Learnable structure](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html)
 - [Training](https://neembed.readthedocs.io/en/latest/user_guide/training.html)
 - [Evaluation](https://neembed.readthedocs.io/en/latest/user_guide/evaluation.html)
 - [Inference](https://neembed.readthedocs.io/en/latest/user_guide/inference.html)
@@ -123,17 +126,14 @@ print(float(distance))
 
 ## 実行例と検証
 
-repository root から geometry-specific example を実行できます。
+主な runnable reference は以下です。
 
-```bash
-python examples/train_poincare.py
-python examples/train_lorentz.py
-```
-
-- [examples/train_poincare.py](../examples/train_poincare.py) に最小の Poincaré workflow があります。
-- [examples/train_lorentz.py](../examples/train_lorentz.py) では同じ train / evaluate / inference workflow を Lorentz geometry で実行し、intrinsic dimension と ambient dimension の違いも確認できます。
-- [examples/train_dataloader.py](../examples/train_dataloader.py) で通常の PyTorch `DataLoader` と epoch validation を確認できます。
-- [experiments/README.md](../experiments/README.md) に再現可能な Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark と結果の解釈上の注意をまとめています。
+- [examples/train_poincare.py](../examples/train_poincare.py) — 最小の Poincaré workflow
+- [examples/train_lorentz.py](../examples/train_lorentz.py) — Lorentz の train / evaluate / inference と intrinsic-vs-ambient dimension
+- [examples/train_dataloader.py](../examples/train_dataloader.py) — 通常の PyTorch `DataLoader` と epoch validation
+- [examples/train_hierarchy.py](../examples/train_hierarchy.py) — 最小の hierarchy-aware prototype objective
+- [examples/v04_learnable_structure.py](../examples/v04_learnable_structure.py) — fixed-vs-learnable structure の regression diagnostics。性能優位性を示す benchmark ではありません
+- [experiments/README.md](../experiments/README.md) — 再現可能な Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark と解釈上の注意
 
 ## License
 
