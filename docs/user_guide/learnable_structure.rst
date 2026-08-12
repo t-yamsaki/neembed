@@ -108,12 +108,18 @@ Hierarchy-aware objective
 -------------------------
 
 ``ManifoldPrototypeHierarchyLoss`` combines sentence-to-prototype attraction
-with a small hierarchy-ranking term. For a child prototype :math:`c`, its
-parent :math:`p`, and an unrelated prototype :math:`n`, the ranking penalty is
+with a small hierarchy-ranking term. For each declared child prototype
+:math:`c` and direct parent :math:`p`, every prototype :math:`n` other than that
+child and direct parent is used as a negative:
 
 .. math::
 
    \max(0, m + d_{\mathcal M}(c,p) - d_{\mathcal M}(c,n)).
+
+This negative set is intentionally local to the declared edge. In a deeper
+hierarchy, ancestors, descendants, or other connected prototypes are not
+relation-aware exclusions; if they are neither the current child nor its direct
+parent, they participate as negatives.
 
 The first input sequence contains sentences. The second contains prototype
 identifier assignments aligned by batch index. ``prototype_ids`` must be
