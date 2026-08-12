@@ -16,10 +16,13 @@ class ManifoldMultipleNegativesRankingLoss(nn.Module):
 
     Each anchor is paired with the positive at the same batch index. All
     off-diagonal positive candidates are treated as negatives, so duplicate
-    positives within one batch should be avoided.
+    positives within one batch should be avoided. An optional aligned sequence
+    of explicit negatives can be supplied; those embeddings are appended to the
+    candidate pool and act as additional negatives for every anchor in the batch.
 
     Args:
-        model: Manifold sentence model used to encode anchors and positives.
+        model: Manifold sentence model used to encode anchors, positives, and
+            optional explicit negatives.
         temperature: Positive, finite temperature used to scale distance logits.
     """
 
@@ -39,25 +42,46 @@ class ManifoldMultipleNegativesRankingLoss(nn.Module):
         self,
         anchors: Sequence[str],
         positives: Sequence[str],
+        negatives: Sequence[str] | None = None,
     ) -> torch.Tensor:
-        """Return the contrastive loss for aligned anchor-positive pairs.
+        """Return the contrastive loss for aligned positives and hard negatives.
 
         Args:
             anchors: Batch of anchor texts.
             positives: Batch of positive texts aligned by index with ``anchors``.
+            negatives: Optional batch of explicit hard-negative texts. When
+                supplied, it must have the same length as ``anchors``. The full
+                negative batch is appended after the positive candidate batch,
+                while the positive targets remain the leading diagonal entries.
 
         Returns:
-            A scalar cross-entropy loss built from pairwise geodesic distances.
+            A scalar cross-entropy loss built only from manifold geodesic
+            distances.
         """
+        if len(anchors) == 0:
+            raise ValueError("anchors and positives must not be empty")
+        if len(anchors) != len(positives):
+            raise ValueError("anchors and positives must have the same length")
+        if negatives is not None and len(anchors) != len(negatives):
+            raise ValueError("anchors and negatives must have the same length")
+
         anchor_embeddings = self.model(anchors)
         positive_embeddings = self.model(positives)
+        candidate_embeddings = positive_embeddings
+
+        if negatives is not None:
+            negative_embeddings = self.model(negatives)
+            candidate_embeddings = torch.cat(
+                (positive_embeddings, negative_embeddings),
+                dim=0,
+            )
 
         distances = self.model.manifold.dist(
             anchor_embeddings[:, None, :],
-            positive_embeddings[None, :, :],
+            candidate_embeddings[None, :, :],
         )
         logits = -distances / self.temperature
-        targets = torch.arange(logits.shape[0], device=logits.device)
+        targets = torch.arange(len(anchors), device=logits.device)
         return F.cross_entropy(logits, targets)
 
 
@@ -112,12 +136,17 @@ class ManifoldPrototypeHierarchyLoss(nn.Module):
             raise ValueError(
                 "prototype_ids must contain exactly one identifier per prototype"
             )
-        if any(not isinstance(prototype_id, str) or not prototype_id for prototype_id in ids):
+        if any(
+            not isinstance(prototype_id, str) or not prototype_id
+            for prototype_id in ids
+        ):
             raise ValueError("prototype_ids must be non-empty strings")
         if len(set(ids)) != len(ids):
             raise ValueError("prototype_ids must be unique")
 
-        prototype_index = {prototype_id: index for index, prototype_id in enumerate(ids)}
+        prototype_index = {
+            prototype_id: index for index, prototype_id in enumerate(ids)
+        }
         relations: list[tuple[str, str]] = []
         parent_by_child: dict[str, str] = {}
         for relation in parent_relations:
