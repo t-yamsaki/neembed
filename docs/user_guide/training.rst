@@ -39,8 +39,8 @@ and an off-diagonal negative in the same loss matrix.
 Optimizer behavior
 ------------------
 
-``ManifoldTrainer`` uses ordinary ``torch.optim.AdamW`` over
-``model.parameters()``. This is intentional for the current training path.
+By default, ``ManifoldTrainer`` preserves the ordinary Euclidean training path
+and creates ``torch.optim.AdamW`` over ``model.parameters()``.
 
 The trainable sentence-encoder weights and optional linear projection are
 ordinary Euclidean PyTorch parameters. The forward output is manifold-valued,
@@ -48,9 +48,31 @@ but the output being on a manifold does not by itself require a Riemannian
 optimizer. Gradients flow through Geoopt's differentiable map and geodesic
 distance back to the Euclidean trainable parameters.
 
-A Riemannian optimizer becomes relevant when trainable parameters themselves
-live on a manifold, for example trainable manifold prototypes or hierarchy
-nodes. The current public model does not introduce such parameters.
+When trainable parameters themselves live on a manifold, such as
+``ManifoldPrototypes``, pass a caller-owned Geoopt optimizer through the
+``optimizer`` argument. ``ManifoldTrainer`` uses a supplied optimizer as-is,
+so one ``geoopt.optim.RiemannianAdam`` can own both ordinary model parameters
+and manifold parameters without neembed reimplementing Riemannian updates.
+Callers are responsible for including every trainable parameter that
+participates in the loss.
+
+For example, a loss that depends on both the model and a prototype module can
+use one mixed optimizer:
+
+.. code-block:: python
+
+   import geoopt
+
+   parameters = [
+       parameter
+       for parameter in (*model.parameters(), *prototypes.parameters())
+       if parameter.requires_grad
+   ]
+   optimizer = geoopt.optim.RiemannianAdam(parameters, lr=1e-3)
+   trainer = ManifoldTrainer(model, loss, optimizer=optimizer)
+
+The loss must actually depend on the prototype values for those parameters to
+receive gradients.
 
 Minimal training loop
 ---------------------

@@ -1,4 +1,6 @@
-"""Minimal Euclidean training loop for neembed."""
+"""Minimal training loop for neembed."""
+
+from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 
@@ -10,14 +12,24 @@ from neembed.model import ManifoldSentenceTransformer
 
 
 class ManifoldTrainer:
-    """Fine-tune a manifold sentence model with ordinary AdamW optimization.
+    """Fine-tune a manifold sentence model with a small optimizer surface.
 
     Args:
-        model: Model whose Euclidean parameters are optimized.
+        model: Model whose parameters are optimized.
         loss: Manifold-aware ranking loss used for each training batch.
-        learning_rate: AdamW learning rate.
-        weight_decay: AdamW weight decay.
+        learning_rate: AdamW learning rate used when ``optimizer`` is omitted.
+        weight_decay: AdamW weight decay used when ``optimizer`` is omitted.
+        optimizer: Optional caller-owned optimizer. Pass a Geoopt Riemannian
+            optimizer here when the loss also depends on manifold-valued
+            parameters such as :class:`neembed.ManifoldPrototypes`.
         verbose: Print one mean-loss line after each epoch when ``True``.
+
+    Notes:
+        When ``optimizer`` is omitted, the existing AdamW path is preserved
+        unchanged and only ``model.parameters()`` are optimized. A supplied
+        optimizer is used as-is, so callers can explicitly include both the
+        model's ordinary parameters and external manifold-valued parameters in
+        one Geoopt optimizer without neembed reimplementing optimizer logic.
     """
 
     def __init__(
@@ -27,14 +39,19 @@ class ManifoldTrainer:
         *,
         learning_rate: float = 2e-5,
         weight_decay: float = 0.01,
+        optimizer: torch.optim.Optimizer | None = None,
         verbose: bool = True,
     ) -> None:
         self.model = model
         self.loss = loss
-        self.optimizer = torch.optim.AdamW(
-            model.parameters(),
-            lr=learning_rate,
-            weight_decay=weight_decay,
+        self.optimizer = (
+            optimizer
+            if optimizer is not None
+            else torch.optim.AdamW(
+                model.parameters(),
+                lr=learning_rate,
+                weight_decay=weight_decay,
+            )
         )
         self.verbose = verbose
 
