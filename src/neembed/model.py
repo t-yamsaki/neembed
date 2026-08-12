@@ -22,8 +22,18 @@ class ManifoldSentenceTransformer(nn.Module):
             projection. If omitted, the encoder embedding dimension is preserved.
             Lorentz embeddings use one additional ambient coordinate.
         curvature: Positive, finite magnitude of the negative sectional curvature.
-        learnable_curvature: When ``True``, optimize curvature jointly with the
-            ordinary model parameters. Fixed curvature remains the default.
+            The same public meaning is used for Poincare and Lorentz geometry.
+        learnable_curvature: When ``True``, optimize the positive scalar curvature
+            state jointly with the ordinary model parameters. Fixed curvature
+            remains the default. Learnable curvature is not itself a
+            manifold-valued point, so this option alone does not require a
+            Riemannian optimizer.
+
+    Notes:
+        The returned sentence embeddings are manifold-valued outputs, while the
+        encoder and optional projection weights remain ordinary Euclidean
+        parameters. True manifold-valued trainable coordinates are introduced
+        separately through :class:`neembed.ManifoldPrototypes`.
     """
 
     def __init__(
@@ -63,7 +73,12 @@ class ManifoldSentenceTransformer(nn.Module):
 
     @property
     def curvature(self) -> float:
-        """Return the current public curvature magnitude as a Python float."""
+        """Return the current public curvature magnitude as a Python float.
+
+        The value is the positive magnitude of negative sectional curvature for
+        both supported geometries. For Lorentz geometry this converts Geoopt's
+        internal squared-radius parameter ``k`` back to ``1 / k``.
+        """
         if self.manifold_name == "poincare":
             curvature = self.manifold.c
         else:
@@ -167,10 +182,17 @@ class ManifoldSentenceTransformer(nn.Module):
             return self.manifold.dist(a_tensor, b_tensor)
 
     def save_pretrained(self, output_path: str | Path) -> None:
-        """Save the encoder, projection weights, and neembed configuration.
+        """Save the encoder, projection, and sentence-model geometry state.
 
         Args:
             output_path: Directory in which to save the model.
+
+        Notes:
+            For learnable curvature, the current public curvature value and its
+            trainable flag are stored in ``neembed_config.json``. External modules
+            such as :class:`neembed.ManifoldPrototypes`, hierarchy metadata, and
+            optimizer state are not included by this helper and should be saved
+            separately when needed.
         """
         output_path = Path(output_path)
         output_path.mkdir(parents=True, exist_ok=True)
@@ -200,7 +222,9 @@ class ManifoldSentenceTransformer(nn.Module):
             model_path: Directory containing a saved neembed model.
 
         Returns:
-            The reconstructed manifold sentence model.
+            The reconstructed manifold sentence model, including the saved
+            current public curvature value and curvature trainability. External
+            prototype modules must be reconstructed and loaded separately.
         """
         model_path = Path(model_path)
         config = json.loads(
