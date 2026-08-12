@@ -150,16 +150,47 @@ def test_prototypes_reject_invalid_configuration(monkeypatch) -> None:
             ManifoldPrototypes(model, num_prototypes=2, init_std=init_std)
 
 
-def test_prototypes_reject_learnable_curvature_until_joint_optimization_is_supported(
+@pytest.mark.parametrize("manifold_name", ["poincare", "lorentz"])
+def test_joint_learnable_curvature_and_prototypes_stay_valid_with_stabilization(
     monkeypatch,
+    manifold_name,
 ) -> None:
     monkeypatch.setattr(model_module, "SentenceTransformer", FakeSentenceTransformer)
+    torch.manual_seed(5)
     model = ManifoldSentenceTransformer(
         "fake-model",
-        manifold="poincare",
+        manifold=manifold_name,
         embedding_dim=2,
+        curvature=1.0,
         learnable_curvature=True,
     )
+    prototypes = ManifoldPrototypes(model, num_prototypes=3, init_std=0.05)
+    initial_curvature = model.curvature
+    prototypes_before = prototypes.prototypes.detach().clone()
+    optimizer = geoopt.optim.RiemannianAdam(
+        [
+            parameter
+            for parameter in (*model.parameters(), *prototypes.parameters())
+            if parameter.requires_grad
+        ],
+        lr=1e-2,
+        stabilize=1,
+    )
 
-    with pytest.raises(ValueError, match="fixed curvature"):
-        ManifoldPrototypes(model, num_prototypes=2)
+    for _ in range(2):
+        optimizer.zero_grad()
+        distances = prototypes(model(["Shiba Inu", "Siamese cat"]))
+        loss = distances.square().mean()
+        loss.backward()
+        optimizer.step()
+
+    assert math.isfinite(model.curvature)
+    assert abs(model.curvature - initial_curvature) > 0.0
+    assert not torch.equal(prototypes_before, prototypes.prototypes.detach())
+    assert prototypes.prototypes.grad is not None
+    assert torch.isfinite(prototypes.prototypes.grad).all()
+    assert model.manifold.check_point_on_manifold(
+        prototypes.prototypes,
+        atol=1e-5,
+        rtol=1e-5,
+    )
