@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 
 import torch
+from torch import nn
 
 from neembed.evaluator import ManifoldEmbeddingEvaluator
-from neembed.losses import ManifoldMultipleNegativesRankingLoss
 from neembed.model import ManifoldSentenceTransformer
 
 
@@ -16,7 +16,8 @@ class ManifoldTrainer:
 
     Args:
         model: Model whose parameters are optimized.
-        loss: Manifold-aware ranking loss used for each training batch.
+        loss: Loss module called with the two sequences yielded by each training
+            batch.
         learning_rate: AdamW learning rate used when ``optimizer`` is omitted.
         weight_decay: AdamW weight decay used when ``optimizer`` is omitted.
         optimizer: Optional caller-owned optimizer. Pass a Geoopt Riemannian
@@ -35,7 +36,7 @@ class ManifoldTrainer:
     def __init__(
         self,
         model: ManifoldSentenceTransformer,
-        loss: ManifoldMultipleNegativesRankingLoss,
+        loss: nn.Module,
         *,
         learning_rate: float = 2e-5,
         weight_decay: float = 0.01,
@@ -62,14 +63,13 @@ class ManifoldTrainer:
         epochs: int = 1,
         evaluator: ManifoldEmbeddingEvaluator | None = None,
     ) -> list[float] | list[dict[str, object]]:
-        """Train on anchor-positive batches with optional epoch validation.
+        """Train on two-sequence batches with optional epoch validation.
 
         Args:
-            train_dataloader: Iterable yielding ``(anchors, positives)`` batches.
-                Each element is a sequence of texts consumed by the configured
-                ranking loss. For ``epochs > 1``, the iterable must be
-                re-iterable; a one-shot iterator or generator is suitable only
-                for a single epoch.
+            train_dataloader: Iterable yielding two aligned string sequences per
+                batch. Their exact meaning is defined by the configured loss. For
+                ``epochs > 1``, the iterable must be re-iterable; a one-shot
+                iterator or generator is suitable only for a single epoch.
             epochs: Number of full passes over ``train_dataloader``.
             evaluator: Optional manifold embedding evaluator called once after
                 each completed epoch.
@@ -87,9 +87,9 @@ class ManifoldTrainer:
             total_loss = 0.0
             steps = 0
 
-            for anchors, positives in train_dataloader:
+            for first, second in train_dataloader:
                 self.optimizer.zero_grad()
-                batch_loss = self.loss(anchors, positives)
+                batch_loss = self.loss(first, second)
                 batch_loss.backward()
                 self.optimizer.step()
 
