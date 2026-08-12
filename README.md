@@ -43,7 +43,7 @@ The released v0.3 path includes:
 - shared public curvature semantics across the two hyperbolic models
 - geodesic distance and manifold-aware multiple-negatives ranking loss
 - ordinary `AdamW` fine-tuning for the model-only path
-- `encode()` / `distance()`, evaluation, DataLoader interoperability, and local save/load
+- `encode()` / `distance()`, `ManifoldEmbeddingEvaluator`, DataLoader interoperability, and local save/load
 - geometry-consistency regressions and a matched Euclidean/Poincaré/Lorentz engineering benchmark
 
 The v0.4 development API adds:
