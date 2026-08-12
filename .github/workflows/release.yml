@@ -107,6 +107,54 @@ jobs:
         with:
           repository-url: https://test.pypi.org/legacy/
 
+  smoke-testpypi:
+    name: Smoke test TestPyPI package
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: publish-testpypi
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Download wheel from TestPyPI
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          mkdir -p /tmp/neembed-testpypi
+          for attempt in 1 2 3 4 5 6; do
+            rm -f /tmp/neembed-testpypi/*
+            if python -m pip download \
+              --no-deps \
+              --only-binary=:all: \
+              --index-url https://test.pypi.org/simple/ \
+              --dest /tmp/neembed-testpypi \
+              "neembed-geoopt==${PACKAGE_VERSION}"; then
+              break
+            fi
+            if [ "${attempt}" -eq 6 ]; then
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Fresh install TestPyPI wheel
+        run: python -m pip install /tmp/neembed-testpypi/neembed_geoopt-*.whl pytest
+
+      - name: Verify installed version and v0.4 smoke
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          python -c "from importlib.metadata import version; import neembed; assert version('neembed-geoopt') == '${PACKAGE_VERSION}'"
+          python -m pytest -q tests/test_import.py tests/test_v04_learnable_structure.py
+
   publish-pypi:
     name: Publish to PyPI
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
@@ -127,3 +175,70 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  smoke-pypi:
+    name: Smoke test PyPI package
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Fresh install PyPI package
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          for attempt in 1 2 3 4 5 6; do
+            if python -m pip install --no-cache-dir "neembed-geoopt==${PACKAGE_VERSION}" pytest; then
+              break
+            fi
+            if [ "${attempt}" -eq 6 ]; then
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Verify installed version and v0.4 smoke
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          python -c "from importlib.metadata import version; import neembed; assert version('neembed-geoopt') == '${PACKAGE_VERSION}'"
+          python -m pytest -q tests/test_import.py tests/test_v04_learnable_structure.py
+
+  create-github-release:
+    name: Create GitHub Release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: smoke-pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Create concise release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "GitHub Release ${GITHUB_REF_NAME} already exists."
+            exit 0
+          fi
+          cat > release-notes.md <<'EOF'
+          v0.4.0 adds opt-in learnable curvature for Poincaré and Lorentz models, trainable manifold-valued prototypes, a focused hierarchy-aware objective, and an explicit caller-supplied Geoopt Riemannian optimizer path for mixed Euclidean/manifold training.
+
+          The existing fixed-curvature model-only path remains backward-compatible and continues to use AdamW by default. The included learnable-structure example is an engineering regression check, not a claim that learnable structure is generally superior to fixed structure.
+          EOF
+          gh release create "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --verify-tag \
+            --title "neembed ${GITHUB_REF_NAME}" \
+            --notes-file release-notes.md
