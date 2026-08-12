@@ -1,8 +1,9 @@
 Training
 ========
 
-neembed fine-tunes the pretrained encoder and optional projection with a
-multiple-negatives ranking objective based on manifold geodesic distance.
+neembed supports both the original multiple-negatives ranking objective and a
+small prototype-based hierarchy objective. Both use manifold geodesic distance
+from Geoopt rather than custom distance formulas.
 
 Geodesic ranking objective
 --------------------------
@@ -35,6 +36,66 @@ batch itself part of the supervision signal.
 Avoid duplicate positives within one batch. For example, pairing two different
 anchors with the same ``"mammal"`` positive would make that item both a target
 and an off-diagonal negative in the same loss matrix.
+
+Prototype hierarchy objective
+-----------------------------
+
+``ManifoldPrototypeHierarchyLoss`` is the focused hierarchy-aware objective for
+trainable ``ManifoldPrototypes``. It combines two interpretable terms:
+
+- each sentence embedding is attracted to its assigned prototype;
+- each child prototype should be at least ``margin`` closer to its declared
+  parent than to an unrelated prototype.
+
+For child :math:`c`, parent :math:`p`, and unrelated prototype :math:`n`, the
+hierarchy penalty is
+
+.. math::
+
+   \max(0, m + d_{\mathcal M}(c,p) - d_{\mathcal M}(c,n)).
+
+Prototype identifiers and hierarchy edges stay as ordinary Python values; no
+graph Dataset or DataModule is required. For example:
+
+.. code-block:: python
+
+   import geoopt
+
+   from neembed import (
+       ManifoldPrototypeHierarchyLoss,
+       ManifoldPrototypes,
+   )
+
+   prototype_ids = ["animal", "dog", "cat"]
+   parent_relations = [
+       ("dog", "animal"),
+       ("cat", "animal"),
+   ]
+
+   prototypes = ManifoldPrototypes(model, num_prototypes=len(prototype_ids))
+   loss = ManifoldPrototypeHierarchyLoss(
+       model,
+       prototypes,
+       prototype_ids=prototype_ids,
+       parent_relations=parent_relations,
+       margin=0.1,
+   )
+
+   parameters = [
+       parameter for parameter in loss.parameters() if parameter.requires_grad
+   ]
+   optimizer = geoopt.optim.RiemannianAdam(parameters, lr=1e-3)
+   trainer = ManifoldTrainer(model, loss, optimizer=optimizer)
+
+   train_batches = [
+       (["Shiba Inu", "Siamese cat"], ["dog", "cat"]),
+   ]
+   history = trainer.fit(train_batches, epochs=3)
+
+The second sequence in each hierarchy batch contains prototype assignments, not
+positive texts. ``prototype_ids`` must be unique non-empty strings, and
+``parent_relations`` must reference those identifiers, give each child at most
+one parent, and remain acyclic.
 
 Optimizer behavior
 ------------------
@@ -77,11 +138,13 @@ receive gradients.
 Minimal training loop
 ---------------------
 
-``ManifoldTrainer.fit`` accepts an iterable yielding ``(anchors, positives)``
-batches. For more than one epoch, that input must be re-iterable, such as a
-list or a DataLoader; a one-shot iterator or generator is only suitable for a
-single epoch. Without validation, the method keeps its original return value:
-one mean loss value per completed epoch.
+``ManifoldTrainer.fit`` accepts an iterable yielding two aligned string
+sequences. Their meaning is defined by the configured loss: anchor-positive
+pairs for ``ManifoldMultipleNegativesRankingLoss`` or sentence-assignment pairs
+for ``ManifoldPrototypeHierarchyLoss``. For more than one epoch, the input must
+be re-iterable, such as a list or a DataLoader; a one-shot iterator or generator
+is only suitable for a single epoch. Without validation, the method keeps its
+original return value: one mean loss value per completed epoch.
 
 .. code-block:: python
 
@@ -152,5 +215,6 @@ better than Poincare geometry.
 
 For argument and return-value details, see
 :class:`neembed.ManifoldMultipleNegativesRankingLoss`,
+:class:`neembed.ManifoldPrototypeHierarchyLoss`,
 :class:`neembed.ManifoldEmbeddingEvaluator`, and
 :class:`neembed.ManifoldTrainer`.
