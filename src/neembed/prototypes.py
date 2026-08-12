@@ -28,12 +28,21 @@ class ManifoldPrototypes(nn.Module):
         parameters and these prototype parameters, then pass it explicitly to
         :class:`neembed.ManifoldTrainer`.
 
+        ``embedding_dim`` is intrinsic. Poincare prototypes have that many
+        coordinates; Lorentz prototypes have one additional ambient time-like
+        coordinate, matching the sentence-model output contract.
+
         Prototypes may share a manifold whose curvature is learnable. In that
         joint path, use Geoopt optimizer stabilization after every step (for
         example ``geoopt.optim.RiemannianAdam(..., stabilize=1)``) so prototype
         coordinates are projected back onto the manifold after the curvature
         parameter changes. neembed delegates both the Riemannian update and the
         stabilization projection to Geoopt.
+
+        Prototype coordinates are external to
+        :meth:`neembed.ManifoldSentenceTransformer.save_pretrained`; persist this
+        module with its own ``state_dict()`` and reconstruct it on a compatible
+        reloaded model before loading that state.
     """
 
     def __init__(
