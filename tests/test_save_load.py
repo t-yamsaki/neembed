@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+import pytest
 import torch
 from torch import nn
 
@@ -145,6 +146,43 @@ def test_lorentz_save_pretrained_round_trip_preserves_config_and_embeddings(
     assert loaded.curvature == 2.0
     assert before.shape == after.shape == (2, 3)
     assert torch.allclose(before, after)
+
+
+@pytest.mark.parametrize("manifold_name", ["poincare", "lorentz"])
+def test_learned_curvature_round_trip_preserves_current_value_and_trainability(
+    monkeypatch,
+    tmp_path,
+    manifold_name: str,
+) -> None:
+    monkeypatch.setattr(model_module, "SentenceTransformer", FakeSentenceTransformer)
+    torch.manual_seed(0)
+    model = ManifoldSentenceTransformer(
+        "fake-model",
+        manifold=manifold_name,
+        embedding_dim=2,
+        curvature=1.0,
+        learnable_curvature=True,
+    )
+    curvature_parameter = next(
+        parameter for parameter in model.manifold.parameters() if parameter.requires_grad
+    )
+    with torch.no_grad():
+        curvature_parameter.add_(0.1)
+    expected_curvature = model.curvature
+    before = model.encode(["Shiba Inu", "dog"], convert_to_tensor=True)
+    save_path = tmp_path / f"saved-{manifold_name}-learnable"
+
+    model.save_pretrained(save_path)
+    loaded = ManifoldSentenceTransformer.from_pretrained(save_path)
+    after = loaded.encode(["Shiba Inu", "dog"], convert_to_tensor=True)
+
+    config = json.loads((save_path / "neembed_config.json").read_text(encoding="utf-8"))
+    assert config["learnable_curvature"] is True
+    assert config["curvature"] == pytest.approx(expected_curvature)
+    assert loaded.learnable_curvature
+    assert loaded.curvature == pytest.approx(expected_curvature, rel=1e-6, abs=1e-7)
+    assert any(parameter.requires_grad for parameter in loaded.manifold.parameters())
+    assert torch.allclose(before, after, atol=1e-6, rtol=1e-6)
 
 
 def test_save_pretrained_round_trip_preserves_disabled_projection(

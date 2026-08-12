@@ -41,7 +41,7 @@ jobs:
       - name: Run real-stack acceptance tests
         env:
           NEEMBED_REAL_STACK: "1"
-        run: python -m pytest -q tests/integration/test_real_stack.py
+        run: python -m pytest -q tests/integration
 
       - name: Verify tag matches package version
         if: startsWith(github.ref, 'refs/tags/')

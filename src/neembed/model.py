@@ -22,6 +22,8 @@ class ManifoldSentenceTransformer(nn.Module):
             projection. If omitted, the encoder embedding dimension is preserved.
             Lorentz embeddings use one additional ambient coordinate.
         curvature: Positive, finite magnitude of the negative sectional curvature.
+        learnable_curvature: When ``True``, optimize curvature jointly with the
+            ordinary model parameters. Fixed curvature remains the default.
     """
 
     def __init__(
@@ -31,6 +33,7 @@ class ManifoldSentenceTransformer(nn.Module):
         manifold: str = "poincare",
         embedding_dim: int | None = None,
         curvature: float = 1.0,
+        learnable_curvature: bool = False,
     ) -> None:
         super().__init__()
         self.encoder = SentenceTransformer(model_name_or_path)
@@ -50,9 +53,22 @@ class ManifoldSentenceTransformer(nn.Module):
         self.projection.to(self.encoder.device)
 
         self.manifold_name = manifold
-        self.curvature = float(curvature)
-        self.manifold = get_manifold(self.manifold_name, self.curvature)
+        self.learnable_curvature = bool(learnable_curvature)
+        self.manifold = get_manifold(
+            self.manifold_name,
+            float(curvature),
+            self.learnable_curvature,
+        )
         self.manifold.to(self.encoder.device)
+
+    @property
+    def curvature(self) -> float:
+        """Return the current public curvature magnitude as a Python float."""
+        if self.manifold_name == "poincare":
+            curvature = self.manifold.c
+        else:
+            curvature = self.manifold.k.reciprocal()
+        return float(curvature.detach().cpu())
 
     def forward(self, sentences: Sequence[str]) -> torch.Tensor:
         """Encode a batch and map embeddings from the origin tangent space.
@@ -165,6 +181,8 @@ class ManifoldSentenceTransformer(nn.Module):
             "manifold": self.manifold_name,
             "curvature": self.curvature,
         }
+        if self.learnable_curvature:
+            config["learnable_curvature"] = True
         (output_path / "neembed_config.json").write_text(
             json.dumps(config, indent=2) + "\n",
             encoding="utf-8",
@@ -193,6 +211,7 @@ class ManifoldSentenceTransformer(nn.Module):
             manifold=config["manifold"],
             embedding_dim=config["embedding_dim"],
             curvature=config["curvature"],
+            learnable_curvature=config.get("learnable_curvature", False),
         )
         projection_state = torch.load(
             model_path / "projection.pt",

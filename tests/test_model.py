@@ -2,6 +2,7 @@
 
 import neembed
 import numpy as np
+import pytest
 import torch
 from torch import nn
 
@@ -61,6 +62,54 @@ def test_forward_without_projection_preserves_encoder_dimension(monkeypatch) -> 
 
     assert embeddings.shape == (2, 4)
     assert isinstance(model.projection, nn.Identity)
+
+
+def test_fixed_curvature_remains_the_default(monkeypatch) -> None:
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", curvature=2.0)
+
+    assert not model.learnable_curvature
+    assert model.curvature == pytest.approx(2.0)
+    assert not any(parameter.requires_grad for parameter in model.manifold.parameters())
+
+
+@pytest.mark.parametrize("manifold_name", ["poincare", "lorentz"])
+def test_learnable_curvature_receives_gradient_and_updates(
+    monkeypatch,
+    manifold_name: str,
+) -> None:
+    _patch_encoder(monkeypatch)
+    torch.manual_seed(0)
+    model = ManifoldSentenceTransformer(
+        "fake-model",
+        manifold=manifold_name,
+        embedding_dim=2,
+        curvature=1.0,
+        learnable_curvature=True,
+    )
+    curvature_parameter = next(
+        parameter for parameter in model.manifold.parameters() if parameter.requires_grad
+    )
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2, weight_decay=0.0)
+    initial_curvature = model.curvature
+
+    optimizer.zero_grad()
+    loss = model(["dog", "mammal"]).square().mean()
+    loss.backward()
+
+    assert curvature_parameter.grad is not None
+    assert torch.isfinite(curvature_parameter.grad).all()
+    assert torch.count_nonzero(curvature_parameter.grad) > 0
+
+    optimizer.step()
+
+    assert math_is_finite_positive(model.curvature)
+    assert model.curvature != pytest.approx(initial_curvature, abs=1e-8)
+    assert torch.isfinite(model(["dog", "mammal"])).all()
+
+
+def math_is_finite_positive(value: float) -> bool:
+    return np.isfinite(value) and value > 0.0
 
 
 def test_lorentz_forward_uses_float64_and_satisfies_constraint(monkeypatch) -> None:

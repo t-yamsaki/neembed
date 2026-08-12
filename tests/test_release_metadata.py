@@ -121,11 +121,14 @@ def test_public_api_and_persistence_cover_v03_geometry_contracts() -> None:
     assert 'Supports ``"poincare"`` and ``"lorentz"``' in model
     assert "Lorentz embeddings use one additional ambient coordinate" in model
     assert "Positive, finite magnitude of the negative sectional curvature" in model
+    assert "learnable_curvature" in model
     assert "Lorentz outputs" in model and "float64" in model
     assert '"manifold": self.manifold_name' in model
     assert '"curvature": self.curvature' in model
+    assert 'config["learnable_curvature"] = True' in model
     assert 'manifold=config["manifold"]' in model
     assert 'curvature=config["curvature"]' in model
+    assert 'config.get("learnable_curvature", False)' in model
 
     assert "NumPy arrays are returned by default" in model
     assert "torch.inference_mode()" in model
@@ -140,20 +143,26 @@ def test_public_api_and_persistence_cover_v03_geometry_contracts() -> None:
         assert metric in evaluator
 
 
-def test_release_real_stack_covers_poincare_and_lorentz() -> None:
+def test_release_real_stack_covers_fixed_and_learnable_geometries() -> None:
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
         encoding="utf-8"
     )
     real_stack = (
         ROOT / "tests" / "integration" / "test_real_stack.py"
     ).read_text(encoding="utf-8")
+    learnable_stack = (
+        ROOT / "tests" / "integration" / "test_real_stack_learnable_curvature.py"
+    ).read_text(encoding="utf-8")
 
     assert 'NEEMBED_REAL_STACK: "1"' in workflow
-    assert "tests/integration/test_real_stack.py" in workflow
+    assert "python -m pytest -q tests/integration" in workflow
     assert 'manifold: str = "poincare"' in real_stack
     assert 'manifold="lorentz"' in real_stack
     assert "geoopt.Lorentz" in real_stack
     assert "torch.optim.AdamW" in real_stack
+    assert 'learnable_curvature=True' in learnable_stack
+    assert '["poincare", "lorentz"]' in learnable_stack
+    assert "trainer.optimizer.step()" in learnable_stack
 
 
 def test_release_workflow_restricts_production_publish_to_tag_pushes() -> None:
