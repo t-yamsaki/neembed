@@ -27,15 +27,28 @@ loss is
 ``ManifoldMultipleNegativesRankingLoss`` computes the full pairwise distance
 matrix and applies cross entropy to these diagonal targets.
 
-In-batch negatives
-------------------
+Explicit hard negatives are optional. Calling
+``loss(anchors, positives, negatives)`` embeds the explicit negatives and
+appends them after the positive candidate batch before computing the same
+geodesic-distance logits. The diagonal targets still point to the leading
+positive candidates, so the candidate pool for every anchor contains all
+in-batch positive candidates plus all supplied explicit negatives.
+
+In-batch and explicit negatives
+-------------------------------
 
 All off-diagonal positive candidates are treated as negatives. This makes the
-batch itself part of the supervision signal.
+batch itself part of the supervision signal. When explicit negatives are
+supplied, they are additional candidates for every anchor in the batch rather
+than one negative being paired only with the anchor at the same index.
 
 Avoid duplicate positives within one batch. For example, pairing two different
 anchors with the same ``"mammal"`` positive would make that item both a target
 and an off-diagonal negative in the same loss matrix.
+
+For the three-sequence form, ``anchors``, ``positives``, and ``negatives`` must
+have the same non-zero batch length. Automatic hard-negative mining is not part
+of this API; callers choose the explicit negative texts.
 
 Prototype hierarchy objective
 -----------------------------
@@ -185,13 +198,20 @@ need to download a Sentence Transformer model repeatedly.
 Minimal training loop
 ---------------------
 
-``ManifoldTrainer.fit`` accepts an iterable yielding two aligned string
-sequences. Their meaning is defined by the configured loss: anchor-positive
-pairs for ``ManifoldMultipleNegativesRankingLoss`` or sentence-assignment pairs
-for ``ManifoldPrototypeHierarchyLoss``. For more than one epoch, the input must
-be re-iterable, such as a list or a DataLoader; a one-shot iterator or generator
-is only suitable for a single epoch. Without validation, the method keeps its
-original return value: one mean loss value per completed epoch.
+``ManifoldTrainer.fit`` accepts an iterable yielding either two or three aligned
+string sequences. Two-sequence batches preserve the existing contract; their
+meaning is defined by the configured loss, such as anchor-positive pairs for
+``ManifoldMultipleNegativesRankingLoss`` or sentence-assignment pairs for
+``ManifoldPrototypeHierarchyLoss``. Three-sequence batches are forwarded as
+``(anchors, positives, negatives)`` and are intended for losses such as
+``ManifoldMultipleNegativesRankingLoss`` that accept explicit hard negatives.
+
+For more than one epoch, the input must be re-iterable, such as a list or a
+DataLoader; a one-shot iterator or generator is only suitable for a single
+epoch. Without validation, the method keeps its original return value: one mean
+loss value per completed epoch.
+
+The original two-sequence form remains unchanged:
 
 .. code-block:: python
 
@@ -202,6 +222,25 @@ original return value: one mean loss value per completed epoch.
 
    history = trainer.fit(train_batches, epochs=3)
    print(history)
+
+For explicit hard negatives, supply a third aligned sequence. Every explicit
+negative in that sequence is added to the candidate pool for every anchor in
+the batch:
+
+.. code-block:: python
+
+   train_batches = [
+       (
+           ["Shiba Inu", "Siamese cat"],
+           ["dog", "cat"],
+           ["wolf", "tiger"],
+       ),
+   ]
+
+   history = trainer.fit(train_batches, epochs=3)
+
+Batches with any other arity are rejected rather than being interpreted by a
+generic batch-dispatch framework.
 
 Optional validation
 -------------------
@@ -239,7 +278,9 @@ The runnable `DataLoader example
 <https://github.com/t-yamsaki/neembed/blob/main/examples/train_dataloader.py>`_
 uses a plain list of aligned text pairs, default PyTorch collation, multi-epoch
 training, and optional validation. Its batches keep positive candidates unique
-so the in-batch-negative objective remains well-defined.
+so the in-batch-negative objective remains well-defined. A DataLoader may also
+yield three aligned string sequences for the explicit-hard-negative ranking
+path; the same batch-length requirements apply.
 
 Lorentz example
 ---------------
