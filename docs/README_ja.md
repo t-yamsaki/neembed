@@ -43,7 +43,7 @@ release 済みの v0.3 path には以下を含みます。
 - 2つの双曲モデルで統一した public curvature semantics
 - geodesic distance と manifold-aware multiple-negatives ranking loss
 - model-only path での通常の `AdamW` fine-tuning
-- `encode()` / `distance()`、evaluation、DataLoader 連携、ローカル save/load
+- `encode()` / `distance()`、`ManifoldEmbeddingEvaluator`、DataLoader 連携、ローカル save/load
 - geometry consistency regression と matched Euclidean/Poincaré/Lorentz engineering benchmark
 
 v0.4 development API ではさらに以下を追加しています。
