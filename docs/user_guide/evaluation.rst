@@ -35,20 +35,42 @@ undefined for a single pair.
        model=model,
        anchors=["Shiba Inu", "Siamese cat", "sparrow"],
        positives=["dog", "cat", "bird"],
+       recall_at_k=(1, 2, 3),
    )
 
    metrics = evaluator()
    print(metrics)
 
 The evaluator runs without gradient tracking and restores the model's original
-training/evaluation mode before returning.
+training/evaluation mode before returning. Candidate ranks use ascending
+manifold geodesic distance. The default ``recall_at_k=(1,)`` adds only
+``recall_at_1``; pass other positive integer cutoffs to request additional
+Recall@K values.
 
 Metrics
 -------
 
 ``retrieval_accuracy``
    Fraction of anchors whose nearest positive candidate is the aligned target.
-   Higher is better. The value is between 0 and 1.
+   Higher is better. The value is between 0 and 1. Under the aligned retrieval
+   contract this is the same quantity as Recall@1.
+
+``recall_at_<K>``
+   Fraction of anchors whose aligned target appears among the K nearest
+   candidates. Higher is better. One key is returned for every configured
+   ``recall_at_k`` cutoff. If K is greater than or equal to the number of
+   candidates, Recall@K is 1 because every aligned target is present in the
+   candidate pool.
+
+``mrr``
+   Mean reciprocal rank of the aligned target. For target ranks
+   :math:`r_1, \ldots, r_N`, MRR is
+
+   .. math::
+
+      \mathrm{MRR} = \frac{1}{N}\sum_{i=1}^{N}\frac{1}{r_i}.
+
+   Higher is better. MRR is 1 only when every aligned target is ranked first.
 
 ``mean_positive_distance``
    Mean distance of aligned anchor-positive pairs, i.e. the diagonal of the
@@ -80,9 +102,8 @@ each completed epoch:
    )
 
 With validation enabled, each history entry contains the epoch's mean
-``train_loss`` and a nested ``validation`` mapping with the three evaluator
-metrics. Without an evaluator, ``fit()`` keeps the original ``list[float]``
-return shape.
+``train_loss`` and a nested ``validation`` mapping with the evaluator metrics.
+Without an evaluator, ``fit()`` keeps the original ``list[float]`` return shape.
 
 See :doc:`training` for the training contract, optimizer behavior, and runnable
 Lorentz example, and :class:`neembed.ManifoldTrainer` for the generated API
