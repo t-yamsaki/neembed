@@ -140,6 +140,32 @@ def test_evaluator_reports_known_ranks_and_configurable_recall_cutoffs() -> None
     assert metrics["mrr"] == pytest.approx((1.0 + 0.5 + 1.0 / 3.0) / 3.0)
 
 
+def test_evaluator_preserves_index_order_for_equal_distance_ties() -> None:
+    model = ControlledDistanceModel(
+        {
+            "a0": 0.0,
+            "a1": 0.0,
+            "p0": -1.0,
+            "p1": 1.0,
+        }
+    )
+    evaluator = ManifoldEmbeddingEvaluator(
+        model=model,
+        anchors=["a0", "a1"],
+        positives=["p0", "p1"],
+        recall_at_k=(1, 2),
+    )
+
+    metrics = evaluator()
+
+    # Both candidates tie for both anchors. Stable index ordering gives the
+    # aligned targets ranks 1 and 2 respectively.
+    assert metrics["retrieval_accuracy"] == pytest.approx(0.5)
+    assert metrics["recall_at_1"] == pytest.approx(0.5)
+    assert metrics["recall_at_2"] == pytest.approx(1.0)
+    assert metrics["mrr"] == pytest.approx(0.75)
+
+
 @pytest.mark.parametrize(
     "recall_at_k,match",
     [
