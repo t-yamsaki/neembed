@@ -21,11 +21,13 @@ python experiments/compare_euclidean_poincare.py
 The command emits one JSON object containing the fixed configuration, exact train/evaluation pairs, ambient dimensions, and these metrics for each variant:
 
 - `retrieval_accuracy`
+- `mrr`
+- `recall_at_1`
 - `mean_positive_distance`
 - `mean_negative_distance`
 - `final_training_loss`
 
-The three evaluation metrics are computed through the shared v0.2 `ManifoldEmbeddingEvaluator`; the Euclidean benchmark wrapper exposes the same minimal `encode()` / `distance()` contract only inside this experiment.
+The five evaluation metrics are computed through the shared `ManifoldEmbeddingEvaluator`; the Euclidean benchmark wrapper exposes the same minimal `encode()` / `distance()` contract only inside this experiment. In the current one-positive-per-anchor evaluation contract, `recall_at_1` is equivalent to `retrieval_accuracy`.
 
 ### Fixed configuration
 
