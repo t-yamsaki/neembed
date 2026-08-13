@@ -89,14 +89,24 @@ class ManifoldEmbeddingEvaluator:
 
                 pair_count = len(self.anchors)
                 targets = torch.arange(pair_count, device=distances.device)
-                ranked_candidates = torch.argsort(distances, dim=1, stable=True)
-                target_ranks = (
-                    (ranked_candidates == targets[:, None])
-                    .to(dtype=torch.int64)
-                    .argmax(dim=1)
-                    + 1
-                )
                 positive_distances = distances.diagonal()
+
+                # Compute the exact stable rank of each aligned target without
+                # materializing an N x N int64 argsort result. Candidates with a
+                # smaller distance rank first; equal-distance candidates preserve
+                # their original index order.
+                target_distances = positive_distances.unsqueeze(1)
+                closer_counts = (distances < target_distances).sum(dim=1)
+                candidate_indices = torch.arange(
+                    pair_count,
+                    device=distances.device,
+                ).unsqueeze(0)
+                equal_before_counts = (
+                    (distances == target_distances)
+                    & (candidate_indices < targets.unsqueeze(1))
+                ).sum(dim=1)
+                target_ranks = closer_counts + equal_before_counts + 1
+
                 negative_mask = ~torch.eye(
                     pair_count,
                     dtype=torch.bool,
