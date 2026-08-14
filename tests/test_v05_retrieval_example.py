@@ -7,11 +7,14 @@ import torch
 from torch import nn
 
 import neembed.model as model_module
-from examples.v05_retrieval_workflow import run_example
+from examples.v05_retrieval_workflow import _train_prototypes, run_example
+from neembed import ManifoldPrototypes, ManifoldSentenceTransformer
 
 
 class FakeSentenceTransformer(nn.Module):
     """Small deterministic encoder used without external model downloads."""
+
+    modes_seen: list[bool] = []
 
     def __init__(self, model_name_or_path: str) -> None:
         super().__init__()
@@ -56,6 +59,7 @@ class FakeSentenceTransformer(nn.Module):
         return {"input_features": torch.tensor(rows, dtype=torch.float32)}
 
     def forward(self, features: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        type(self).modes_seen.append(self.training)
         return {"sentence_embedding": self.linear(features["input_features"])}
 
 
@@ -119,3 +123,28 @@ def test_v05_example_is_deterministic_with_fixed_seed(monkeypatch) -> None:
     assert first["prototype_training_loss"] == pytest.approx(
         second["prototype_training_loss"]
     )
+
+
+def test_prototype_stage_keeps_frozen_encoder_in_eval_mode(monkeypatch) -> None:
+    monkeypatch.setattr(model_module, "SentenceTransformer", FakeSentenceTransformer)
+    torch.manual_seed(7)
+    model = ManifoldSentenceTransformer(
+        "fake-model",
+        manifold="poincare",
+        embedding_dim=3,
+    )
+    prototypes = ManifoldPrototypes(model, num_prototypes=4, init_std=0.05)
+    model.train()
+    FakeSentenceTransformer.modes_seen.clear()
+
+    loss = _train_prototypes(
+        model,
+        prototypes,
+        epochs=2,
+        learning_rate=2e-2,
+    )
+
+    assert math.isfinite(loss)
+    assert FakeSentenceTransformer.modes_seen
+    assert not any(FakeSentenceTransformer.modes_seen)
+    assert model.training
