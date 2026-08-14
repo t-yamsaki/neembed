@@ -204,13 +204,18 @@ class ManifoldSentenceTransformer(nn.Module):
             original input order.
 
         Raises:
-            ValueError: If ``candidates`` is empty or ``top_k`` is invalid.
+            ValueError: If ``candidates`` is a bare string or empty, or ``top_k``
+                is invalid.
 
         Notes:
             This helper is intended for small in-memory reranking. It does not
             build or persist a search index. Encoding and distance calculation run
             without gradient tracking through the existing inference helpers.
         """
+        if isinstance(candidates, str):
+            raise ValueError(
+                "candidates must be a sequence of strings, not a single string"
+            )
         candidate_list = list(candidates)
         if not candidate_list:
             raise ValueError("candidates must contain at least one item")
