@@ -76,7 +76,7 @@ def _train_prototypes(
     epochs: int,
     learning_rate: float,
 ) -> float:
-    """Fit only prototype points while leaving the retrieval model fixed."""
+    """Fit only prototype points against deterministic frozen embeddings."""
     hierarchy_loss = ManifoldPrototypeHierarchyLoss(
         model,
         prototypes,
@@ -85,32 +85,32 @@ def _train_prototypes(
         margin=0.1,
     )
     requires_grad = [parameter.requires_grad for parameter in model.parameters()]
+    was_training = model.training
     try:
         for parameter in model.parameters():
             parameter.requires_grad_(False)
+        model.eval()
         optimizer = geoopt.optim.RiemannianAdam(
             prototypes.parameters(),
             lr=learning_rate,
             stabilize=1,
         )
-        trainer = ManifoldTrainer(
-            model,
-            hierarchy_loss,
-            optimizer=optimizer,
-            verbose=False,
-        )
-        history = trainer.fit(
-            [(PROTOTYPE_SENTENCES, PROTOTYPE_ASSIGNMENTS)],
-            epochs=epochs,
-        )
+        final_loss = math.nan
+        for _ in range(epochs):
+            optimizer.zero_grad()
+            batch_loss = hierarchy_loss(PROTOTYPE_SENTENCES, PROTOTYPE_ASSIGNMENTS)
+            batch_loss.backward()
+            optimizer.step()
+            final_loss = float(batch_loss.detach())
     finally:
+        model.train(was_training)
         for parameter, original_requires_grad in zip(
             model.parameters(),
             requires_grad,
             strict=True,
         ):
             parameter.requires_grad_(original_requires_grad)
-    return float(history[-1])
+    return final_loss
 
 
 def run_example(
@@ -149,7 +149,6 @@ def run_example(
         model,
         ranking_loss,
         learning_rate=learning_rate,
-        weight_decay=0.0,
         verbose=False,
     )
     training_history = trainer.fit(
@@ -157,24 +156,25 @@ def run_example(
         epochs=epochs,
     )
 
-    retrieval_metrics = ManifoldEmbeddingEvaluator(
+    retrieval_evaluator = ManifoldEmbeddingEvaluator(
         model=model,
         anchors=EVAL_ANCHORS,
         positives=EVAL_POSITIVES,
         recall_at_k=(1, 2, 3),
-    )()
+    )
+    retrieval_metrics = retrieval_evaluator()
     ranked_results = model.rank(
         RERANK_QUERY,
         RERANK_CANDIDATES,
         top_k=3,
     )
-
-    embedding_pair = model.encode(
-        EVAL_ANCHORS[:2],
+    encoded_pair = model.encode(
+        [TRAIN_ANCHORS[0], TRAIN_POSITIVES[0]],
         convert_to_tensor=True,
     )
-    embedding_distance = float(model.distance(embedding_pair[0], embedding_pair[1]))
+    embedding_distance = float(model.distance(encoded_pair[0], encoded_pair[1]))
 
+    torch.manual_seed(seed + 1)
     prototypes = ManifoldPrototypes(
         model,
         num_prototypes=len(PROTOTYPE_IDS),
@@ -186,17 +186,18 @@ def run_example(
         epochs=prototype_epochs,
         learning_rate=prototype_learning_rate,
     )
-    prototype_metrics = ManifoldPrototypeAssignmentEvaluator(
+    prototype_evaluator = ManifoldPrototypeAssignmentEvaluator(
         model=model,
         prototypes=prototypes,
         prototype_ids=PROTOTYPE_IDS,
         sentences=PROTOTYPE_SENTENCES,
         expected_prototype_ids=PROTOTYPE_ASSIGNMENTS,
-    )()
+    )
+    prototype_metrics = prototype_evaluator()
 
     return {
+        "manifold": model.manifold_name,
         "seed": seed,
-        "manifold": "poincare",
         "final_training_loss": float(training_history[-1]),
         "initial_pair_loss": paired_only_loss,
         "initial_hard_negative_loss": hard_negative_loss,
@@ -209,23 +210,21 @@ def run_example(
     }
 
 
-def _validate_results(results: dict[str, Any]) -> None:
-    scalar_keys = (
-        "final_training_loss",
-        "initial_pair_loss",
-        "initial_hard_negative_loss",
-        "hard_negative_loss_delta",
-        "embedding_distance",
-        "prototype_training_loss",
-    )
-    for key in scalar_keys:
-        if not math.isfinite(results[key]):
-            raise RuntimeError(f"{key} became non-finite")
+def _validate_regression(results: dict[str, Any]) -> None:
+    if not math.isfinite(results["final_training_loss"]):
+        raise RuntimeError("training loss became non-finite")
     if results["hard_negative_loss_delta"] <= 0.0:
-        raise RuntimeError("explicit hard negatives did not increase the initial objective")
+        raise RuntimeError("explicit hard negatives did not enlarge the candidate objective")
+    if not math.isfinite(results["embedding_distance"]):
+        raise RuntimeError("embedding distance became non-finite")
+    if not math.isfinite(results["prototype_training_loss"]):
+        raise RuntimeError("prototype training loss became non-finite")
     if not math.isfinite(results["prototype"]["mean_assigned_prototype_distance"]):
-        raise RuntimeError("prototype assignment distance became non-finite")
-    if any(not math.isfinite(item["distance"]) for item in results["ranked_results"]):
+        raise RuntimeError("prototype distance became non-finite")
+    if any(
+        not math.isfinite(item["distance"])
+        for item in results["ranked_results"]
+    ):
         raise RuntimeError("reranking produced a non-finite distance")
 
 
@@ -238,18 +237,16 @@ def main() -> None:
     )
     parser.add_argument("--epochs", type=int, default=2)
     parser.add_argument("--prototype-epochs", type=int, default=5)
-    parser.add_argument("--seed", type=int, default=23)
     args = parser.parse_args()
 
     results = run_example(
         args.model,
         epochs=args.epochs,
         prototype_epochs=args.prototype_epochs,
-        seed=args.seed,
     )
-    _validate_results(results)
+    _validate_regression(results)
     print(json.dumps(results, indent=2, sort_keys=True))
-    print("Diagnostics only: this tiny example is not a performance-superiority claim.")
+    print("Diagnostics only: this tiny run is not a superiority claim.")
 
 
 if __name__ == "__main__":
