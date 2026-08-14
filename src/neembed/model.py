@@ -181,6 +181,82 @@ class ManifoldSentenceTransformer(nn.Module):
         with torch.no_grad():
             return self.manifold.dist(a_tensor, b_tensor)
 
+    def rank(
+        self,
+        query: str,
+        candidates: Sequence[str],
+        *,
+        top_k: int | None = None,
+    ) -> list[dict[str, str | int | float]]:
+        """Rank an in-memory candidate list by geodesic distance to a query.
+
+        Args:
+            query: Query text to encode.
+            candidates: Non-empty sequence of candidate texts to rerank.
+            top_k: Number of ranked candidates to return. ``None`` returns the
+                full list. Integer values must be between 1 and the candidate
+                count, inclusive.
+
+        Returns:
+            Plain Python dictionaries ordered by ascending geodesic distance.
+            Each result contains the original ``candidate``, its input ``index``,
+            and the scalar ``distance``. Equal-distance candidates retain their
+            original input order.
+
+        Raises:
+            ValueError: If ``candidates`` is a bare string or empty, or ``top_k``
+                is invalid.
+
+        Notes:
+            This helper is intended for small in-memory reranking. It does not
+            build or persist a search index. Encoding and distance calculation run
+            without gradient tracking through the existing inference helpers.
+        """
+        if isinstance(candidates, str):
+            raise ValueError(
+                "candidates must be a sequence of strings, not a single string"
+            )
+        candidate_list = list(candidates)
+        if not candidate_list:
+            raise ValueError("candidates must contain at least one item")
+        if top_k is None:
+            result_count = len(candidate_list)
+        else:
+            if (
+                isinstance(top_k, bool)
+                or not isinstance(top_k, int)
+                or not 1 <= top_k <= len(candidate_list)
+            ):
+                raise ValueError(
+                    "top_k must be an integer between 1 and the candidate count"
+                )
+            result_count = top_k
+
+        with torch.no_grad():
+            query_embedding = self.encode(query, convert_to_tensor=True)
+            candidate_embeddings = self.encode(
+                candidate_list,
+                convert_to_tensor=True,
+            )
+            distances = self.distance(
+                query_embedding.unsqueeze(0),
+                candidate_embeddings,
+            )
+
+        distance_values = distances.detach().cpu().tolist()
+        ranked_indices = sorted(
+            range(len(candidate_list)),
+            key=distance_values.__getitem__,
+        )[:result_count]
+        return [
+            {
+                "candidate": candidate_list[index],
+                "index": index,
+                "distance": float(distance_values[index]),
+            }
+            for index in ranked_indices
+        ]
+
     def save_pretrained(self, output_path: str | Path) -> None:
         """Save the encoder, projection, and sentence-model geometry state.
 

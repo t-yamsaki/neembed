@@ -1,7 +1,7 @@
 Inference
 =========
 
-The public inference helpers are ``encode()`` and ``distance()`` on
+The public inference helpers are ``encode()``, ``distance()``, and ``rank()`` on
 :class:`neembed.ManifoldSentenceTransformer`.
 
 Encoding text
@@ -72,3 +72,32 @@ distance uses the model parameter dtype, while Lorentz distance is evaluated in
 distance calculation runs under ``torch.no_grad()`` and returns a Tensor.
 This helper is therefore also inference-oriented; the training loss calls the
 manifold distance directly so gradients remain available during optimization.
+
+In-memory geodesic reranking
+----------------------------
+
+``rank()`` is a small convenience helper for reranking a supplied candidate
+list by ascending manifold geodesic distance:
+
+.. code-block:: python
+
+   results = model.rank(
+       "Shiba Inu",
+       ["dog", "cat", "mammal"],
+       top_k=2,
+   )
+
+Each result is a plain Python dictionary containing the original ``candidate``,
+its input ``index``, and the scalar ``distance``. The index keeps duplicate text
+candidates distinguishable. Equal-distance candidates retain their original
+input order.
+
+``top_k=None`` returns the complete ranked list. An integer ``top_k`` must be
+between 1 and the number of supplied candidates, inclusive. The candidate list
+must be non-empty.
+
+The helper uses the existing ``encode()`` and ``distance()`` inference paths, so
+Poincare and Lorentz models use their configured Geoopt geodesic distance. It is
+intentionally limited to small in-memory candidate lists: it does not create an
+ANN index, persist a corpus, cache embeddings, or integrate with a vector
+database.
