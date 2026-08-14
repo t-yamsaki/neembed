@@ -148,13 +148,15 @@ class ManifoldPrototypeAssignmentEvaluator:
     Args:
         model: Manifold sentence embedding model used to encode ``sentences``.
         prototypes: Prototype module whose rows define the assignment candidates.
-        prototype_ids: Unique prototype identifiers aligned to prototype indices.
+        prototype_ids: Unique, non-empty string identifiers aligned to prototype
+            indices.
         sentences: Non-empty sequence of texts to evaluate.
         expected_prototype_ids: Expected prototype identifier for each sentence.
 
     Raises:
-        ValueError: If prototype IDs do not align with the prototype count, IDs
-            are duplicated, sentence and expected-ID counts differ, evaluation is
+        ValueError: If the prototypes do not use the model's manifold instance,
+            prototype IDs do not align with the prototype count, IDs are invalid
+            or duplicated, sentence and expected-ID counts differ, evaluation is
             empty, an expected ID is unknown, or a sequence argument is passed as
             a bare string.
     """
@@ -168,6 +170,8 @@ class ManifoldPrototypeAssignmentEvaluator:
         sentences: Sequence[str],
         expected_prototype_ids: Sequence[str],
     ) -> None:
+        if prototypes.manifold is not model.manifold:
+            raise ValueError("prototypes must use the model's manifold instance")
         if isinstance(prototype_ids, str):
             raise ValueError("prototype_ids must be a sequence of IDs, not a string")
         if isinstance(sentences, str):
@@ -188,6 +192,11 @@ class ManifoldPrototypeAssignmentEvaluator:
                 "prototype_ids must contain one ID per prototype: "
                 f"expected {self.prototypes.num_prototypes}, got {len(self.prototype_ids)}"
             )
+        if any(
+            not isinstance(prototype_id, str) or not prototype_id
+            for prototype_id in self.prototype_ids
+        ):
+            raise ValueError("prototype_ids must be non-empty strings")
         if len(set(self.prototype_ids)) != len(self.prototype_ids):
             raise ValueError("prototype_ids must be unique")
         if len(self.sentences) != len(self.expected_prototype_ids):
