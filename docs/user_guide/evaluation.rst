@@ -87,6 +87,46 @@ scale. Compare raw distance values only when the evaluation setup is
 meaningfully comparable; do not treat their absolute scale as a universal
 quality score across cosine, Poincare, and Lorentz geometry.
 
+Prototype assignment evaluation
+-------------------------------
+
+``ManifoldPrototypeAssignmentEvaluator`` measures whether sentence embeddings
+are assigned to the intended learned prototype IDs by nearest geodesic distance.
+Prototype identifiers remain ordinary caller-owned metadata aligned to prototype
+row indices; they are not stored inside the Geoopt manifold parameter.
+
+.. code-block:: python
+
+   from neembed import ManifoldPrototypeAssignmentEvaluator
+
+   evaluator = ManifoldPrototypeAssignmentEvaluator(
+       model=model,
+       prototypes=prototypes,
+       prototype_ids=("animal", "dog", "cat"),
+       sentences=("Shiba Inu", "Siamese cat", "living creature"),
+       expected_prototype_ids=("dog", "cat", "animal"),
+   )
+
+   metrics = evaluator()
+   print(metrics)
+
+The evaluator returns two metrics:
+
+``assignment_accuracy``
+   Fraction of sentences whose nearest prototype has the expected caller-owned
+   ID. Higher is better.
+
+``mean_assigned_prototype_distance``
+   Mean geodesic distance from each sentence embedding to the prototype selected
+   by nearest-distance assignment. This is the distance to the predicted
+   prototype, even when the predicted ID is incorrect.
+
+Evaluation uses :class:`neembed.ManifoldPrototypes` directly, so Poincare and
+Lorentz paths use their configured Geoopt manifold distance. The evaluator runs
+without gradients, does not update model or prototype parameters, and restores
+the original train/eval modes before returning. Prototype ID count and uniqueness
+are validated explicitly, and unknown expected IDs fail before evaluation.
+
 Validation during training
 --------------------------
 
@@ -159,4 +199,5 @@ API reference
 -------------
 
 For constructor and return-value details generated directly from docstrings,
-see :class:`neembed.ManifoldEmbeddingEvaluator`.
+see :class:`neembed.ManifoldEmbeddingEvaluator` and
+:class:`neembed.ManifoldPrototypeAssignmentEvaluator`.
