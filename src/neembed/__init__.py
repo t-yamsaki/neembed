@@ -1,6 +1,9 @@
 """neembed package."""
 
-from neembed.evaluator import ManifoldEmbeddingEvaluator
+from neembed.evaluator import (
+    ManifoldEmbeddingEvaluator,
+    ManifoldPrototypeAssignmentEvaluator,
+)
 from neembed.losses import (
     ManifoldMultipleNegativesRankingLoss,
     ManifoldPrototypeHierarchyLoss,
@@ -12,6 +15,7 @@ from neembed.trainer import ManifoldTrainer
 __all__ = [
     "ManifoldEmbeddingEvaluator",
     "ManifoldMultipleNegativesRankingLoss",
+    "ManifoldPrototypeAssignmentEvaluator",
     "ManifoldPrototypeHierarchyLoss",
     "ManifoldPrototypes",
     "ManifoldSentenceTransformer",
