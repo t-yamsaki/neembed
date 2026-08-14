@@ -163,6 +163,30 @@ shows default PyTorch collation, multi-epoch training, and epoch-end validation.
 Keep positive candidates unique within each batch because the ranking loss uses
 off-diagonal positives as in-batch negatives.
 
+v0.5 retrieval workflow example
+-------------------------------
+
+A compact Poincare reference workflow composes the v0.5 retrieval features in
+one runnable script:
+
+.. code-block:: bash
+
+   python examples/v05_retrieval_workflow.py
+
+The example trains with an explicit three-sequence hard-negative batch, reports
+Recall@K and MRR, reranks a small in-memory candidate list by geodesic distance,
+and then fits a few manifold prototypes while the retrieval model is frozen so
+prototype assignment can be evaluated separately. It also reports the initial
+paired-only and explicit-hard-negative objectives on identical model weights;
+the difference is an engineering diagnostic that confirms the extra candidates
+entered the ranking objective.
+
+The corpus, seed, hierarchy, and candidate lists are all defined directly in the
+script. The default Sentence Transformer may download on first use, while the
+normal test suite replaces it with a deterministic tiny encoder and requires no
+network access. This example is a composition/regression check only, not a
+performance benchmark or evidence that Poincare geometry is generally superior.
+
 Euclidean vs Poincare vs Lorentz benchmark
 ------------------------------------------
 
