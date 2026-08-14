@@ -11,10 +11,12 @@ or learnable curvature, and true manifold-valued prototype parameters while
 preserving the original model-only AdamW path.
 
 Start with :doc:`getting_started/quickstart` if you want the ordinary training
-workflow. Read :doc:`user_guide/learnable_structure` to distinguish Euclidean
-trainable parameters, learnable curvature, and manifold-valued prototypes, or
-jump to the :ref:`api-reference` for class and method details generated from the
-public docstrings.
+workflow. For the v0.5 hard-negative, Recall@K / MRR, in-memory reranking, and
+prototype-assignment path, see :doc:`user_guide/retrieval`. Read
+:doc:`user_guide/learnable_structure` to distinguish Euclidean trainable
+parameters, learnable curvature, and manifold-valued prototypes, or jump to the
+:ref:`api-reference` for class and method details generated from the public
+docstrings.
 
 .. toctree::
    :maxdepth: 2
@@ -30,6 +32,7 @@ public docstrings.
    user_guide/architecture
    user_guide/learnable_structure
    user_guide/training
+   user_guide/retrieval
    user_guide/evaluation
    user_guide/inference
    user_guide/saving_loading
