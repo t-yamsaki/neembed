@@ -76,7 +76,7 @@ def _train_prototypes(
     epochs: int,
     learning_rate: float,
 ) -> float:
-    """Fit only prototype points against deterministic frozen embeddings."""
+    """Fit only prototype points against deterministic frozen eval-mode embeddings."""
     hierarchy_loss = ManifoldPrototypeHierarchyLoss(
         model,
         prototypes,
