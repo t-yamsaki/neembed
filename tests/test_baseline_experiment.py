@@ -111,9 +111,13 @@ def test_benchmark_returns_directly_comparable_results(monkeypatch) -> None:
             "retrieval_accuracy",
             "mean_positive_distance",
             "mean_negative_distance",
+            "mrr",
+            "recall_at_1",
             "final_training_loss",
         }
         assert 0.0 <= variant["retrieval_accuracy"] <= 1.0
+        assert variant["recall_at_1"] == pytest.approx(variant["retrieval_accuracy"])
+        assert 0.0 <= variant["mrr"] <= 1.0
         assert math.isfinite(variant["mean_positive_distance"])
         assert math.isfinite(variant["mean_negative_distance"])
         assert math.isfinite(variant["final_training_loss"])
@@ -143,6 +147,8 @@ def test_benchmark_is_deterministic_with_fixed_seed(monkeypatch) -> None:
             "retrieval_accuracy",
             "mean_positive_distance",
             "mean_negative_distance",
+            "mrr",
+            "recall_at_1",
             "final_training_loss",
         ):
             assert first_result[metric] == pytest.approx(second_result[metric], abs=1e-8)
