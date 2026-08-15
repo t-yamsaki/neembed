@@ -117,7 +117,7 @@ def test_readmes_defer_detailed_guidance_to_read_the_docs() -> None:
     assert "Recall@K" in retrieval
     assert "MRR" in retrieval
     assert "in-memory" in retrieval
-    assert "Automatic hard-negative mining is not part of neembed" in retrieval
+    assert "neembed does not mine hard negatives automatically" in retrieval
 
 
 def test_public_api_signatures_cover_v05_retrieval_contracts() -> None:
@@ -150,7 +150,8 @@ def test_public_api_signatures_cover_v05_retrieval_contracts() -> None:
     assert "expected_prototype_ids" in prototype_evaluator_parameters
 
     fit_doc = ManifoldTrainer.fit.__doc__ or ""
-    assert "two or three aligned string sequences" in fit_doc
+    assert "two- or three-sequence batches" in fit_doc
+    assert "(anchors, positives, negatives)" in fit_doc
 
 
 def test_release_suite_keeps_v04_and_covers_v05_regressions() -> None:
@@ -181,10 +182,11 @@ def test_release_suite_keeps_v04_and_covers_v05_regressions() -> None:
     assert 'results["retrieval"]' in v05_example
     assert 'results["ranked_results"]' in v05_example
     assert 'results["prototype"]' in v05_example
-    assert "test_two_sequence_loss_matches_original_contract" in hard_negatives
-    assert "test_three_sequence_loss_uses_explicit_negatives" in hard_negatives
-    assert 'pytest.mark.parametrize("manifold_name", ["poincare", "lorentz"])' in ranking
-    assert 'pytest.mark.parametrize("manifold_name", ["poincare", "lorentz"])' in prototype_evaluator
+    assert "test_two_sequence_loss_keeps_existing_formula" in hard_negatives
+    assert "test_explicit_negatives_are_appended_to_geodesic_candidate_pool" in hard_negatives
+    assert 'pytest.mark.parametrize("manifold", ["poincare", "lorentz"])' in ranking
+    assert "test_prototype_assignment_evaluator_reports_perfect_assignment" in prototype_evaluator
+    assert "test_prototype_assignment_evaluator_rejects_unknown_expected_id" in prototype_evaluator
 
 
 def test_release_real_stack_covers_v04_and_v05_paths() -> None:
