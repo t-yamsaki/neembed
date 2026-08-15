@@ -204,7 +204,7 @@ def test_release_real_stack_covers_v04_and_v05_paths() -> None:
     ).read_text(encoding="utf-8")
 
     assert 'NEEMBED_REAL_STACK: "1"' in workflow
-    assert "python -m pytest -q tests/integration" in workflow
+    assert "python -m pytest -vv -s --durations=20 tests/integration" in workflow
     assert 'manifold: str = "poincare"' in real_stack
     assert 'manifold="lorentz"' in real_stack
     assert "torch.optim.AdamW" in real_stack
