@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [日本語](docs/README_ja.md)
 
-> **Status:** The latest tagged / PyPI release is v0.4.0. It adds opt-in learnable curvature, trainable manifold prototypes, a hierarchy-aware objective, caller-supplied Riemannian optimization for manifold-valued parameters, and a learnable-structure regression example while preserving the fixed-curvature model-only path. The development branch toward v0.5 additionally contains explicit hard-negative training, Recall@K / MRR evaluation, small in-memory geodesic reranking, prototype-assignment evaluation, and a retrieval regression example; these additions are not yet part of a tagged release. The API remains intentionally small and may still evolve before a stable 1.0 release.
+> **Status:** Package version v0.5.0 adds caller-supplied explicit hard-negative training, Recall@K / MRR evaluation, small in-memory geodesic reranking, and prototype-assignment evaluation while preserving the v0.4 learnable-structure path and the original fixed-curvature model-only workflow. The API remains intentionally small and may still evolve before a stable 1.0 release.
 
 `neembed` is a lightweight integration layer between pretrained Sentence Transformer models and manifold-valued representations. It keeps the pretrained encoder intact, optionally projects its Euclidean output, and delegates hyperbolic geometry to Geoopt.
 
@@ -55,7 +55,7 @@ v0.4 also adds:
 - joint learnable-curvature / prototype training through Geoopt stabilization
 - a compact fixed-vs-learnable structure regression example
 
-The development branch toward v0.5 adds a focused retrieval workflow without introducing a retrieval framework:
+v0.5 adds a focused retrieval workflow without introducing a retrieval framework:
 
 - optional caller-supplied explicit hard negatives while preserving the original `(anchors, positives)` training contract
 - Recall@K and MRR on the aligned retrieval evaluator
