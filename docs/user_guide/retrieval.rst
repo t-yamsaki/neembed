@@ -1,12 +1,11 @@
 Retrieval workflow
 ==================
 
-The development branch for v0.5 adds a small retrieval-oriented workflow on top
-of the existing manifold sentence-model API. The pieces are intentionally
-separate: train with optional caller-supplied hard negatives, evaluate aligned
-retrieval ranks, rerank a small candidate list by geodesic distance, and add
-prototype assignment diagnostics only when learned manifold structure is part
-of the task.
+v0.5 adds a small retrieval-oriented workflow on top of the existing manifold
+sentence-model API. The pieces are intentionally separate: train with optional
+caller-supplied hard negatives, evaluate aligned retrieval ranks, rerank a small
+candidate list by geodesic distance, and add prototype assignment diagnostics
+only when learned manifold structure is part of the task.
 
 All of these paths use the configured Geoopt geodesic distance. Poincare and
 Lorentz therefore keep the same geometry semantics used by ``encode()`` and

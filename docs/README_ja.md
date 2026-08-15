@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [English README](../README.md)
 
-> **Status:** 最新の tag / PyPI release は v0.4.0 です。opt-in の learnable curvature、trainable manifold prototype、hierarchy-aware objective、manifold-valued parameter 用の caller-supplied Riemannian optimization、learnable-structure regression example を追加しつつ、fixed-curvature の model-only path は維持しています。v0.5 に向けた development branch には、explicit hard-negative training、Recall@K / MRR evaluation、小規模な in-memory geodesic reranking、prototype-assignment evaluation、retrieval regression example も含まれていますが、これらはまだ tagged release には含まれていません。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
+> **Status:** package version v0.5.0 では、caller-supplied explicit hard-negative training、Recall@K / MRR evaluation、小規模な in-memory geodesic reranking、prototype-assignment evaluation を追加しつつ、v0.4 の learnable-structure path と従来の fixed-curvature model-only workflow を維持しています。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
 
 `neembed` は、pretrained Sentence Transformer と manifold-valued representation をつなぐ軽量な integration layer です。pretrained encoder はそのまま利用し、必要に応じて Euclidean embedding を projection したうえで、双曲幾何の演算を Geoopt に委譲します。
 
@@ -55,7 +55,7 @@ v0.4 ではさらに以下を追加しています。
 - Geoopt stabilization を使った learnable curvature + prototype の共同学習
 - fixed-vs-learnable structure の compact regression example
 
-v0.5 に向けた development branch では、retrieval framework を追加せず、次の focused retrieval workflow を追加しています。
+v0.5 では、retrieval framework を追加せず、次の focused retrieval workflow を追加しています。
 
 - 従来の `(anchors, positives)` contract を維持したまま使える caller-supplied explicit hard negatives
 - aligned retrieval evaluator の Recall@K と MRR
