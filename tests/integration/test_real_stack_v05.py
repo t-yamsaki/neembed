@@ -108,7 +108,12 @@ def test_v05_real_stack_retrieval_and_prototype_contracts(manifold_name: str) ->
     for parameter in model.parameters():
         parameter.requires_grad_(False)
     model.eval()
-    target_embeddings = model.encode(("dog", "cat"), convert_to_tensor=True)
+    # ``encode()`` intentionally uses inference_mode(), whose tensors cannot be
+    # saved by autograd while differentiating with respect to the prototypes.
+    # A frozen direct forward under no_grad() keeps ordinary tensors while still
+    # avoiding model gradients.
+    with torch.no_grad():
+        target_embeddings = model(("dog", "cat"))
     prototypes = ManifoldPrototypes(model, num_prototypes=2, init_std=0.05)
     prototypes_before = prototypes.prototypes.detach().clone()
     optimizer = geoopt.optim.RiemannianAdam(
