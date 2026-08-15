@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [English README](../README.md)
 
-> **Status:** 最新の tag / PyPI release は v0.4.0 です。opt-in の learnable curvature、trainable manifold prototype、hierarchy-aware objective、manifold-valued parameter 用の caller-supplied Riemannian optimization、learnable-structure regression example を追加しつつ、fixed-curvature の model-only path は維持しています。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
+> **Status:** 最新の tag / PyPI release は v0.4.0 です。opt-in の learnable curvature、trainable manifold prototype、hierarchy-aware objective、manifold-valued parameter 用の caller-supplied Riemannian optimization、learnable-structure regression example を追加しつつ、fixed-curvature の model-only path は維持しています。v0.5 に向けた development branch には、explicit hard-negative training、Recall@K / MRR evaluation、小規模な in-memory geodesic reranking、prototype-assignment evaluation、retrieval regression example も含まれていますが、これらはまだ tagged release には含まれていません。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
 
 `neembed` は、pretrained Sentence Transformer と manifold-valued representation をつなぐ軽量な integration layer です。pretrained encoder はそのまま利用し、必要に応じて Euclidean embedding を projection したうえで、双曲幾何の演算を Geoopt に委譲します。
 
@@ -55,7 +55,15 @@ v0.4 ではさらに以下を追加しています。
 - Geoopt stabilization を使った learnable curvature + prototype の共同学習
 - fixed-vs-learnable structure の compact regression example
 
-manifold-valued な **出力** を返すだけでは Riemannian optimization は必要ありません。encoder / projection parameter と learnable curvature は manifold 上の点ではありません。parameter・optimizer・persistence・numerical behavior の詳細は [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) を参照してください。
+v0.5 に向けた development branch では、retrieval framework を追加せず、次の focused retrieval workflow を追加しています。
+
+- 従来の `(anchors, positives)` contract を維持したまま使える caller-supplied explicit hard negatives
+- aligned retrieval evaluator の Recall@K と MRR
+- 小規模な in-memory geodesic reranking 用の `model.rank()`
+- learned manifold structure 向け nearest-prototype assignment evaluation
+- 1本の再現可能な v0.5 retrieval regression example
+
+manifold-valued な **出力** を返すだけでは Riemannian optimization は必要ありません。encoder / projection parameter と learnable curvature は manifold 上の点ではありません。parameter・optimizer・persistence・numerical behavior の詳細は [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) を参照してください。end-to-end の retrieval 構成と in-memory の境界は [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html) にまとめています。
 
 ## インストール
 
@@ -108,7 +116,7 @@ distance = model.distance(embeddings[0], embeddings[1])
 print(float(distance))
 ```
 
-各 anchor は同じ batch index の positive と対応します。off-diagonal candidate は in-batch negative になるため、同じ batch 内で positive を重複させないでください。この model-only path は出力が manifold-valued でも通常の AdamW behavior のままです。目的関数と batching の詳細は [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html)、trainable manifold prototype を追加する前には [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) を参照してください。
+各 anchor は同じ batch index の positive と対応します。off-diagonal candidate は in-batch negative になるため、同じ batch 内で positive を重複させないでください。この model-only path は出力が manifold-valued でも通常の AdamW behavior のままです。目的関数と batching の詳細は [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html)、optional explicit negatives と retrieval evaluation は [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html)、trainable manifold prototype を追加する前には [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) を参照してください。
 
 ## ドキュメント
 
@@ -119,6 +127,7 @@ print(float(distance))
 - [Architecture](https://neembed.readthedocs.io/en/latest/user_guide/architecture.html)
 - [Learnable structure](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html)
 - [Training](https://neembed.readthedocs.io/en/latest/user_guide/training.html)
+- [Retrieval workflow](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html)
 - [Evaluation](https://neembed.readthedocs.io/en/latest/user_guide/evaluation.html)
 - [Inference](https://neembed.readthedocs.io/en/latest/user_guide/inference.html)
 - [Saving and Loading](https://neembed.readthedocs.io/en/latest/user_guide/saving_loading.html)
@@ -132,6 +141,7 @@ repository root から主な reference を実行できます。
 python examples/train_poincare.py
 python examples/train_lorentz.py
 python examples/v04_learnable_structure.py
+python examples/v05_retrieval_workflow.py
 ```
 
 - [examples/train_poincare.py](../examples/train_poincare.py) — 最小の Poincaré workflow
@@ -139,6 +149,7 @@ python examples/v04_learnable_structure.py
 - [examples/train_dataloader.py](../examples/train_dataloader.py) — 通常の PyTorch `DataLoader` と epoch validation
 - [examples/train_hierarchy.py](../examples/train_hierarchy.py) — 最小の hierarchy-aware prototype objective
 - [examples/v04_learnable_structure.py](../examples/v04_learnable_structure.py) — fixed-vs-learnable structure の regression diagnostics。性能優位性を示す benchmark ではありません
+- [examples/v05_retrieval_workflow.py](../examples/v05_retrieval_workflow.py) — explicit hard negatives、Recall@K / MRR、in-memory geodesic reranking、prototype assignment を1つにまとめた Poincaré regression workflow。research benchmark ではありません
 - [experiments/README.md](../experiments/README.md) — 再現可能な Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark と解釈上の注意
 
 ## License

@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [日本語](docs/README_ja.md)
 
-> **Status:** The latest tagged / PyPI release is v0.4.0. It adds opt-in learnable curvature, trainable manifold prototypes, a hierarchy-aware objective, caller-supplied Riemannian optimization for manifold-valued parameters, and a learnable-structure regression example while preserving the fixed-curvature model-only path. The API remains intentionally small and may still evolve before a stable 1.0 release.
+> **Status:** The latest tagged / PyPI release is v0.4.0. It adds opt-in learnable curvature, trainable manifold prototypes, a hierarchy-aware objective, caller-supplied Riemannian optimization for manifold-valued parameters, and a learnable-structure regression example while preserving the fixed-curvature model-only path. The development branch toward v0.5 additionally contains explicit hard-negative training, Recall@K / MRR evaluation, small in-memory geodesic reranking, prototype-assignment evaluation, and a retrieval regression example; these additions are not yet part of a tagged release. The API remains intentionally small and may still evolve before a stable 1.0 release.
 
 `neembed` is a lightweight integration layer between pretrained Sentence Transformer models and manifold-valued representations. It keeps the pretrained encoder intact, optionally projects its Euclidean output, and delegates hyperbolic geometry to Geoopt.
 
@@ -55,7 +55,15 @@ v0.4 also adds:
 - joint learnable-curvature / prototype training through Geoopt stabilization
 - a compact fixed-vs-learnable structure regression example
 
-A manifold-valued **output** does not by itself require Riemannian optimization: encoder/projection parameters and learnable curvature are not manifold-valued points. Detailed parameter, optimizer, persistence, and numerical behavior lives in the [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html).
+The development branch toward v0.5 adds a focused retrieval workflow without introducing a retrieval framework:
+
+- optional caller-supplied explicit hard negatives while preserving the original `(anchors, positives)` training contract
+- Recall@K and MRR on the aligned retrieval evaluator
+- `model.rank()` for small in-memory geodesic reranking
+- nearest-prototype assignment evaluation for learned manifold structure
+- one reproducible v0.5 retrieval regression example
+
+A manifold-valued **output** does not by itself require Riemannian optimization: encoder/projection parameters and learnable curvature are not manifold-valued points. Detailed parameter, optimizer, persistence, and numerical behavior lives in the [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html). The end-to-end retrieval composition and its in-memory boundary are documented in the [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html).
 
 ## Installation
 
@@ -108,7 +116,7 @@ distance = model.distance(embeddings[0], embeddings[1])
 print(float(distance))
 ```
 
-Each anchor is paired with the positive at the same batch index. Because off-diagonal candidates become in-batch negatives, avoid duplicate positives within one batch. This model-only path keeps the ordinary AdamW behavior even though its outputs lie on a manifold. See the [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html) for the objective and batching details, and the [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) before adding trainable manifold prototypes.
+Each anchor is paired with the positive at the same batch index. Because off-diagonal candidates become in-batch negatives, avoid duplicate positives within one batch. This model-only path keeps the ordinary AdamW behavior even though its outputs lie on a manifold. See the [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html) for the objective and batching details, the [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html) for optional explicit negatives and retrieval evaluation, and the [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) before adding trainable manifold prototypes.
 
 ## Documentation
 
@@ -119,6 +127,7 @@ The full guide is hosted on Read the Docs:
 - [Architecture](https://neembed.readthedocs.io/en/latest/user_guide/architecture.html)
 - [Learnable structure](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html)
 - [Training](https://neembed.readthedocs.io/en/latest/user_guide/training.html)
+- [Retrieval workflow](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html)
 - [Evaluation](https://neembed.readthedocs.io/en/latest/user_guide/evaluation.html)
 - [Inference](https://neembed.readthedocs.io/en/latest/user_guide/inference.html)
 - [Saving and Loading](https://neembed.readthedocs.io/en/latest/user_guide/saving_loading.html)
@@ -132,6 +141,7 @@ Run the main references from the repository root:
 python examples/train_poincare.py
 python examples/train_lorentz.py
 python examples/v04_learnable_structure.py
+python examples/v05_retrieval_workflow.py
 ```
 
 - [examples/train_poincare.py](examples/train_poincare.py) — minimal Poincaré workflow
@@ -139,6 +149,7 @@ python examples/v04_learnable_structure.py
 - [examples/train_dataloader.py](examples/train_dataloader.py) — ordinary PyTorch `DataLoader` training and epoch validation
 - [examples/train_hierarchy.py](examples/train_hierarchy.py) — minimal hierarchy-aware prototype objective
 - [examples/v04_learnable_structure.py](examples/v04_learnable_structure.py) — fixed-vs-learnable structure regression diagnostics; not a superiority benchmark
+- [examples/v05_retrieval_workflow.py](examples/v05_retrieval_workflow.py) — explicit hard negatives, Recall@K / MRR, in-memory geodesic reranking, and prototype assignment in one Poincaré regression workflow; not a research benchmark
 - [experiments/README.md](experiments/README.md) — reproducible Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark and interpretation limits
 
 ## License

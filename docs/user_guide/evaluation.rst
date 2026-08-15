@@ -152,16 +152,18 @@ details.
 PyTorch DataLoader interoperability
 -----------------------------------
 
-``ManifoldTrainer`` accepts any re-iterable input that yields
-``(anchors, positives)`` batches. An ordinary ``torch.utils.data.DataLoader``
-therefore works directly; neembed does not add a Dataset, DataModule, or custom
-collator abstraction.
+``ManifoldTrainer`` accepts any re-iterable input that yields either two or
+three aligned string sequences. An ordinary ``torch.utils.data.DataLoader`` can
+therefore use the original ``(anchors, positives)`` contract or yield
+``(anchors, positives, negatives)`` for explicit hard-negative ranking; neembed
+does not add a Dataset, DataModule, or custom collator abstraction.
 
 The runnable `DataLoader example
 <https://github.com/t-yamsaki/neembed/blob/main/examples/train_dataloader.py>`_
 shows default PyTorch collation, multi-epoch training, and epoch-end validation.
 Keep positive candidates unique within each batch because the ranking loss uses
-off-diagonal positives as in-batch negatives.
+off-diagonal positives as in-batch negatives. Explicit negatives remain
+caller-supplied; the DataLoader path does not mine them automatically.
 
 v0.5 retrieval workflow example
 -------------------------------
@@ -186,6 +188,8 @@ script. The default Sentence Transformer may download on first use, while the
 normal test suite replaces it with a deterministic tiny encoder and requires no
 network access. This example is a composition/regression check only, not a
 performance benchmark or evidence that Poincare geometry is generally superior.
+For the end-to-end usage boundary and links to each detailed API path, see
+:doc:`retrieval`.
 
 Euclidean vs Poincare vs Lorentz benchmark
 ------------------------------------------
