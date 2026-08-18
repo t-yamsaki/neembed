@@ -44,6 +44,20 @@ def _as_text_sequence(value: Sequence[str], *, name: str) -> list[str]:
     return items
 
 
+def _encode_text_batches(
+    model: "ManifoldSentenceTransformer",
+    texts: list[str],
+    *,
+    batch_size: int,
+) -> torch.Tensor:
+    """Encode text in bounded batches and stage completed embeddings on CPU."""
+    batches: list[torch.Tensor] = []
+    for start in range(0, len(texts), batch_size):
+        encoded = model.encode(texts[start : start + batch_size])
+        batches.append(torch.as_tensor(encoded))
+    return torch.cat(batches, dim=0)
+
+
 def _iter_exact_geodesic_distance_blocks(
     model: "ManifoldSentenceTransformer",
     queries: Any,
@@ -113,8 +127,10 @@ def exact_corpus_search(
         corpus: Non-empty sequence of corpus texts. A bare string is rejected.
         top_k: Number of results to retain per query. ``None`` returns the full
             corpus ranking. Integer values must be between 1 and corpus size.
-        query_chunk_size: Positive query block size used for distance evaluation.
-        corpus_chunk_size: Positive corpus block size used for distance evaluation.
+        query_chunk_size: Positive query batch/block size used for text encoding
+            and distance evaluation.
+        corpus_chunk_size: Positive corpus batch/block size used for text encoding
+            and distance evaluation.
 
     Returns:
         One ranked result list per query, preserving query input order. Each result
@@ -123,12 +139,13 @@ def exact_corpus_search(
         preserve corpus input order.
 
     Notes:
-        This is exact search, not ANN. The query-by-corpus distance matrix is never
-        materialized in full: distance blocks are streamed through
-        :func:`_iter_exact_geodesic_distance_blocks`, and top-k mode retains only
-        the best candidates seen for each query. Text embeddings themselves remain
-        in memory for the duration of the call. No index, cache, or persistence is
-        created.
+        This is exact search, not ANN. Query and corpus texts are encoded in bounded
+        batches and completed embeddings are staged on CPU. The query-by-corpus
+        distance matrix is never materialized in full: distance blocks are streamed
+        through :func:`_iter_exact_geodesic_distance_blocks`, which moves only the
+        active blocks to the model device through ``model.distance()``. Top-k mode
+        retains only the best candidates seen for each query. No index, cache, or
+        persistence is created.
     """
     query_list = _as_text_sequence(queries, name="queries")
     corpus_list = _as_text_sequence(corpus, name="corpus")
@@ -154,8 +171,16 @@ def exact_corpus_search(
             )
         result_count = top_k
 
-    query_embeddings = model.encode(query_list, convert_to_tensor=True)
-    corpus_embeddings = model.encode(corpus_list, convert_to_tensor=True)
+    query_embeddings = _encode_text_batches(
+        model,
+        query_list,
+        batch_size=query_chunk_size,
+    )
+    corpus_embeddings = _encode_text_batches(
+        model,
+        corpus_list,
+        batch_size=corpus_chunk_size,
+    )
 
     retained: list[list[tuple[float, int]]] = [[] for _ in query_list]
     for query_start, corpus_start, distance_block in (
