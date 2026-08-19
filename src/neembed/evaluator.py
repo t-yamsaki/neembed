@@ -1,12 +1,16 @@
 """Evaluation helpers for manifold-valued sentence embeddings."""
 
+from bisect import bisect_right
 from collections.abc import Mapping, Sequence
 
 import torch
 
 from neembed.model import ManifoldSentenceTransformer
 from neembed.prototypes import ManifoldPrototypes
-from neembed.retrieval import exact_corpus_search
+from neembed.retrieval import (
+    _encode_text_batches,
+    _iter_exact_geodesic_distance_blocks,
+)
 
 
 class ManifoldEmbeddingEvaluator:
@@ -144,13 +148,14 @@ class ManifoldCorpusRetrievalEvaluator:
 
     This evaluator complements :class:`ManifoldEmbeddingEvaluator`: queries and
     corpus items have caller-owned IDs, and each query may map to one or more
-    relevant corpus IDs. Ranking delegates to :func:`exact_corpus_search`, so it
-    inherits the exact Geoopt geodesic distance, bounded text/distance batching,
-    and stable corpus-index tie ordering from the v0.6 retrieval path.
+    relevant corpus IDs. Evaluation reuses the bounded encoding and exact
+    geodesic-distance block primitives behind ``exact_corpus_search`` while
+    streaming rank counts instead of materializing complete query-corpus rankings.
 
     ``Recall@K`` is computed per query as the fraction of that query's relevant
     corpus IDs retrieved in the first ``K`` results, then averaged across queries.
-    ``MRR`` uses the rank of the first relevant result for each query.
+    ``MRR`` uses the rank of the first relevant result for each query. Equal-distance
+    ties preserve corpus index order, matching exact corpus search.
     """
 
     def __init__(
@@ -234,8 +239,12 @@ class ManifoldCorpusRetrievalEvaluator:
         if missing_query_ids:
             raise ValueError(f"missing relevance for query IDs: {missing_query_ids}")
 
+        corpus_index = {
+            corpus_id: index for index, corpus_id in enumerate(self.corpus_ids)
+        }
         corpus_id_set = set(self.corpus_ids)
         normalized_relevance: dict[str, frozenset[str]] = {}
+        relevant_indices: list[tuple[int, ...]] = []
         for query_id in self.query_ids:
             relevant_value = relevance[query_id]
             if isinstance(relevant_value, str):
@@ -266,47 +275,107 @@ class ManifoldCorpusRetrievalEvaluator:
                     f"{unknown_corpus_ids}"
                 )
             normalized_relevance[query_id] = frozenset(relevant_ids)
+            relevant_indices.append(
+                tuple(sorted(corpus_index[corpus_id] for corpus_id in relevant_ids))
+            )
         self.relevance = normalized_relevance
+        self._relevant_corpus_indices = tuple(relevant_indices)
 
     def __call__(self) -> dict[str, float]:
         """Return exact corpus ``mrr`` and configured multi-positive Recall@K."""
         was_training = self.model.training
         try:
             with torch.no_grad():
-                rankings = exact_corpus_search(
+                query_embeddings = _encode_text_batches(
                     self.model,
                     self.queries,
-                    self.corpus,
-                    top_k=None,
-                    query_chunk_size=self.query_chunk_size,
-                    corpus_chunk_size=self.corpus_chunk_size,
+                    batch_size=self.query_chunk_size,
                 )
+                corpus_embeddings = _encode_text_batches(
+                    self.model,
+                    self.corpus,
+                    batch_size=self.corpus_chunk_size,
+                )
+
+                # Store only the stable sort keys for relevant corpus items. These
+                # are needed to derive exact ranks without retaining all Q x C
+                # candidate results.
+                target_keys_by_query: list[list[tuple[float, int]]] = []
+                for query_index, indices in enumerate(self._relevant_corpus_indices):
+                    target_keys: list[tuple[float, int]] = []
+                    for start in range(0, len(indices), self.corpus_chunk_size):
+                        index_chunk = indices[start : start + self.corpus_chunk_size]
+                        relevant_embeddings = corpus_embeddings[list(index_chunk)]
+                        distances = self.model.distance(
+                            query_embeddings[query_index : query_index + 1],
+                            relevant_embeddings,
+                        )
+                        distance_values = distances.detach().cpu().reshape(-1).tolist()
+                        target_keys.extend(
+                            (float(distance), corpus_index)
+                            for distance, corpus_index in zip(
+                                distance_values,
+                                index_chunk,
+                                strict=True,
+                            )
+                        )
+                    target_keys.sort()
+                    target_keys_by_query.append(target_keys)
+
+                # For each streamed candidate key, find the first relevant target
+                # that ranks after it. A difference-array range update then counts
+                # that candidate as preceding every later relevant target without
+                # constructing a full ranking or doing O(relevance) work per item.
+                rank_diffs = [
+                    [0] * (len(target_keys) + 1)
+                    for target_keys in target_keys_by_query
+                ]
+                for query_start, corpus_start, distance_block in (
+                    _iter_exact_geodesic_distance_blocks(
+                        self.model,
+                        query_embeddings,
+                        corpus_embeddings,
+                        query_chunk_size=self.query_chunk_size,
+                        corpus_chunk_size=self.corpus_chunk_size,
+                    )
+                ):
+                    block_values = distance_block.detach().cpu().tolist()
+                    for query_offset, distances in enumerate(block_values):
+                        query_index = query_start + query_offset
+                        target_keys = target_keys_by_query[query_index]
+                        diff = rank_diffs[query_index]
+                        target_count = len(target_keys)
+                        for corpus_offset, distance in enumerate(distances):
+                            candidate_key = (
+                                float(distance),
+                                corpus_start + corpus_offset,
+                            )
+                            first_later_target = bisect_right(
+                                target_keys,
+                                candidate_key,
+                            )
+                            if first_later_target < target_count:
+                                diff[first_later_target] += 1
+                                diff[target_count] -= 1
 
                 reciprocal_rank_sum = 0.0
                 recall_sums = {k: 0.0 for k in self.recall_at_k}
-                for query_id, ranking in zip(
-                    self.query_ids,
-                    rankings,
+                for target_keys, diff in zip(
+                    target_keys_by_query,
+                    rank_diffs,
                     strict=True,
                 ):
-                    relevant_ids = self.relevance[query_id]
-                    ranked_corpus_ids = [
-                        self.corpus_ids[int(result["index"])]
-                        for result in ranking
-                    ]
-                    first_relevant_rank = next(
-                        rank
-                        for rank, corpus_id in enumerate(ranked_corpus_ids, start=1)
-                        if corpus_id in relevant_ids
-                    )
-                    reciprocal_rank_sum += 1.0 / first_relevant_rank
+                    preceding_count = 0
+                    ranks: list[int] = []
+                    for target_index in range(len(target_keys)):
+                        preceding_count += diff[target_index]
+                        ranks.append(preceding_count + 1)
 
+                    reciprocal_rank_sum += 1.0 / min(ranks)
                     for k in self.recall_at_k:
-                        retrieved_relevant = sum(
-                            corpus_id in relevant_ids
-                            for corpus_id in ranked_corpus_ids[:k]
+                        recall_sums[k] += (
+                            sum(rank <= k for rank in ranks) / len(ranks)
                         )
-                        recall_sums[k] += retrieved_relevant / len(relevant_ids)
 
                 query_count = len(self.query_ids)
                 metrics = {"mrr": reciprocal_rank_sum / query_count}
