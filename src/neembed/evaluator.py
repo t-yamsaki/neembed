@@ -1,11 +1,12 @@
 """Evaluation helpers for manifold-valued sentence embeddings."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import torch
 
 from neembed.model import ManifoldSentenceTransformer
 from neembed.prototypes import ManifoldPrototypes
+from neembed.retrieval import exact_corpus_search
 
 
 class ManifoldEmbeddingEvaluator:
@@ -133,6 +134,184 @@ class ManifoldEmbeddingEvaluator:
                     metrics[f"recall_at_{k}"] = float(
                         (target_ranks <= k).float().mean().item()
                     )
+                return metrics
+        finally:
+            self.model.train(was_training)
+
+
+class ManifoldCorpusRetrievalEvaluator:
+    """Evaluate exact corpus retrieval with explicit multi-positive relevance.
+
+    This evaluator complements :class:`ManifoldEmbeddingEvaluator`: queries and
+    corpus items have caller-owned IDs, and each query may map to one or more
+    relevant corpus IDs. Ranking delegates to :func:`exact_corpus_search`, so it
+    inherits the exact Geoopt geodesic distance, bounded text/distance batching,
+    and stable corpus-index tie ordering from the v0.6 retrieval path.
+
+    ``Recall@K`` is computed per query as the fraction of that query's relevant
+    corpus IDs retrieved in the first ``K`` results, then averaged across queries.
+    ``MRR`` uses the rank of the first relevant result for each query.
+    """
+
+    def __init__(
+        self,
+        *,
+        model: ManifoldSentenceTransformer,
+        query_ids: Sequence[str],
+        queries: Sequence[str],
+        corpus_ids: Sequence[str],
+        corpus: Sequence[str],
+        relevance: Mapping[str, Sequence[str]],
+        recall_at_k: Sequence[int] = (1,),
+        query_chunk_size: int = 32,
+        corpus_chunk_size: int = 256,
+    ) -> None:
+        if isinstance(query_ids, str):
+            raise ValueError("query_ids must be a sequence of IDs, not a string")
+        if isinstance(queries, str):
+            raise ValueError("queries must be a sequence of texts, not a string")
+        if isinstance(corpus_ids, str):
+            raise ValueError("corpus_ids must be a sequence of IDs, not a string")
+        if isinstance(corpus, str):
+            raise ValueError("corpus must be a sequence of texts, not a string")
+        if not isinstance(relevance, Mapping):
+            raise ValueError("relevance must be a mapping from query IDs to corpus IDs")
+
+        self.model = model
+        self.query_ids = tuple(query_ids)
+        self.queries = list(queries)
+        self.corpus_ids = tuple(corpus_ids)
+        self.corpus = list(corpus)
+        self.recall_at_k = tuple(recall_at_k)
+        self.query_chunk_size = query_chunk_size
+        self.corpus_chunk_size = corpus_chunk_size
+
+        if not self.query_ids:
+            raise ValueError("evaluation requires at least one query")
+        if not self.corpus_ids:
+            raise ValueError("evaluation requires at least one corpus item")
+        if len(self.query_ids) != len(self.queries):
+            raise ValueError("query_ids and queries must contain the same number of items")
+        if len(self.corpus_ids) != len(self.corpus):
+            raise ValueError("corpus_ids and corpus must contain the same number of items")
+        if any(not isinstance(query_id, str) or not query_id for query_id in self.query_ids):
+            raise ValueError("query_ids must be non-empty strings")
+        if any(not isinstance(corpus_id, str) or not corpus_id for corpus_id in self.corpus_ids):
+            raise ValueError("corpus_ids must be non-empty strings")
+        if any(not isinstance(text, str) for text in self.queries):
+            raise ValueError("queries must contain only strings")
+        if any(not isinstance(text, str) for text in self.corpus):
+            raise ValueError("corpus must contain only strings")
+        if len(set(self.query_ids)) != len(self.query_ids):
+            raise ValueError("query_ids must be unique")
+        if len(set(self.corpus_ids)) != len(self.corpus_ids):
+            raise ValueError("corpus_ids must be unique")
+
+        if not self.recall_at_k:
+            raise ValueError("recall_at_k must contain at least one cutoff")
+        if any(
+            isinstance(k, bool) or not isinstance(k, int) or k <= 0
+            for k in self.recall_at_k
+        ):
+            raise ValueError("recall_at_k values must be positive integers")
+        if len(set(self.recall_at_k)) != len(self.recall_at_k):
+            raise ValueError("recall_at_k values must be unique")
+        for value, name in (
+            (self.query_chunk_size, "query_chunk_size"),
+            (self.corpus_chunk_size, "corpus_chunk_size"),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{name} must be a positive integer")
+
+        if any(not isinstance(query_id, str) or not query_id for query_id in relevance):
+            raise ValueError("relevance query IDs must be non-empty strings")
+        query_id_set = set(self.query_ids)
+        relevance_query_ids = set(relevance)
+        unknown_query_ids = sorted(relevance_query_ids - query_id_set)
+        if unknown_query_ids:
+            raise ValueError(f"unknown relevance query IDs: {unknown_query_ids}")
+        missing_query_ids = sorted(query_id_set - relevance_query_ids)
+        if missing_query_ids:
+            raise ValueError(f"missing relevance for query IDs: {missing_query_ids}")
+
+        corpus_id_set = set(self.corpus_ids)
+        normalized_relevance: dict[str, frozenset[str]] = {}
+        for query_id in self.query_ids:
+            relevant_value = relevance[query_id]
+            if isinstance(relevant_value, str):
+                raise ValueError(
+                    f"relevance for query {query_id!r} must be a sequence of corpus IDs"
+                )
+            try:
+                relevant_ids = tuple(relevant_value)
+            except TypeError as exc:
+                raise ValueError(
+                    f"relevance for query {query_id!r} must be a sequence of corpus IDs"
+                ) from exc
+            if not relevant_ids:
+                raise ValueError(f"relevance for query {query_id!r} must not be empty")
+            if any(
+                not isinstance(corpus_id, str) or not corpus_id
+                for corpus_id in relevant_ids
+            ):
+                raise ValueError("relevant corpus IDs must be non-empty strings")
+            if len(set(relevant_ids)) != len(relevant_ids):
+                raise ValueError(
+                    f"relevance for query {query_id!r} must contain unique corpus IDs"
+                )
+            unknown_corpus_ids = sorted(set(relevant_ids) - corpus_id_set)
+            if unknown_corpus_ids:
+                raise ValueError(
+                    f"unknown relevant corpus IDs for query {query_id!r}: "
+                    f"{unknown_corpus_ids}"
+                )
+            normalized_relevance[query_id] = frozenset(relevant_ids)
+        self.relevance = normalized_relevance
+
+    def __call__(self) -> dict[str, float]:
+        """Return exact corpus ``mrr`` and configured multi-positive Recall@K."""
+        was_training = self.model.training
+        try:
+            with torch.no_grad():
+                rankings = exact_corpus_search(
+                    self.model,
+                    self.queries,
+                    self.corpus,
+                    top_k=None,
+                    query_chunk_size=self.query_chunk_size,
+                    corpus_chunk_size=self.corpus_chunk_size,
+                )
+
+                reciprocal_rank_sum = 0.0
+                recall_sums = {k: 0.0 for k in self.recall_at_k}
+                for query_id, ranking in zip(
+                    self.query_ids,
+                    rankings,
+                    strict=True,
+                ):
+                    relevant_ids = self.relevance[query_id]
+                    ranked_corpus_ids = [
+                        self.corpus_ids[int(result["index"])]
+                        for result in ranking
+                    ]
+                    first_relevant_rank = next(
+                        rank
+                        for rank, corpus_id in enumerate(ranked_corpus_ids, start=1)
+                        if corpus_id in relevant_ids
+                    )
+                    reciprocal_rank_sum += 1.0 / first_relevant_rank
+
+                    for k in self.recall_at_k:
+                        retrieved_relevant = sum(
+                            corpus_id in relevant_ids
+                            for corpus_id in ranked_corpus_ids[:k]
+                        )
+                        recall_sums[k] += retrieved_relevant / len(relevant_ids)
+
+                query_count = len(self.query_ids)
+                metrics = {"mrr": reciprocal_rank_sum / query_count}
+                for k in self.recall_at_k:
+                    metrics[f"recall_at_{k}"] = recall_sums[k] / query_count
                 return metrics
         finally:
             self.model.train(was_training)
