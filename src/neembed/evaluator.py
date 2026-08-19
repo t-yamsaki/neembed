@@ -97,10 +97,6 @@ class ManifoldEmbeddingEvaluator:
                 targets = torch.arange(pair_count, device=distances.device)
                 positive_distances = distances.diagonal()
 
-                # Compute the exact stable rank of each aligned target without
-                # materializing an N x N int64 argsort result. Candidates with a
-                # smaller distance rank first; equal-distance candidates preserve
-                # their original index order.
                 target_distances = positive_distances.unsqueeze(1)
                 closer_counts = (distances < target_distances).sum(dim=1)
                 candidate_indices = torch.arange(
@@ -130,9 +126,7 @@ class ManifoldEmbeddingEvaluator:
                     "mean_negative_distance": float(
                         negative_distances.mean().item()
                     ),
-                    "mrr": float(
-                        target_ranks.float().reciprocal().mean().item()
-                    ),
+                    "mrr": float(target_ranks.float().reciprocal().mean().item()),
                 }
                 for k in self.recall_at_k:
                     metrics[f"recall_at_{k}"] = float(
@@ -297,35 +291,40 @@ class ManifoldCorpusRetrievalEvaluator:
                     batch_size=self.corpus_chunk_size,
                 )
 
-                # Store only the stable sort keys for relevant corpus items. These
-                # are needed to derive exact ranks without retaining all Q x C
-                # candidate results.
-                target_keys_by_query: list[list[tuple[float, int]]] = []
-                for query_index, indices in enumerate(self._relevant_corpus_indices):
-                    target_keys: list[tuple[float, int]] = []
-                    for start in range(0, len(indices), self.corpus_chunk_size):
-                        index_chunk = indices[start : start + self.corpus_chunk_size]
-                        relevant_embeddings = corpus_embeddings[list(index_chunk)]
-                        distances = self.model.distance(
-                            query_embeddings[query_index : query_index + 1],
-                            relevant_embeddings,
-                        )
-                        distance_values = distances.detach().cpu().reshape(-1).tolist()
-                        target_keys.extend(
-                            (float(distance), corpus_index)
-                            for distance, corpus_index in zip(
-                                distance_values,
-                                index_chunk,
-                                strict=True,
-                            )
-                        )
-                    target_keys.sort()
-                    target_keys_by_query.append(target_keys)
+                relevant_index_sets = [
+                    set(indices) for indices in self._relevant_corpus_indices
+                ]
+                target_keys_by_query: list[list[tuple[float, int]]] = [
+                    [] for _ in self.query_ids
+                ]
 
-                # For each streamed candidate key, find the first relevant target
-                # that ranks after it. A difference-array range update then counts
-                # that candidate as preceding every later relevant target without
-                # constructing a full ranking or doing O(relevance) work per item.
+                # First pass: keep only exact stable sort keys for relevant items,
+                # using the same block shapes as the ranking pass below.
+                for query_start, corpus_start, distance_block in (
+                    _iter_exact_geodesic_distance_blocks(
+                        self.model,
+                        query_embeddings,
+                        corpus_embeddings,
+                        query_chunk_size=self.query_chunk_size,
+                        corpus_chunk_size=self.corpus_chunk_size,
+                    )
+                ):
+                    block_values = distance_block.detach().cpu().tolist()
+                    for query_offset, distances in enumerate(block_values):
+                        query_index = query_start + query_offset
+                        relevant_indices = relevant_index_sets[query_index]
+                        target_keys = target_keys_by_query[query_index]
+                        for corpus_offset, distance in enumerate(distances):
+                            corpus_index = corpus_start + corpus_offset
+                            if corpus_index in relevant_indices:
+                                target_keys.append((float(distance), corpus_index))
+
+                for target_keys in target_keys_by_query:
+                    target_keys.sort()
+
+                # Second pass: count candidates preceding each relevant target.
+                # Difference-array range updates avoid full rankings and avoid
+                # O(number_of_relevant_items) work for every corpus candidate.
                 rank_diffs = [
                     [0] * (len(target_keys) + 1)
                     for target_keys in target_keys_by_query
@@ -373,9 +372,7 @@ class ManifoldCorpusRetrievalEvaluator:
 
                     reciprocal_rank_sum += 1.0 / min(ranks)
                     for k in self.recall_at_k:
-                        recall_sums[k] += (
-                            sum(rank <= k for rank in ranks) / len(ranks)
-                        )
+                        recall_sums[k] += sum(rank <= k for rank in ranks) / len(ranks)
 
                 query_count = len(self.query_ids)
                 metrics = {"mrr": reciprocal_rank_sum / query_count}
