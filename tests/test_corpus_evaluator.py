@@ -217,7 +217,7 @@ def test_corpus_evaluator_is_finite_on_supported_manifolds(
         ("query_ids", ["q0", "q0"], "query_ids must be unique"),
         ("corpus_ids", ["c0", "c0"], "corpus_ids must be unique"),
         ("query_ids", [""], "query_ids must be non-empty strings"),
-        ("corpus_ids", [""], "corpus_ids must be non-empty strings"),
+        ("corpus_ids", ["", "c1"], "corpus_ids must be non-empty strings"),
         ("queries", [1], "queries must contain only strings"),
         ("corpus", [1, "other"], "corpus must contain only strings"),
         ("recall_at_k", (), "at least one cutoff"),
