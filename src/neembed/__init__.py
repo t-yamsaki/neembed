@@ -1,6 +1,7 @@
 """neembed package."""
 
 from neembed.evaluator import (
+    ManifoldCorpusRetrievalEvaluator,
     ManifoldEmbeddingEvaluator,
     ManifoldPrototypeAssignmentEvaluator,
 )
@@ -14,6 +15,7 @@ from neembed.retrieval import exact_corpus_search
 from neembed.trainer import ManifoldTrainer
 
 __all__ = [
+    "ManifoldCorpusRetrievalEvaluator",
     "ManifoldEmbeddingEvaluator",
     "ManifoldMultipleNegativesRankingLoss",
     "ManifoldPrototypeAssignmentEvaluator",
