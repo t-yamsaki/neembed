@@ -61,7 +61,7 @@ class FakeSentenceTransformer(nn.Module):
         return {"sentence_embedding": self.linear(features["input_features"])}
 
 
-def _run(monkeypatch):
+def _run(monkeypatch, *, top_k: int = 3):
     monkeypatch.setattr(model_module, "SentenceTransformer", FakeSentenceTransformer)
     return run_example(
         "fake-model",
@@ -69,7 +69,7 @@ def _run(monkeypatch):
         seed=13,
         embedding_dim=3,
         learning_rate=1e-2,
-        top_k=3,
+        top_k=top_k,
         query_chunk_size=2,
         corpus_chunk_size=2,
     )
@@ -102,8 +102,18 @@ def test_v06_example_composes_public_retrieval_mining_and_training(monkeypatch) 
     for query_id, item in zip(v06_example.QUERY_IDS, mined, strict=True):
         assert {"corpus_id", "candidate", "index", "distance"} == set(item)
         assert item["corpus_id"] not in RELEVANCE[query_id]
+        assert item["corpus_id"] not in v06_example.TRAIN_POSITIVE_IDS
         assert math.isfinite(item["distance"])
         assert item["distance"] >= 0.0
+
+
+def test_v06_example_supports_top_k_one_without_duplicate_cutoffs(monkeypatch) -> None:
+    results = _run(monkeypatch, top_k=1)
+
+    for stage_name in ("before", "after"):
+        stage = results[stage_name]
+        assert all(len(ranking) == 1 for ranking in stage["search_results"])
+        assert set(stage["retrieval"]) == {"mrr", "recall_at_1"}
 
 
 def test_v06_example_is_deterministic_with_fixed_seed(monkeypatch) -> None:
