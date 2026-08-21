@@ -40,6 +40,9 @@ RELEVANCE = {
     "query-bird": ("bird",),
 }
 TRAIN_POSITIVES = ("dog", "cat", "bird")
+TRAIN_POSITIVE_IDS = tuple(
+    dict.fromkeys(corpus_id for relevant_ids in RELEVANCE.values() for corpus_id in relevant_ids)
+)
 
 
 def _retrieval_diagnostics(
@@ -57,6 +60,7 @@ def _retrieval_diagnostics(
         query_chunk_size=query_chunk_size,
         corpus_chunk_size=corpus_chunk_size,
     )
+    recall_at_k = (1,) if top_k == 1 else (1, top_k)
     evaluator = ManifoldCorpusRetrievalEvaluator(
         model=model,
         query_ids=QUERY_IDS,
@@ -64,7 +68,7 @@ def _retrieval_diagnostics(
         corpus_ids=CORPUS_IDS,
         corpus=CORPUS,
         relevance=RELEVANCE,
-        recall_at_k=(1, top_k),
+        recall_at_k=recall_at_k,
         query_chunk_size=query_chunk_size,
         corpus_chunk_size=corpus_chunk_size,
     )
@@ -110,6 +114,14 @@ def run_example(
         corpus_chunk_size=corpus_chunk_size,
     )
 
+    batch_positive_exclusions = {
+        query_id: tuple(
+            corpus_id
+            for corpus_id in TRAIN_POSITIVE_IDS
+            if corpus_id not in RELEVANCE[query_id]
+        )
+        for query_id in QUERY_IDS
+    }
     mined = mine_hard_negatives(
         model,
         QUERIES,
@@ -117,6 +129,7 @@ def run_example(
         query_ids=QUERY_IDS,
         corpus_ids=CORPUS_IDS,
         positive_corpus_ids=RELEVANCE,
+        excluded_corpus_ids=batch_positive_exclusions,
         num_negatives=1,
         query_chunk_size=query_chunk_size,
         corpus_chunk_size=corpus_chunk_size,
@@ -174,6 +187,8 @@ def _validate_regression(results: dict[str, Any]) -> None:
             raise RuntimeError("hard-negative mining produced a non-finite distance")
         if mined["corpus_id"] in RELEVANCE[query_id]:
             raise RuntimeError("hard-negative mining returned a known positive")
+        if mined["corpus_id"] in TRAIN_POSITIVE_IDS:
+            raise RuntimeError("hard-negative mining returned another batch positive")
 
 
 def main() -> None:
