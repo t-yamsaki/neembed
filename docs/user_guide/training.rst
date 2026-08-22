@@ -321,6 +321,22 @@ Mining remains separate from ``ManifoldTrainer.fit()``. A minimal composition is
 
    from neembed import mine_hard_negatives
 
+   batch_positive_ids = tuple(
+       dict.fromkeys(
+           corpus_id
+           for relevant_ids in relevance.values()
+           for corpus_id in relevant_ids
+       )
+   )
+   batch_positive_exclusions = {
+       query_id: tuple(
+           corpus_id
+           for corpus_id in batch_positive_ids
+           if corpus_id not in relevance[query_id]
+       )
+       for query_id in query_ids
+   }
+
    mined = mine_hard_negatives(
        model,
        queries=anchors,
@@ -328,6 +344,7 @@ Mining remains separate from ``ManifoldTrainer.fit()``. A minimal composition is
        query_ids=query_ids,
        corpus_ids=corpus_ids,
        positive_corpus_ids=relevance,
+       excluded_corpus_ids=batch_positive_exclusions,
        num_negatives=1,
    )
    negatives = tuple(items[0]["candidate"] for items in mined)
@@ -339,11 +356,11 @@ Mining remains separate from ``ManifoldTrainer.fit()``. A minimal composition is
 
 Because every explicit negative is a candidate for every anchor in a ranking
 batch, do not mine each query in isolation and then accidentally include another
-query's positive as a batch-wide negative. Exclude the union of the batch's
-positive corpus IDs during mining, or split examples into compatible batches.
-The `v0.6 retrieval example
+query's positive as a batch-wide negative. The snippet above excludes every
+other positive ID in the same batch; alternatively, split examples into
+compatible batches. The `v0.6 retrieval example
 <https://github.com/t-yamsaki/neembed/blob/main/examples/v06_exact_retrieval_workflow.py>`_
-shows the union-exclusion pattern before feeding the mined texts into the
+uses the same union-exclusion pattern before feeding the mined texts into the
 existing three-sequence trainer contract.
 
 The optimizer guidance above is unchanged: ordinary model-only training keeps
