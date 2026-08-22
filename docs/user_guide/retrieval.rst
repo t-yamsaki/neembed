@@ -143,9 +143,10 @@ metric definitions and validation boundary.
 Offline hard-negative mining
 ----------------------------
 
-``mine_hard_negatives()`` is an explicit preprocessing step. It does not run
-inside ``ManifoldTrainer.fit()`` and it does not create a background or online
-mining loop.
+``mine_hard_negatives()`` is an explicit preprocessing step. neembed does not mine hard negatives automatically.
+The helper runs only when the caller invokes it; it does not run inside
+``ManifoldTrainer.fit()`` and it does not create a background or online mining
+loop.
 
 .. code-block:: python
 
