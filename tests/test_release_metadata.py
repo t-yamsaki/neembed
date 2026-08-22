@@ -232,8 +232,8 @@ def test_release_suite_keeps_prior_paths_and_covers_v06_regressions() -> None:
     mining = (ROOT / "tests" / "test_mining.py").read_text(encoding="utf-8")
 
     assert 'results["mined_negatives"]' in v06_example
-    assert 'results["before"]' in v06_example
-    assert 'results["after"]' in v06_example
+    assert 'for stage_name in ("before", "after"):' in v06_example
+    assert "stage = results[stage_name]" in v06_example
     assert "test_v06_example_supports_top_k_one_without_duplicate_cutoffs" in v06_example
     assert "test_v06_example_is_deterministic_with_fixed_seed" in v06_example
     assert "multi_positive" in corpus_evaluator
