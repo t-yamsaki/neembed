@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [日本語](docs/README_ja.md)
 
-> **Status:** Package version v0.5.0 adds caller-supplied explicit hard-negative training, Recall@K / MRR evaluation, small in-memory geodesic reranking, and prototype-assignment evaluation while preserving the v0.4 learnable-structure path and the original fixed-curvature model-only workflow. The API remains intentionally small and may still evolve before a stable 1.0 release.
+> **Status:** Package version v0.6.0 adds chunked exact corpus retrieval, explicit-ID multi-positive corpus evaluation, deterministic offline hard-negative mining, and a reproducible end-to-end retrieval regression while preserving the v0.5 aligned evaluator, `model.rank()`, the v0.4 learnable-structure path, and the original fixed-curvature model-only workflow. The API remains intentionally small and may still evolve before a stable 1.0 release.
 
 `neembed` is a lightweight integration layer between pretrained Sentence Transformer models and manifold-valued representations. It keeps the pretrained encoder intact, optionally projects its Euclidean output, and delegates hyperbolic geometry to Geoopt.
 
@@ -63,7 +63,17 @@ v0.5 adds a focused retrieval workflow without introducing a retrieval framework
 - nearest-prototype assignment evaluation for learned manifold structure
 - one reproducible v0.5 retrieval regression example
 
-A manifold-valued **output** does not by itself require Riemannian optimization: encoder/projection parameters and learnable curvature are not manifold-valued points. Detailed parameter, optimizer, persistence, and numerical behavior lives in the [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html). The end-to-end retrieval composition and its in-memory boundary are documented in the [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html).
+v0.6 extends that workflow to exact caller-owned corpora without adding ANN infrastructure:
+
+- chunked exact geodesic distance evaluation without materializing the full query-by-corpus distance matrix
+- `exact_corpus_search()` for exact text-corpus top-k retrieval
+- `ManifoldCorpusRetrievalEvaluator` with explicit query/corpus IDs and multi-positive Recall@K / MRR
+- deterministic caller-invoked `mine_hard_negatives()` with positive, self, and additional exclusions
+- a reproducible v0.6 exact-search → evaluation → mining → explicit-negative training regression example
+
+ANN / FAISS / HNSW, vector-database integration, online mining, and distributed retrieval remain out of scope for v0.6.
+
+A manifold-valued **output** does not by itself require Riemannian optimization: encoder/projection parameters and learnable curvature are not manifold-valued points. Detailed parameter, optimizer, persistence, and numerical behavior lives in the [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html). The end-to-end retrieval composition and the distinction between small in-memory reranking, exact corpus search, and external ANN systems are documented in the [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html).
 
 ## Installation
 
@@ -142,6 +152,7 @@ python examples/train_poincare.py
 python examples/train_lorentz.py
 python examples/v04_learnable_structure.py
 python examples/v05_retrieval_workflow.py
+python examples/v06_exact_retrieval_workflow.py
 ```
 
 - [examples/train_poincare.py](examples/train_poincare.py) — minimal Poincaré workflow
@@ -150,6 +161,7 @@ python examples/v05_retrieval_workflow.py
 - [examples/train_hierarchy.py](examples/train_hierarchy.py) — minimal hierarchy-aware prototype objective
 - [examples/v04_learnable_structure.py](examples/v04_learnable_structure.py) — fixed-vs-learnable structure regression diagnostics; not a superiority benchmark
 - [examples/v05_retrieval_workflow.py](examples/v05_retrieval_workflow.py) — explicit hard negatives, Recall@K / MRR, in-memory geodesic reranking, and prototype assignment in one Poincaré regression workflow; not a research benchmark
+- [examples/v06_exact_retrieval_workflow.py](examples/v06_exact_retrieval_workflow.py) — exact corpus search, explicit-ID corpus evaluation, offline hard-negative mining, and the existing three-sequence trainer in one Poincaré regression workflow; not a research benchmark
 - [experiments/README.md](experiments/README.md) — reproducible Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark and interpretation limits
 
 ## License
