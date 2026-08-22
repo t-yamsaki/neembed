@@ -15,9 +15,8 @@ Choose the retrieval path
 -------------------------
 
 ``ManifoldSentenceTransformer.rank()``
-   Use this for one query and a small candidate list already held in memory. It
-   encodes the supplied candidates and returns them ordered by exact geodesic
-   distance.
+   Use this for one query and a small in-memory candidate list. It encodes the
+   supplied candidates and returns them ordered by exact geodesic distance.
 
 ``exact_corpus_search()``
    Use this when you own a text corpus and want exact geodesic top-k search over
