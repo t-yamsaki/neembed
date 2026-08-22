@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [English README](../README.md)
 
-> **Status:** package version v0.5.0 では、caller-supplied explicit hard-negative training、Recall@K / MRR evaluation、小規模な in-memory geodesic reranking、prototype-assignment evaluation を追加しつつ、v0.4 の learnable-structure path と従来の fixed-curvature model-only workflow を維持しています。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
+> **Status:** package version v0.6.0 では、chunked exact corpus retrieval、explicit ID を使う multi-positive corpus evaluation、deterministic offline hard-negative mining、end-to-end の retrieval regression を追加しつつ、v0.5 の aligned evaluator と `model.rank()`、v0.4 の learnable-structure path、従来の fixed-curvature model-only workflow を維持しています。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
 
 `neembed` は、pretrained Sentence Transformer と manifold-valued representation をつなぐ軽量な integration layer です。pretrained encoder はそのまま利用し、必要に応じて Euclidean embedding を projection したうえで、双曲幾何の演算を Geoopt に委譲します。
 
@@ -63,7 +63,17 @@ v0.5 では、retrieval framework を追加せず、次の focused retrieval wor
 - learned manifold structure 向け nearest-prototype assignment evaluation
 - 1本の再現可能な v0.5 retrieval regression example
 
-manifold-valued な **出力** を返すだけでは Riemannian optimization は必要ありません。encoder / projection parameter と learnable curvature は manifold 上の点ではありません。parameter・optimizer・persistence・numerical behavior の詳細は [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) を参照してください。end-to-end の retrieval 構成と in-memory の境界は [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html) にまとめています。
+v0.6 では ANN infrastructure を追加せず、caller-owned corpus に対する exact retrieval workflow まで拡張します。
+
+- full query-by-corpus distance matrix を materialize しない chunked exact geodesic distance evaluation
+- exact text-corpus top-k retrieval 用の `exact_corpus_search()`
+- explicit query/corpus ID と multi-positive Recall@K / MRR を扱う `ManifoldCorpusRetrievalEvaluator`
+- positive / self / additional exclusion を明示できる deterministic caller-invoked `mine_hard_negatives()`
+- exact search → evaluation → mining → explicit-negative training をつなぐ再現可能な v0.6 regression example
+
+ANN / FAISS / HNSW、vector database integration、online mining、distributed retrieval は v0.6 の対象外です。
+
+manifold-valued な **出力** を返すだけでは Riemannian optimization は必要ありません。encoder / projection parameter と learnable curvature は manifold 上の点ではありません。parameter・optimizer・persistence・numerical behavior の詳細は [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) を参照してください。小規模 in-memory reranking、exact corpus search、外部 ANN system の境界を含む end-to-end retrieval workflow は [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html) にまとめています。
 
 ## インストール
 
@@ -142,6 +152,7 @@ python examples/train_poincare.py
 python examples/train_lorentz.py
 python examples/v04_learnable_structure.py
 python examples/v05_retrieval_workflow.py
+python examples/v06_exact_retrieval_workflow.py
 ```
 
 - [examples/train_poincare.py](../examples/train_poincare.py) — 最小の Poincaré workflow
@@ -150,6 +161,7 @@ python examples/v05_retrieval_workflow.py
 - [examples/train_hierarchy.py](../examples/train_hierarchy.py) — 最小の hierarchy-aware prototype objective
 - [examples/v04_learnable_structure.py](../examples/v04_learnable_structure.py) — fixed-vs-learnable structure の regression diagnostics。性能優位性を示す benchmark ではありません
 - [examples/v05_retrieval_workflow.py](../examples/v05_retrieval_workflow.py) — explicit hard negatives、Recall@K / MRR、in-memory geodesic reranking、prototype assignment を1つにまとめた Poincaré regression workflow。research benchmark ではありません
+- [examples/v06_exact_retrieval_workflow.py](../examples/v06_exact_retrieval_workflow.py) — exact corpus search、explicit-ID corpus evaluation、offline hard-negative mining、既存 three-sequence trainer を1つにまとめた Poincaré regression workflow。research benchmark ではありません
 - [experiments/README.md](../experiments/README.md) — 再現可能な Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark と解釈上の注意
 
 ## License
