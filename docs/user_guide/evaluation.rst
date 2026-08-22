@@ -229,3 +229,64 @@ API reference
 For constructor and return-value details generated directly from docstrings,
 see :class:`neembed.ManifoldEmbeddingEvaluator` and
 :class:`neembed.ManifoldPrototypeAssignmentEvaluator`.
+
+Corpus retrieval evaluation in v0.6
+-----------------------------------
+
+Use :class:`neembed.ManifoldCorpusRetrievalEvaluator` when queries and corpus
+items have explicit caller-owned IDs and a query may have more than one relevant
+corpus item. This evaluator complements rather than replaces the aligned
+``ManifoldEmbeddingEvaluator`` contract above.
+
+.. code-block:: python
+
+   from neembed import ManifoldCorpusRetrievalEvaluator
+
+   evaluator = ManifoldCorpusRetrievalEvaluator(
+       model=model,
+       query_ids=["q-dog", "q-cat"],
+       queries=["Shiba Inu", "Siamese cat"],
+       corpus_ids=["dog", "cat", "bird", "vehicle"],
+       corpus=["dog", "cat", "bird", "vehicle"],
+       relevance={
+           "q-dog": ["dog"],
+           "q-cat": ["cat", "bird"],
+       },
+       recall_at_k=(1, 2, 4),
+   )
+   metrics = evaluator()
+
+For a query :math:`q` with relevant corpus-ID set :math:`R_q`, Recall@K is
+
+.. math::
+
+   \mathrm{Recall@K}(q)
+   = \frac{|R_q \cap \mathrm{topK}(q)|}{|R_q|}.
+
+The reported ``recall_at_<K>`` value is the mean of this fraction across
+queries. ``mrr`` uses the first relevant exact result rank for each query, so a
+query with several relevant items contributes the reciprocal rank of the nearest
+one. If K exceeds the corpus size, top-K contains the full corpus and Recall@K is
+1 for valid non-empty relevance sets.
+
+Query IDs and corpus IDs must be unique non-empty strings. Every query ID must
+appear in ``relevance`` with at least one known corpus ID; duplicate cutoffs and
+malformed relevance mappings are rejected. Exact ranks use configured Geoopt
+geodesic distance and the same stable ``(distance, corpus index)`` tie behavior
+as exact corpus search.
+
+The evaluator processes exact distance blocks without building a full Python
+ranking for every query/corpus pair. ``query_chunk_size`` and
+``corpus_chunk_size`` therefore tune the same exact memory/runtime tradeoff as
+the v0.6 corpus-search path rather than changing metric semantics.
+
+Run the full v0.6 composition with:
+
+.. code-block:: bash
+
+   python examples/v06_exact_retrieval_workflow.py
+
+The example evaluates before and after training, mines offline hard negatives,
+and keeps all diagnostics interpretive rather than claiming retrieval-quality
+improvement. See :doc:`retrieval` for the overall workflow and
+:class:`neembed.ManifoldCorpusRetrievalEvaluator` for generated API details.
