@@ -1,118 +1,234 @@
 Retrieval workflow
 ==================
 
-v0.5 adds a small retrieval-oriented workflow on top of the existing manifold
-sentence-model API. The pieces are intentionally separate: train with optional
-caller-supplied hard negatives, evaluate aligned retrieval ranks, rerank a small
-candidate list by geodesic distance, and add prototype assignment diagnostics
-only when learned manifold structure is part of the task.
+v0.6 extends the lightweight retrieval path introduced in v0.5 with exact text
+corpus search, corpus-level evaluation with explicit IDs and multi-positive
+relevance, and caller-invoked offline hard-negative mining. The pieces remain
+separate on purpose: neembed provides exact manifold scoring and small utilities,
+not a retrieval framework.
 
-All of these paths use the configured Geoopt geodesic distance. Poincare and
+All retrieval paths use the configured Geoopt geodesic distance. Poincare and
 Lorentz therefore keep the same geometry semantics used by ``encode()`` and
 ``distance()`` elsewhere in neembed.
 
-End-to-end reference
---------------------
+Choose the retrieval path
+-------------------------
 
-Run the compact v0.5 reference workflow from the repository root:
+``ManifoldSentenceTransformer.rank()``
+   Use this for one query and a small candidate list already held in memory. It
+   encodes the supplied candidates and returns them ordered by exact geodesic
+   distance.
+
+``exact_corpus_search()``
+   Use this when you own a text corpus and want exact geodesic top-k search over
+   one or more queries without materializing the full query-by-corpus distance
+   matrix. Text encoding and distance evaluation are processed in bounded
+   batches/blocks.
+
+ANN or vector-database retrieval
+   Use an external system when the corpus is too large for exact exhaustive
+   search. v0.6 does not add FAISS, HNSW, a vector database, persistent indexes,
+   or approximate search. An external system may generate candidates, after
+   which neembed can still score or rerank them with its manifold helpers.
+
+The distinction is about scale and ownership, not distance semantics:
+``rank()`` and ``exact_corpus_search()`` both use exact configured Geoopt
+geodesic distance.
+
+v0.6 end-to-end reference
+-------------------------
+
+Run the compact v0.6 workflow from the repository root:
 
 .. code-block:: bash
 
-   python examples/v05_retrieval_workflow.py
+   python examples/v06_exact_retrieval_workflow.py
 
-The script composes the public APIs for explicit hard-negative training,
-Recall@K / MRR evaluation, in-memory geodesic reranking, and prototype
-assignment evaluation. The corpus, hierarchy metadata, and seed are defined in
-the script itself.
+The script composes public APIs only:
 
-This is an engineering and regression reference, not a benchmark claim. The
-user-facing script intentionally uses one Poincare configuration; lower-level
-tests provide the geometry parity coverage for Poincare and Lorentz.
+1. exact corpus search;
+2. corpus MRR / Recall@K evaluation with explicit IDs;
+3. offline hard-negative mining with positive exclusions;
+4. the existing ``(anchors, positives, negatives)`` training contract;
+5. the same retrieval diagnostics after training.
 
-1. Train with two or three sequences
-------------------------------------
+The tiny corpus and fixed seed live in the script. This is an engineering and
+regression reference, not a benchmark claim and not evidence that training must
+improve the reported metrics.
 
-The original ranking contract remains supported:
+See the `v0.6 example source
+<https://github.com/t-yamsaki/neembed/blob/main/examples/v06_exact_retrieval_workflow.py>`_
+for the full composition.
 
-``(anchors, positives)``
-   Uses aligned anchor-positive pairs. Off-diagonal positive candidates act as
-   in-batch negatives.
+Exact corpus search
+-------------------
 
-``(anchors, positives, negatives)``
-   Adds a caller-supplied explicit-negative sequence. Every explicit negative is
-   appended to the candidate pool for every anchor in the batch.
+``exact_corpus_search()`` accepts multiple query texts and a corpus of candidate
+texts:
 
-The third sequence is optional and does not replace the original two-sequence
-path. neembed does not mine hard negatives automatically; callers choose the
-negative texts. See :doc:`training` for the loss definition, batch validation,
-and optimizer behavior.
+.. code-block:: python
 
-For ordinary model-only fine-tuning, including fixed-curvature models and the
-opt-in learnable-curvature scalar path, the trainer's default ``AdamW`` behavior
-remains valid. A manifold-valued model output does not by itself require a
-Riemannian optimizer.
+   from neembed import exact_corpus_search
 
-2. Evaluate aligned retrieval
------------------------------
+   results = exact_corpus_search(
+       model,
+       ["Shiba Inu", "Siamese cat"],
+       ["dog", "cat", "bird", "vehicle"],
+       top_k=2,
+       query_chunk_size=2,
+       corpus_chunk_size=3,
+   )
 
-``ManifoldEmbeddingEvaluator`` treats every supplied positive as a retrieval
-candidate for every anchor and uses the same-index positive as the single
-relevant target. It reports the existing distance metrics plus:
+One ranked list is returned per query. Every result contains the original
+``candidate`` text, its corpus ``index``, and exact geodesic ``distance``.
+Results are ordered by ascending distance; equal-distance candidates preserve
+corpus input order through the stable ``(distance, index)`` ordering rule.
 
-``Recall@K``
-   Fraction of anchors whose aligned target is among the K nearest positive
-   candidates. ``recall_at_1`` is the same quantity as
-   ``retrieval_accuracy`` under this single-relevant aligned contract.
+``top_k=None`` returns a full corpus ranking for every query. For a bounded
+result set, prefer an integer ``top_k`` so the search retains only the best K
+candidates seen for each query.
 
-``MRR``
-   Mean reciprocal rank of the aligned target.
+Chunking is exact, not approximate
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Candidate ranks are ordered by ascending Geoopt geodesic distance. See
-:doc:`evaluation` for the exact definitions, cutoff behavior, and prototype
-assignment metrics.
+``query_chunk_size`` and ``corpus_chunk_size`` control both text-encoding batch
+sizes and the active geodesic distance blocks. Completed embeddings are staged
+on CPU and the full query-by-corpus distance matrix is not materialized.
 
-3. Rerank a small candidate set
--------------------------------
+Smaller chunks generally reduce peak encoder/device working memory, while more
+chunks can increase runtime because more forward passes and distance blocks are
+processed. Changing a chunk size does **not** change exact-search semantics or
+introduce approximation; it only changes how the same exhaustive computation is
+scheduled.
 
-``ManifoldSentenceTransformer.rank()`` encodes one query and a supplied
-candidate sequence, then returns plain Python results ordered by ascending
-geodesic distance. It is intended for small in-memory reranking only.
+The encoded query and corpus embeddings themselves still exist for the duration
+of the call, so chunking is not a substitute for ANN or persistent indexing when
+the corpus becomes very large. See :doc:`inference` for the concise inference
+contract and :func:`neembed.exact_corpus_search` for argument details.
 
-The helper does **not** build an ANN index, persist a corpus, cache embeddings,
-or provide a vector-database integration. For a large corpus, candidate
-retrieval or indexing remains outside neembed; a small externally produced
-shortlist can then be scored or reranked with the existing manifold inference
-helpers. See :doc:`inference` for the ``rank()`` result contract and ``top_k``
-validation.
+Corpus retrieval evaluation
+----------------------------
 
-4. Add prototype diagnostics when needed
-----------------------------------------
+``ManifoldCorpusRetrievalEvaluator`` evaluates a real corpus rather than the
+older aligned-positive candidate matrix. Query IDs and corpus IDs are explicit
+caller-owned strings, and ``relevance`` maps every query ID to one or more
+relevant corpus IDs:
 
-``ManifoldPrototypeAssignmentEvaluator`` is optional. Use it when the task also
-contains learned ``ManifoldPrototypes`` and caller-owned prototype IDs. It
-assigns each sentence to the nearest prototype by Geoopt geodesic distance and
-reports assignment accuracy plus mean distance to the selected prototype.
+.. code-block:: python
 
-Prototype coordinates are true manifold-valued trainable parameters. When they
-are optimized, use a Geoopt Riemannian optimizer such as
-``RiemannianAdam``. This requirement is specific to manifold-valued trainable
-parameters; it does not change the ordinary AdamW model-only path. See
-:doc:`learnable_structure` for the parameter categories, persistence boundary,
-and joint learnable-curvature / prototype guidance.
+   from neembed import ManifoldCorpusRetrievalEvaluator
 
-What v0.5 does not add
-----------------------
+   evaluator = ManifoldCorpusRetrievalEvaluator(
+       model=model,
+       query_ids=["q-dog", "q-cat"],
+       queries=["Shiba Inu", "Siamese cat"],
+       corpus_ids=["dog", "cat", "bird", "vehicle"],
+       corpus=["dog", "cat", "bird", "vehicle"],
+       relevance={
+           "q-dog": ["dog"],
+           "q-cat": ["cat", "bird"],
+       },
+       recall_at_k=(1, 2, 4),
+   )
 
-The retrieval additions deliberately stop before a retrieval framework. They do
-not implement:
+For each query, Recall@K is the fraction of that query's relevant corpus items
+found in the first K exact results. The evaluator then averages that fraction
+across queries. MRR uses the rank of the first relevant result for each query.
+This differs intentionally from ``ManifoldEmbeddingEvaluator``, whose aligned
+single-positive contract keeps ``retrieval_accuracy == recall_at_1``.
 
-- automatic hard-negative mining;
-- ANN or vector-database indexing;
-- persistent corpus management or embedding caches;
-- distributed retrieval infrastructure;
-- multi-relevance metrics such as nDCG;
-- a claim that the tiny v0.5 example establishes geometry superiority.
+IDs must be unique, every query must have a non-empty relevance set, and all
+relevance IDs must exist in the supplied corpus. See :doc:`evaluation` for the
+metric definitions and validation boundary.
 
-This boundary keeps the public API focused on manifold representation,
-geodesic scoring, and lightweight evaluation while allowing larger retrieval
-systems to own their indexing and candidate-generation layers.
+Offline hard-negative mining
+----------------------------
+
+``mine_hard_negatives()`` is an explicit preprocessing step. It does not run
+inside ``ManifoldTrainer.fit()`` and it does not create a background or online
+mining loop.
+
+.. code-block:: python
+
+   from neembed import mine_hard_negatives
+
+   mined = mine_hard_negatives(
+       model,
+       queries=["Shiba Inu", "Siamese cat"],
+       corpus=["dog", "cat", "wolf", "tiger"],
+       query_ids=["q-dog", "q-cat"],
+       corpus_ids=["dog", "cat", "wolf", "tiger"],
+       positive_corpus_ids={
+           "q-dog": ["dog"],
+           "q-cat": ["cat"],
+       },
+       num_negatives=1,
+   )
+
+Known positives are never returned. ``excluded_corpus_ids`` can add caller-owned
+exclusions, and a corpus item whose ID equals the current query ID is excluded
+as an explicit self item. The nearest remaining candidates are selected by exact
+geodesic distance, with corpus input order as the equal-distance tie-breaker.
+Returned dictionaries include ``corpus_id``, ``candidate``, original ``index``,
+and ``distance`` so mining decisions can be audited.
+
+When mined negatives are fed into one three-sequence ranking batch, remember
+that ``ManifoldMultipleNegativesRankingLoss`` makes every explicit negative a
+candidate for every anchor in that batch. If one query's mined negative is a
+positive for another query in the same batch, exclude the union of that batch's
+positive IDs during mining or split the triples into compatible batches. The
+v0.6 reference example demonstrates the union-exclusion approach.
+
+See :doc:`training` for the three-sequence loss semantics and
+:func:`neembed.mine_hard_negatives` for the focused API contract.
+
+Training composition
+--------------------
+
+After mining, the existing trainer API remains unchanged:
+
+.. code-block:: python
+
+   mined_negative_texts = tuple(items[0]["candidate"] for items in mined)
+
+   history = trainer.fit(
+       [(anchors, positives, mined_negative_texts)],
+       epochs=3,
+   )
+
+The trainer does not know whether the third sequence was mined, manually chosen,
+or produced by another system. This separation keeps hard-negative policy under
+caller control and avoids turning the trainer into an online retrieval
+framework.
+
+For ordinary model-only fine-tuning, including fixed curvature and the opt-in
+learnable-curvature scalar path, the default AdamW path remains valid. A
+manifold-valued model output does not by itself require a Riemannian optimizer.
+True manifold-valued trainable parameters such as ``ManifoldPrototypes`` still
+require an appropriate Geoopt optimizer such as ``RiemannianAdam``. See
+:doc:`training` and :doc:`learnable_structure` for that optimizer boundary.
+
+Aligned retrieval and prototype diagnostics
+-------------------------------------------
+
+The v0.5 utilities remain supported. ``ManifoldEmbeddingEvaluator`` is useful
+for aligned anchor-positive evaluation, while
+``ManifoldPrototypeAssignmentEvaluator`` remains optional for tasks with learned
+``ManifoldPrototypes``. v0.6 does not redefine those contracts; it adds corpus
+retrieval and mining beside them.
+
+What v0.6 still does not add
+----------------------------
+
+The retrieval additions deliberately stop before a general retrieval system.
+They do not implement:
+
+- ANN, FAISS, HNSW, or vector-database integrations;
+- persistent indexes, corpus stores, or embedding caches;
+- online or asynchronous hard-negative mining;
+- distributed retrieval or cross-device mining;
+- nDCG, MAP, or graded relevance;
+- benchmark superiority claims.
+
+This boundary keeps neembed focused on manifold representation, exact geodesic
+scoring, lightweight evaluation, and caller-controlled training composition.
