@@ -306,3 +306,64 @@ For argument and return-value details, see
 :class:`neembed.ManifoldPrototypeHierarchyLoss`,
 :class:`neembed.ManifoldEmbeddingEvaluator`, and
 :class:`neembed.ManifoldTrainer`.
+
+Offline hard-negative mining before training
+--------------------------------------------
+
+v0.6 adds :func:`neembed.mine_hard_negatives` as a caller-invoked preprocessing
+utility. It searches the supplied corpus by exact configured Geoopt geodesic
+distance, removes known positives and caller-owned exclusions, and returns the
+nearest valid candidates with IDs, indices, and distances for auditing.
+
+Mining remains separate from ``ManifoldTrainer.fit()``. A minimal composition is:
+
+.. code-block:: python
+
+   from neembed import mine_hard_negatives
+
+   batch_positive_ids = tuple(
+       dict.fromkeys(
+           corpus_id
+           for relevant_ids in relevance.values()
+           for corpus_id in relevant_ids
+       )
+   )
+   batch_positive_exclusions = {
+       query_id: tuple(
+           corpus_id
+           for corpus_id in batch_positive_ids
+           if corpus_id not in relevance[query_id]
+       )
+       for query_id in query_ids
+   }
+
+   mined = mine_hard_negatives(
+       model,
+       queries=anchors,
+       corpus=corpus,
+       query_ids=query_ids,
+       corpus_ids=corpus_ids,
+       positive_corpus_ids=relevance,
+       excluded_corpus_ids=batch_positive_exclusions,
+       num_negatives=1,
+   )
+   negatives = tuple(items[0]["candidate"] for items in mined)
+
+   history = trainer.fit(
+       [(anchors, positives, negatives)],
+       epochs=3,
+   )
+
+Because every explicit negative is a candidate for every anchor in a ranking
+batch, do not mine each query in isolation and then accidentally include another
+query's positive as a batch-wide negative. The snippet above excludes every
+other positive ID in the same batch; alternatively, split examples into
+compatible batches. The `v0.6 retrieval example
+<https://github.com/t-yamsaki/neembed/blob/main/examples/v06_exact_retrieval_workflow.py>`_
+uses the same union-exclusion pattern before feeding the mined texts into the
+existing three-sequence trainer contract.
+
+The optimizer guidance above is unchanged: ordinary model-only training keeps
+the default AdamW path, while true manifold-valued trainable parameters such as
+``ManifoldPrototypes`` require the appropriate caller-owned Geoopt optimizer.
+See :doc:`retrieval` for the full exact-search/evaluation/mining workflow.

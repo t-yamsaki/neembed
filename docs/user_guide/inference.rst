@@ -1,8 +1,9 @@
 Inference
 =========
 
-The public inference helpers are ``encode()``, ``distance()``, and ``rank()`` on
-:class:`neembed.ManifoldSentenceTransformer`.
+The model-level public inference helpers are ``encode()``, ``distance()``, and
+``rank()`` on :class:`neembed.ManifoldSentenceTransformer`. v0.6 also exposes
+:func:`neembed.exact_corpus_search` for exact multi-query text-corpus search.
 
 Encoding text
 -------------
@@ -101,3 +102,34 @@ Poincare and Lorentz models use their configured Geoopt geodesic distance. It is
 intentionally limited to small in-memory candidate lists: it does not create an
 ANN index, persist a corpus, cache embeddings, or integrate with a vector
 database.
+
+Exact text-corpus search
+------------------------
+
+Use :func:`neembed.exact_corpus_search` when you want exhaustive geodesic search
+across one or more queries and a caller-owned text corpus:
+
+.. code-block:: python
+
+   from neembed import exact_corpus_search
+
+   results = exact_corpus_search(
+       model,
+       queries=["Shiba Inu", "Siamese cat"],
+       corpus=["dog", "cat", "bird", "vehicle"],
+       top_k=2,
+       query_chunk_size=2,
+       corpus_chunk_size=3,
+   )
+
+The result shape is one ranked list per query. Search uses the same exact Geoopt
+geodesic distance as ``rank()``. ``query_chunk_size`` and
+``corpus_chunk_size`` bound encoding batches and active distance blocks; they
+change the memory/runtime tradeoff but do not approximate the ranking. Equal
+distances use corpus input order as the deterministic tie-breaker.
+
+The full query-by-corpus distance matrix is not materialized, but the encoded
+query and corpus embeddings are retained for the call. v0.6 still does not
+provide ANN, FAISS/HNSW, persistent indexing, or vector-database integration.
+For the decision boundary between ``rank()``, exact corpus search, and external
+ANN retrieval, see :doc:`retrieval`.
