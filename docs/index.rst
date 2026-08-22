@@ -5,17 +5,19 @@ neembed
 spaces while delegating manifold geometry to Geoopt.
 
 The public API is intentionally small: a sentence model, manifold-aware losses,
-a minimal trainer, an embedding evaluator, and opt-in manifold prototypes. The
-current development API supports Poincare and Lorentz hyperbolic models, fixed
-or learnable curvature, and true manifold-valued prototype parameters while
-preserving the original model-only AdamW path.
+a minimal trainer, retrieval evaluators, exact corpus search, offline
+hard-negative mining, and opt-in manifold prototypes. The current development
+API supports Poincare and Lorentz hyperbolic models, fixed or learnable
+curvature, and true manifold-valued prototype parameters while preserving the
+original model-only AdamW path.
 
 Start with :doc:`getting_started/quickstart` if you want the ordinary training
-workflow. For the v0.5 hard-negative, Recall@K / MRR, in-memory reranking, and
-prototype-assignment path, see :doc:`user_guide/retrieval`. Read
+workflow. For the v0.6 retrieval path -- small-list reranking, exact corpus
+search, corpus MRR / multi-positive Recall@K, and caller-invoked hard-negative
+mining -- see :doc:`user_guide/retrieval`. Read
 :doc:`user_guide/learnable_structure` to distinguish Euclidean trainable
 parameters, learnable curvature, and manifold-valued prototypes, or jump to the
-:ref:`api-reference` for class and method details generated from the public
+:ref:`api-reference` for class and function details generated from the public
 docstrings.
 
 .. toctree::
@@ -49,4 +51,6 @@ API reference
    api/losses
    api/trainer
    api/evaluator
+   api/retrieval
+   api/mining
    api/prototypes
