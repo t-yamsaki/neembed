@@ -6,6 +6,7 @@ from neembed.evaluator import (
     ManifoldPrototypeAssignmentEvaluator,
 )
 from neembed.losses import (
+    ManifoldDistanceMSELoss,
     ManifoldMarginMSELoss,
     ManifoldMultipleNegativesRankingLoss,
     ManifoldPrototypeHierarchyLoss,
@@ -19,6 +20,7 @@ from neembed.trainer import ManifoldTrainer
 
 __all__ = [
     "ManifoldCorpusRetrievalEvaluator",
+    "ManifoldDistanceMSELoss",
     "ManifoldEmbeddingEvaluator",
     "ManifoldMarginMSELoss",
     "ManifoldMultipleNegativesRankingLoss",
