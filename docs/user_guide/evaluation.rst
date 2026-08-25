@@ -152,18 +152,23 @@ details.
 PyTorch DataLoader interoperability
 -----------------------------------
 
-``ManifoldTrainer`` accepts any re-iterable input that yields either two or
-three aligned string sequences. An ordinary ``torch.utils.data.DataLoader`` can
-therefore use the original ``(anchors, positives)`` contract or yield
-``(anchors, positives, negatives)`` for explicit hard-negative ranking; neembed
-does not add a Dataset, DataModule, or custom collator abstraction.
+``ManifoldTrainer`` accepts re-iterable inputs using the existing two- and
+three-sequence forms, plus four-input margin-regression batches. An ordinary
+``torch.utils.data.DataLoader`` can therefore yield ``(anchors, positives)``,
+``(anchors, positives, negatives)`` for triplet or explicit-hard-negative
+objectives, or ``(anchors, positives, negatives, target_margin)`` for
+``ManifoldMarginMSELoss``. neembed does not add a Dataset, DataModule, or custom
+collator abstraction; caller-provided targets are simply forwarded to the
+configured loss.
 
 The runnable `DataLoader example
 <https://github.com/t-yamsaki/neembed/blob/main/examples/train_dataloader.py>`_
 shows default PyTorch collation, multi-epoch training, and epoch-end validation.
 Keep positive candidates unique within each batch because the ranking loss uses
 off-diagonal positives as in-batch negatives. Explicit negatives remain
-caller-supplied; the DataLoader path does not mine them automatically.
+caller-supplied; the DataLoader path does not mine them automatically. See
+:doc:`training` for the four-input teacher-margin example and its sign
+convention.
 
 v0.5 retrieval workflow example
 -------------------------------
