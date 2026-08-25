@@ -9,3 +9,6 @@ Loss
 
 .. autoclass:: neembed.ManifoldMarginMSELoss
    :members:
+
+.. autoclass:: neembed.ManifoldDistanceMSELoss
+   :members:
