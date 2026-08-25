@@ -265,6 +265,96 @@ class ManifoldMarginMSELoss(nn.Module):
         return F.mse_loss(predicted_margin, target)
 
 
+class ManifoldDistanceMSELoss(nn.Module):
+    """Regress aligned text pairs toward target manifold geodesic distances.
+
+    The predicted value is the configured Geoopt geodesic distance
+    ``d(text_a, text_b)``. Targets use the same distance semantics: ``0`` means
+    coincident points, and lower values mean the pair should be closer on the
+    manifold. Targets must therefore be finite and non-negative.
+
+    Args:
+        model: Manifold sentence model used to encode aligned text pairs.
+    """
+
+    def __init__(self, model: ManifoldSentenceTransformer) -> None:
+        super().__init__()
+        self.model = model
+
+    @staticmethod
+    def _normalize_target_distance(
+        target_distance: float | int | Sequence[float] | torch.Tensor,
+        *,
+        batch_size: int,
+    ) -> torch.Tensor:
+        try:
+            target = torch.as_tensor(target_distance)
+        except (TypeError, ValueError, RuntimeError) as exc:
+            raise ValueError(
+                "target_distance must contain real numeric values"
+            ) from exc
+
+        if target.dtype == torch.bool or torch.is_complex(target):
+            raise ValueError("target_distance must contain real numeric values")
+        if target.ndim == 0:
+            target = target.expand(batch_size)
+        elif target.ndim != 1 or target.shape[0] != batch_size:
+            raise ValueError(
+                "target_distance must be a scalar or one value per aligned pair"
+            )
+        if not bool(torch.isfinite(target).all()):
+            raise ValueError("target_distance must contain only finite values")
+        if bool((target < 0).any()):
+            raise ValueError("target_distance must contain only non-negative values")
+        return target
+
+    def forward(
+        self,
+        texts_a: Sequence[str],
+        texts_b: Sequence[str],
+        target_distance: float | int | Sequence[float] | torch.Tensor,
+    ) -> torch.Tensor:
+        """Return mean squared error against aligned target distances.
+
+        Args:
+            texts_a: First text sequence in the aligned pairs.
+            texts_b: Second text sequence aligned by index with ``texts_a``.
+            target_distance: Desired geodesic distance for each aligned pair. A
+                scalar is broadcast over the batch. A sequence or tensor must be
+                one-dimensional with exactly one non-negative finite value per
+                pair.
+
+        Returns:
+            Scalar MSE between configured manifold distances and target values.
+        """
+        for name, values in (("texts_a", texts_a), ("texts_b", texts_b)):
+            if isinstance(values, (str, bytes)):
+                raise ValueError(f"{name} must be a sequence of texts, not a string")
+
+        if len(texts_a) == 0:
+            raise ValueError("texts_a and texts_b must not be empty")
+        if len(texts_a) != len(texts_b):
+            raise ValueError("texts_a and texts_b must have the same length")
+
+        target = self._normalize_target_distance(
+            target_distance,
+            batch_size=len(texts_a),
+        )
+
+        embeddings_a = self.model(texts_a)
+        embeddings_b = self.model(texts_b)
+        predicted_distance = self.model.manifold.dist(embeddings_a, embeddings_b)
+        target = target.to(
+            device=predicted_distance.device,
+            dtype=predicted_distance.dtype,
+        )
+        if not bool(torch.isfinite(target).all()):
+            raise ValueError("target_distance must contain only finite values")
+        if bool((target < 0).any()):
+            raise ValueError("target_distance must contain only non-negative values")
+        return F.mse_loss(predicted_distance, target)
+
+
 class ManifoldPrototypeHierarchyLoss(nn.Module):
     """Attract sentences to labeled prototypes while preserving simple hierarchy.
 
