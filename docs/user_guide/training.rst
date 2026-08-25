@@ -1,9 +1,9 @@
 Training
 ========
 
-neembed supports both the original multiple-negatives ranking objective and a
-small prototype-based hierarchy objective. Both use manifold geodesic distance
-from Geoopt rather than custom distance formulas.
+neembed supports the original multiple-negatives ranking objective, teacher-scored
+margin regression, and a small prototype-based hierarchy objective. These paths
+use manifold geodesic distance from Geoopt rather than custom distance formulas.
 
 Geodesic ranking objective
 --------------------------
@@ -49,6 +49,47 @@ and an off-diagonal negative in the same loss matrix.
 For the three-sequence form, ``anchors``, ``positives``, and ``negatives`` must
 have the same non-zero batch length. Automatic hard-negative mining is not part
 of this API; callers choose the explicit negative texts.
+
+Teacher-scored margin regression
+--------------------------------
+
+``ManifoldMarginMSELoss`` supports aligned
+``(anchor, positive, negative, target_margin)`` supervision when an external
+teacher provides the desired positive-vs-negative preference margin. neembed
+predicts the margin from geodesic distances as
+
+.. math::
+
+   \hat m = d_{\mathcal M}(a,n) - d_{\mathcal M}(a,p).
+
+If larger teacher scores are better, pass
+``teacher_positive_score - teacher_negative_score`` as ``target_margin``. A
+positive target therefore prefers the positive text, zero means no preference,
+and a negative target prefers the supplied negative text. A scalar target is
+broadcast across the batch; list and tensor targets must provide exactly one
+value per aligned triplet.
+
+A minimal trainer batch is:
+
+.. code-block:: python
+
+   from neembed import ManifoldMarginMSELoss, ManifoldTrainer
+
+   loss = ManifoldMarginMSELoss(model)
+   trainer = ManifoldTrainer(model, loss)
+
+   train_batches = [
+       (
+           ["Shiba Inu", "Siamese cat"],
+           ["dog", "cat"],
+           ["vehicle", "airplane"],
+           [0.8, 0.4],
+       ),
+   ]
+   history = trainer.fit(train_batches, epochs=3)
+
+Teacher execution and score generation stay caller-owned; neembed only regresses
+the supplied margins.
 
 Prototype hierarchy objective
 -----------------------------
@@ -198,13 +239,15 @@ need to download a Sentence Transformer model repeatedly.
 Minimal training loop
 ---------------------
 
-``ManifoldTrainer.fit`` accepts an iterable yielding either two or three aligned
-string sequences. Two-sequence batches preserve the existing contract; their
-meaning is defined by the configured loss, such as anchor-positive pairs for
+``ManifoldTrainer.fit`` accepts re-iterable batches in three supported shapes.
+Two-sequence batches preserve the existing contract; their meaning is defined by
+the configured loss, such as anchor-positive pairs for
 ``ManifoldMultipleNegativesRankingLoss`` or sentence-assignment pairs for
 ``ManifoldPrototypeHierarchyLoss``. Three-sequence batches are forwarded as
-``(anchors, positives, negatives)`` and are intended for losses such as
-``ManifoldMultipleNegativesRankingLoss`` that accept explicit hard negatives.
+``(anchors, positives, negatives)`` for triplet or explicit-negative objectives.
+Four-input batches are forwarded as
+``(anchors, positives, negatives, target_margin)`` for margin-regression
+objectives such as ``ManifoldMarginMSELoss``.
 
 For more than one epoch, the input must be re-iterable, such as a list or a
 DataLoader; a one-shot iterator or generator is only suitable for a single
@@ -238,6 +281,27 @@ the batch:
    ]
 
    history = trainer.fit(train_batches, epochs=3)
+
+For teacher-margin regression, supply the fourth target input. The first three
+sequences remain aligned triplets, while ``target_margin`` can be one value per
+triplet or a scalar broadcast across the batch:
+
+.. code-block:: python
+
+   margin_batches = [
+       (
+           ["Shiba Inu", "Siamese cat"],
+           ["dog", "cat"],
+           ["vehicle", "airplane"],
+           [0.8, 0.4],
+       ),
+   ]
+
+   margin_trainer = ManifoldTrainer(
+       model,
+       ManifoldMarginMSELoss(model),
+   )
+   history = margin_trainer.fit(margin_batches, epochs=3)
 
 Batches with any other arity are rejected rather than being interpreted by a
 generic batch-dispatch framework.
@@ -279,8 +343,9 @@ The runnable `DataLoader example
 uses a plain list of aligned text pairs, default PyTorch collation, multi-epoch
 training, and optional validation. Its batches keep positive candidates unique
 so the in-batch-negative objective remains well-defined. A DataLoader may also
-yield three aligned string sequences for the explicit-hard-negative ranking
-path; the same batch-length requirements apply.
+yield three aligned string sequences for triplet or explicit-hard-negative
+objectives, or ``(anchors, positives, negatives, target_margin)`` for
+``ManifoldMarginMSELoss``; the same alignment requirements apply.
 
 Lorentz example
 ---------------
@@ -303,6 +368,7 @@ better than Poincare geometry.
 
 For argument and return-value details, see
 :class:`neembed.ManifoldMultipleNegativesRankingLoss`,
+:class:`neembed.ManifoldMarginMSELoss`,
 :class:`neembed.ManifoldPrototypeHierarchyLoss`,
 :class:`neembed.ManifoldEmbeddingEvaluator`, and
 :class:`neembed.ManifoldTrainer`.
