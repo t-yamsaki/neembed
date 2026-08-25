@@ -1,5 +1,7 @@
 """Losses for manifold-valued sentence embeddings."""
 
+from __future__ import annotations
+
 from collections.abc import Sequence
 import math
 
@@ -154,6 +156,113 @@ class ManifoldTripletLoss(nn.Module):
         return F.relu(
             positive_distances - negative_distances + self.margin
         ).mean()
+
+
+class ManifoldMarginMSELoss(nn.Module):
+    """Regress teacher preference margins with manifold geodesic distances.
+
+    The predicted margin is
+    ``d(anchor, negative) - d(anchor, positive)``. This is equivalent to the
+    positive-minus-negative margin when geodesic similarity is defined as
+    ``score = -distance``. A positive target therefore means the teacher prefers
+    the positive text, zero means no preference, and a negative target means the
+    teacher prefers the supplied negative text.
+
+    If teacher scores use the convention that larger is better, callers can pass
+    ``teacher_positive_score - teacher_negative_score`` directly as the target
+    margin. neembed does not calibrate or rescale teacher scores automatically.
+
+    Args:
+        model: Manifold sentence model used to encode aligned triplets.
+    """
+
+    def __init__(self, model: ManifoldSentenceTransformer) -> None:
+        super().__init__()
+        self.model = model
+
+    @staticmethod
+    def _normalize_target_margin(
+        target_margin: float | int | Sequence[float] | torch.Tensor,
+        *,
+        batch_size: int,
+    ) -> torch.Tensor:
+        try:
+            target = torch.as_tensor(target_margin)
+        except (TypeError, ValueError, RuntimeError) as exc:
+            raise ValueError("target_margin must contain real numeric values") from exc
+
+        if target.dtype == torch.bool or torch.is_complex(target):
+            raise ValueError("target_margin must contain real numeric values")
+        if target.ndim == 0:
+            target = target.expand(batch_size)
+        elif target.ndim != 1 or target.shape[0] != batch_size:
+            raise ValueError(
+                "target_margin must be a scalar or one value per aligned triplet"
+            )
+        if not bool(torch.isfinite(target).all()):
+            raise ValueError("target_margin must contain only finite values")
+        return target
+
+    def forward(
+        self,
+        anchors: Sequence[str],
+        positives: Sequence[str],
+        negatives: Sequence[str],
+        target_margin: float | int | Sequence[float] | torch.Tensor,
+    ) -> torch.Tensor:
+        """Return mean squared error against aligned teacher margins.
+
+        Args:
+            anchors: Batch of anchor texts.
+            positives: Batch of positive texts aligned by index with ``anchors``.
+            negatives: Batch of negative texts aligned by index with ``anchors``.
+            target_margin: Teacher positive-minus-negative score margin. A scalar
+                is broadcast over the batch. A sequence or tensor must be
+                one-dimensional with exactly one value per triplet.
+
+        Returns:
+            Scalar MSE between the target margin and
+            ``d(anchor, negative) - d(anchor, positive)``.
+        """
+        for name, values in (
+            ("anchors", anchors),
+            ("positives", positives),
+            ("negatives", negatives),
+        ):
+            if isinstance(values, (str, bytes)):
+                raise ValueError(f"{name} must be a sequence of texts, not a string")
+
+        if len(anchors) == 0:
+            raise ValueError("anchors, positives, and negatives must not be empty")
+        if len(anchors) != len(positives):
+            raise ValueError("anchors and positives must have the same length")
+        if len(anchors) != len(negatives):
+            raise ValueError("anchors and negatives must have the same length")
+
+        target = self._normalize_target_margin(
+            target_margin,
+            batch_size=len(anchors),
+        )
+
+        anchor_embeddings = self.model(anchors)
+        positive_embeddings = self.model(positives)
+        negative_embeddings = self.model(negatives)
+        positive_distances = self.model.manifold.dist(
+            anchor_embeddings,
+            positive_embeddings,
+        )
+        negative_distances = self.model.manifold.dist(
+            anchor_embeddings,
+            negative_embeddings,
+        )
+        predicted_margin = negative_distances - positive_distances
+        target = target.to(
+            device=predicted_margin.device,
+            dtype=predicted_margin.dtype,
+        )
+        if not bool(torch.isfinite(target).all()):
+            raise ValueError("target_margin must contain only finite values")
+        return F.mse_loss(predicted_margin, target)
 
 
 class ManifoldPrototypeHierarchyLoss(nn.Module):
