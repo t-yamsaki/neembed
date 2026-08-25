@@ -162,13 +162,12 @@ def test_distance_mse_requires_one_target_per_pair_for_non_scalars(
         (float("nan"), "finite"),
         (float("inf"), "finite"),
         (-0.1, "non-negative"),
-        ([0.1, -0.2], "non-negative"),
         (True, "real numeric"),
         (1.0 + 2.0j, "real numeric"),
         ("not-a-number", "real numeric"),
     ],
 )
-def test_distance_mse_rejects_invalid_target_values(
+def test_distance_mse_rejects_invalid_scalar_target_values(
     monkeypatch,
     target_distance,
     message: str,
@@ -178,6 +177,20 @@ def test_distance_mse_rejects_invalid_target_values(
 
     with pytest.raises(ValueError, match=message):
         loss_fn(["anchor"], ["other"], target_distance)
+
+
+def test_distance_mse_rejects_negative_value_in_aligned_target_sequence(
+    monkeypatch,
+) -> None:
+    model = _make_model(monkeypatch)
+    loss_fn = ManifoldDistanceMSELoss(model=model)
+
+    with pytest.raises(ValueError, match="non-negative"):
+        loss_fn(
+            ["a1", "a2"],
+            ["b1", "b2"],
+            [0.1, -0.2],
+        )
 
 
 @pytest.mark.parametrize("manifold", ["poincare", "lorentz"])
