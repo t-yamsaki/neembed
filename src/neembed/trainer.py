@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from typing import TypeAlias, Union
 
 import torch
 from torch import nn
@@ -11,12 +12,12 @@ from neembed.evaluator import ManifoldEmbeddingEvaluator
 from neembed.model import ManifoldSentenceTransformer
 
 
-MarginTarget = float | int | Sequence[float] | torch.Tensor
-TrainingBatch = (
-    tuple[Sequence[str], Sequence[str]]
-    | tuple[Sequence[str], Sequence[str], Sequence[str]]
-    | tuple[Sequence[str], Sequence[str], Sequence[str], MarginTarget]
-)
+MarginTarget: TypeAlias = Union[float, int, Sequence[float], torch.Tensor]
+TrainingBatch: TypeAlias = Union[
+    tuple[Sequence[str], Sequence[str]],
+    tuple[Sequence[str], Sequence[str], Sequence[str]],
+    tuple[Sequence[str], Sequence[str], Sequence[str], MarginTarget],
+]
 
 
 class ManifoldTrainer:
