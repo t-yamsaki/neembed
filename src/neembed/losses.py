@@ -85,6 +85,77 @@ class ManifoldMultipleNegativesRankingLoss(nn.Module):
         return F.cross_entropy(logits, targets)
 
 
+class ManifoldTripletLoss(nn.Module):
+    """Margin triplet loss based on manifold geodesic distance.
+
+    Each anchor, positive, and negative is aligned by batch index. The objective
+    is ``relu(d(anchor, positive) - d(anchor, negative) + margin)`` averaged over
+    the batch, where ``d`` is the configured Geoopt manifold distance.
+
+    Args:
+        model: Manifold sentence model used to encode aligned triplets.
+        margin: Non-negative, finite geodesic ranking margin.
+    """
+
+    def __init__(
+        self,
+        model: ManifoldSentenceTransformer,
+        margin: float = 0.1,
+    ) -> None:
+        super().__init__()
+        if margin < 0 or not math.isfinite(margin):
+            raise ValueError("margin must be non-negative and finite")
+
+        self.model = model
+        self.margin = float(margin)
+
+    def forward(
+        self,
+        anchors: Sequence[str],
+        positives: Sequence[str],
+        negatives: Sequence[str],
+    ) -> torch.Tensor:
+        """Return the mean geodesic margin loss for aligned text triplets.
+
+        Args:
+            anchors: Batch of anchor texts.
+            positives: Batch of positive texts aligned by index with ``anchors``.
+            negatives: Batch of negative texts aligned by index with ``anchors``.
+
+        Returns:
+            Scalar mean triplet loss built from manifold geodesic distances.
+        """
+        for name, values in (
+            ("anchors", anchors),
+            ("positives", positives),
+            ("negatives", negatives),
+        ):
+            if isinstance(values, (str, bytes)):
+                raise ValueError(f"{name} must be a sequence of texts, not a string")
+
+        if len(anchors) == 0:
+            raise ValueError("anchors, positives, and negatives must not be empty")
+        if len(anchors) != len(positives):
+            raise ValueError("anchors and positives must have the same length")
+        if len(anchors) != len(negatives):
+            raise ValueError("anchors and negatives must have the same length")
+
+        anchor_embeddings = self.model(anchors)
+        positive_embeddings = self.model(positives)
+        negative_embeddings = self.model(negatives)
+        positive_distances = self.model.manifold.dist(
+            anchor_embeddings,
+            positive_embeddings,
+        )
+        negative_distances = self.model.manifold.dist(
+            anchor_embeddings,
+            negative_embeddings,
+        )
+        return F.relu(
+            positive_distances - negative_distances + self.margin
+        ).mean()
+
+
 class ManifoldPrototypeHierarchyLoss(nn.Module):
     """Attract sentences to labeled prototypes while preserving simple hierarchy.
 
