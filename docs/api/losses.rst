@@ -4,6 +4,9 @@ Loss
 .. autoclass:: neembed.ManifoldMultipleNegativesRankingLoss
    :members:
 
+.. autoclass:: neembed.ManifoldSymmetricMultipleNegativesRankingLoss
+   :members:
+
 .. autoclass:: neembed.ManifoldTripletLoss
    :members:
 
