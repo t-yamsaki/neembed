@@ -25,8 +25,9 @@ class ManifoldTrainer:
 
     Args:
         model: Model whose parameters are optimized.
-        loss: Loss module called with the two, three, or four inputs yielded by
-            each training batch.
+        loss: Loss module called with the two or three aligned sequences yielded
+            by existing training batches, or with a fourth target-margin input
+            for margin-regression objectives.
         learning_rate: AdamW learning rate used when ``optimizer`` is omitted.
         weight_decay: AdamW weight decay used when ``optimizer`` is omitted.
         optimizer: Optional caller-owned optimizer. Pass a Geoopt Riemannian
@@ -78,7 +79,7 @@ class ManifoldTrainer:
         epochs: int = 1,
         evaluator: ManifoldEmbeddingEvaluator | None = None,
     ) -> list[float] | list[dict[str, object]]:
-        """Train on two-, three-, or four-input batches with optional validation.
+        """Train on two- or three-sequence batches, plus margin-regression batches.
 
         Args:
             train_dataloader: Iterable yielding ``(anchors, positives)`` batches
@@ -108,7 +109,8 @@ class ManifoldTrainer:
             for batch in train_dataloader:
                 if len(batch) not in (2, 3, 4):
                     raise ValueError(
-                        "training batches must contain two, three, or four inputs"
+                        "training batches must contain two or three aligned sequences, "
+                        "or four inputs for margin regression"
                     )
 
                 self.optimizer.zero_grad()
