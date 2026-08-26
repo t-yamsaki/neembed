@@ -212,3 +212,26 @@ def test_symmetric_loss_rejects_malformed_aligned_batches(
 
     with pytest.raises(ValueError, match=message):
         loss_fn(anchors, positives, negatives)
+
+
+@pytest.mark.parametrize(
+    ("anchors", "positives", "negatives", "message"),
+    [
+        ("ab", ["p1", "p2"], None, "anchors must be a sequence of texts"),
+        (["a1", "a2"], "pq", None, "positives must be a sequence of texts"),
+        (["a1", "a2"], ["p1", "p2"], "xy", "negatives must be a sequence of texts"),
+        (b"ab", ["p1", "p2"], None, "anchors must be a sequence of texts"),
+    ],
+)
+def test_symmetric_loss_rejects_bare_strings_before_length_checks(
+    monkeypatch,
+    anchors,
+    positives,
+    negatives,
+    message: str,
+) -> None:
+    model = _make_model(monkeypatch)
+    loss_fn = ManifoldSymmetricMultipleNegativesRankingLoss(model=model)
+
+    with pytest.raises(ValueError, match=message):
+        loss_fn(anchors, positives, negatives)
