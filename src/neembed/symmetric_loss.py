@@ -35,6 +35,14 @@ class ManifoldSymmetricMultipleNegativesRankingLoss(
         negatives: Sequence[str] | None = None,
     ) -> torch.Tensor:
         """Return the mean of forward and reverse retrieval losses."""
+        for name, values in (
+            ("anchors", anchors),
+            ("positives", positives),
+            ("negatives", negatives),
+        ):
+            if values is not None and isinstance(values, (str, bytes)):
+                raise ValueError(f"{name} must be a sequence of texts, not a string")
+
         if len(anchors) == 0:
             raise ValueError("anchors and positives must not be empty")
         if len(anchors) != len(positives):
