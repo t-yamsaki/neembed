@@ -47,7 +47,10 @@ class ManifoldGradedCorpusRetrievalEvaluator(ManifoldCorpusRetrievalEvaluator):
     Notes:
         nDCG is opt-in through this graded evaluator so the existing
         :class:`neembed.ManifoldCorpusRetrievalEvaluator` output remains exactly
-        backward compatible for binary/multi-positive callers.
+        backward compatible for binary/multi-positive callers. Internally, gains
+        are divided by the largest gain for each query before DCG/IDCG are formed.
+        This common scaling cancels in nDCG and avoids overflow for large finite
+        grades while preserving the documented ``2**grade - 1`` metric.
     """
 
     def __init__(
@@ -141,8 +144,23 @@ class ManifoldGradedCorpusRetrievalEvaluator(ManifoldCorpusRetrievalEvaluator):
         self.ndcg_at_k = ndcg_cutoffs
 
     @staticmethod
-    def _gain(grade: float) -> float:
-        return math.pow(2.0, grade) - 1.0
+    def _log_gain(grade: float) -> float:
+        """Return log(2**grade - 1) without overflowing for finite grades."""
+        if grade == 0.0:
+            return -math.inf
+        exponent = grade * math.log(2.0)
+        if exponent < 50.0:
+            return math.log(math.expm1(exponent))
+        return exponent + math.log1p(-math.exp(-exponent))
+
+    @classmethod
+    def _normalized_gain(cls, grade: float, *, max_grade: float) -> float:
+        """Return gain divided by the query's largest gain in log space."""
+        if grade == 0.0:
+            return 0.0
+        if grade == max_grade:
+            return 1.0
+        return math.exp(cls._log_gain(grade) - cls._log_gain(max_grade))
 
     def __call__(self) -> dict[str, float]:
         """Return exact MRR, Recall@K, and configured nDCG@K metrics."""
@@ -162,17 +180,22 @@ class ManifoldGradedCorpusRetrievalEvaluator(ManifoldCorpusRetrievalEvaluator):
             ndcg_sums = {k: 0.0 for k in self.ndcg_at_k}
             for query_id, ranking in zip(self.query_ids, rankings, strict=True):
                 grades = self.graded_relevance[query_id]
-                ideal_gains = sorted(
-                    (self._gain(grade) for grade in grades.values()),
-                    reverse=True,
-                )
+                max_grade = max(grades.values())
+                normalized_gains = {
+                    corpus_id: self._normalized_gain(
+                        grade,
+                        max_grade=max_grade,
+                    )
+                    for corpus_id, grade in grades.items()
+                }
+                ideal_gains = sorted(normalized_gains.values(), reverse=True)
 
                 for k in self.ndcg_at_k:
                     effective_k = min(k, len(self.corpus))
                     dcg = 0.0
                     for rank, result in enumerate(ranking[:effective_k], start=1):
                         corpus_id = self.corpus_ids[int(result["index"])]
-                        gain = self._gain(grades.get(corpus_id, 0.0))
+                        gain = normalized_gains.get(corpus_id, 0.0)
                         dcg += gain / math.log2(rank + 1.0)
 
                     idcg = sum(
