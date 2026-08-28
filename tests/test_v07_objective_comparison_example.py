@@ -5,7 +5,6 @@ import math
 import runpy
 import sys
 
-import pytest
 import torch
 from torch import nn
 
@@ -78,7 +77,7 @@ def test_v07_objective_comparison_is_deterministic_and_finite(monkeypatch) -> No
 
     validate(first)
     validate(second)
-    assert first == pytest.approx(second)
+    assert first == second
 
     assert first["manifold"] == "poincare"
     assert tuple(first["objectives"]) == (
