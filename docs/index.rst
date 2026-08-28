@@ -12,9 +12,11 @@ curvature, and true manifold-valued prototype parameters while preserving the
 original model-only AdamW path.
 
 Start with :doc:`getting_started/quickstart` if you want the ordinary training
-workflow. For the v0.6 retrieval path -- small-list reranking, exact corpus
-search, corpus MRR / multi-positive Recall@K, and caller-invoked hard-negative
-mining -- see :doc:`user_guide/retrieval`. Read
+workflow. For v0.7 objective selection and graded relevance -- MNRL, symmetric
+MNRL, Triplet, MarginMSE, DistanceMSE, and nDCG@K -- see
+:doc:`user_guide/retrieval_objectives`. For the exact retrieval path --
+small-list reranking, exact corpus search, corpus evaluation, and caller-invoked
+hard-negative mining -- see :doc:`user_guide/retrieval`. Read
 :doc:`user_guide/learnable_structure` to distinguish Euclidean trainable
 parameters, learnable curvature, and manifold-valued prototypes, or jump to the
 :ref:`api-reference` for class and function details generated from the public
@@ -34,6 +36,7 @@ docstrings.
    user_guide/architecture
    user_guide/learnable_structure
    user_guide/training
+   user_guide/retrieval_objectives
    user_guide/retrieval
    user_guide/evaluation
    user_guide/inference
