@@ -193,7 +193,7 @@ jobs:
       - name: Fresh install TestPyPI wheel
         run: python -m pip install /tmp/neembed-testpypi/neembed_geoopt-*.whl pytest
 
-      - name: Verify installed version and v0.4/v0.5/v0.6 smoke
+      - name: Verify installed version and v0.4-v0.7 smoke
         shell: bash
         run: |
           PACKAGE_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
@@ -202,7 +202,8 @@ jobs:
             tests/test_import.py \
             tests/test_v04_learnable_structure.py \
             tests/test_v05_retrieval_example.py \
-            tests/test_v06_exact_retrieval_example.py
+            tests/test_v06_exact_retrieval_example.py \
+            tests/test_v07_objective_comparison_example.py
 
       - name: Report TestPyPI-validated source commit
         run: echo "TestPyPI validated source commit ${GITHUB_SHA}"
@@ -283,7 +284,7 @@ jobs:
       - name: Fresh install PyPI wheel
         run: python -m pip install /tmp/neembed-pypi/neembed_geoopt-*.whl pytest
 
-      - name: Verify installed version and v0.4/v0.5/v0.6 smoke
+      - name: Verify installed version and v0.4-v0.7 smoke
         shell: bash
         run: |
           PACKAGE_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
@@ -292,28 +293,29 @@ jobs:
             tests/test_import.py \
             tests/test_v04_learnable_structure.py \
             tests/test_v05_retrieval_example.py \
-            tests/test_v06_exact_retrieval_example.py
+            tests/test_v06_exact_retrieval_example.py \
+            tests/test_v07_objective_comparison_example.py
 
   verify-hosted-docs:
-    name: Verify hosted v0.6 docs
+    name: Verify hosted v0.7 docs
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: smoke-pypi
     runs-on: ubuntu-latest
 
     steps:
-      - name: Verify Read the Docs contains v0.6 retrieval content
+      - name: Verify Read the Docs contains v0.7 objective guidance
         shell: bash
         run: |
           for attempt in 1 2 3 4 5 6; do
             if curl -fsSL \
-              https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html \
-              -o /tmp/neembed-retrieval.html \
-              && grep -F "v0.6" /tmp/neembed-retrieval.html >/dev/null; then
-              echo "Hosted Read the Docs contains v0.6 retrieval content."
+              https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html \
+              -o /tmp/neembed-retrieval-objectives.html \
+              && grep -F "v0.7" /tmp/neembed-retrieval-objectives.html >/dev/null; then
+              echo "Hosted Read the Docs contains v0.7 retrieval-objective guidance."
               exit 0
             fi
             if [ "${attempt}" -eq 6 ]; then
-              echo "Hosted Read the Docs did not expose v0.6 retrieval content."
+              echo "Hosted Read the Docs did not expose v0.7 retrieval-objective guidance."
               exit 1
             fi
             sleep 10
@@ -338,9 +340,9 @@ jobs:
             exit 0
           fi
           cat > release-notes.md <<'EOF'
-          v0.6.0 adds chunked exact geodesic corpus retrieval, exact text-corpus top-k search, explicit-ID multi-positive MRR / Recall@K evaluation, and deterministic caller-invoked offline hard-negative mining.
+          v0.7.0 adds manifold retrieval objectives for aligned Triplet, MarginMSE, direct distance regression, and opt-in symmetric MNRL, plus graded exact-corpus evaluation with nDCG@K.
 
-          The v0.5 aligned evaluator, `model.rank()`, two- and three-sequence training contracts, Poincaré and Lorentz Geoopt semantics, and the v0.4 learnable-curvature / manifold-prototype path remain supported. Exact corpus search is exhaustive rather than ANN; FAISS, HNSW, vector databases, online mining, and distributed retrieval remain out of scope. The included v0.6 workflow is an engineering regression reference, not a research benchmark or a claim of geometry superiority.
+          The v0.6 exact corpus search, multi-positive MRR / Recall@K evaluator, offline hard-negative mining, the v0.5 retrieval surface, Poincaré and Lorentz Geoopt semantics, and the v0.4 learnable-curvature / manifold-prototype path remain supported. The included v0.7 objective-comparison workflow is an engineering regression reference, not a research benchmark or a claim of objective superiority. Hierarchy-native objectives, new manifold families, ANN/vector databases, and distributed retrieval remain out of scope.
           EOF
           gh release create "${GITHUB_REF_NAME}" \
             --repo "${GITHUB_REPOSITORY}" \

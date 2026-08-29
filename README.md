@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [日本語](docs/README_ja.md)
 
-> **Status:** Package version v0.6.0 adds chunked exact corpus retrieval, explicit-ID multi-positive corpus evaluation, deterministic offline hard-negative mining, and a reproducible end-to-end retrieval regression while preserving the v0.5 aligned evaluator, `model.rank()`, the v0.4 learnable-structure path, and the original fixed-curvature model-only workflow. The API remains intentionally small and may still evolve before a stable 1.0 release.
+> **Status:** Package version v0.7.0 adds manifold Triplet, MarginMSE, distance-regression, and symmetric MNRL objectives, graded corpus nDCG@K evaluation, and a deterministic objective-comparison workflow while preserving the v0.6 exact-retrieval/mining surface and all v0.4-v0.5 public paths. The API remains intentionally small and may still evolve before a stable 1.0 release.
 
 `neembed` is a lightweight integration layer between pretrained Sentence Transformer models and manifold-valued representations. It keeps the pretrained encoder intact, optionally projects its Euclidean output, and delegates hyperbolic geometry to Geoopt.
 
@@ -71,9 +71,18 @@ v0.6 extends that workflow to exact caller-owned corpora without adding ANN infr
 - deterministic caller-invoked `mine_hard_negatives()` with positive, self, and additional exclusions
 - a reproducible v0.6 exact-search → evaluation → mining → explicit-negative training regression example
 
-ANN / FAISS / HNSW, vector-database integration, online mining, and distributed retrieval remain out of scope for v0.6.
+v0.7 expands the retrieval-objective and evaluation surface without changing the v0.4-v0.6 contracts:
 
-A manifold-valued **output** does not by itself require Riemannian optimization: encoder/projection parameters and learnable curvature are not manifold-valued points. Detailed parameter, optimizer, persistence, and numerical behavior lives in the [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html). The end-to-end retrieval composition and the distinction between small in-memory reranking, exact corpus search, and external ANN systems are documented in the [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html).
+- `ManifoldTripletLoss` for aligned geodesic margin triplets
+- `ManifoldMarginMSELoss` for teacher positive-minus-negative margin regression
+- `ManifoldDistanceMSELoss` for direct geodesic-distance regression
+- opt-in `ManifoldSymmetricMultipleNegativesRankingLoss` while keeping the original one-directional MNRL unchanged
+- `ManifoldGradedCorpusRetrievalEvaluator` with nDCG@K while preserving the existing binary/multi-positive evaluator output
+- a deterministic Poincaré objective-comparison example covering MNRL, Triplet, MarginMSE, DistanceMSE, MRR, Recall@K, and nDCG@K
+
+Hierarchy-native retrieval objectives are planned separately for v0.8. New manifold families, ANN/vector-database integration, and distributed retrieval remain outside the v0.7 scope.
+
+A manifold-valued **output** does not by itself require Riemannian optimization: encoder/projection parameters and learnable curvature are not manifold-valued points. Detailed parameter, optimizer, persistence, and numerical behavior lives in the [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html). The end-to-end retrieval composition and the distinction between small in-memory reranking, exact corpus search, and external ANN systems are documented in the [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html). Objective and graded-evaluation selection for v0.7 is documented in the [Retrieval objectives guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html).
 
 ## Installation
 
@@ -126,7 +135,7 @@ distance = model.distance(embeddings[0], embeddings[1])
 print(float(distance))
 ```
 
-Each anchor is paired with the positive at the same batch index. Because off-diagonal candidates become in-batch negatives, avoid duplicate positives within one batch. This model-only path keeps the ordinary AdamW behavior even though its outputs lie on a manifold. See the [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html) for the objective and batching details, the [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html) for optional explicit negatives and retrieval evaluation, and the [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) before adding trainable manifold prototypes.
+Each anchor is paired with the positive at the same batch index. Because off-diagonal candidates become in-batch negatives, avoid duplicate positives within one batch. This model-only path keeps the ordinary AdamW behavior even though its outputs lie on a manifold. See the [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html) for the objective and batching details, the [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html) for optional explicit negatives and retrieval evaluation, the [Retrieval objectives guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html) for v0.7 objective/metric selection, and the [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) before adding trainable manifold prototypes.
 
 ## Documentation
 
@@ -138,6 +147,7 @@ The full guide is hosted on Read the Docs:
 - [Learnable structure](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html)
 - [Training](https://neembed.readthedocs.io/en/latest/user_guide/training.html)
 - [Retrieval workflow](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html)
+- [Retrieval objectives](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html)
 - [Evaluation](https://neembed.readthedocs.io/en/latest/user_guide/evaluation.html)
 - [Inference](https://neembed.readthedocs.io/en/latest/user_guide/inference.html)
 - [Saving and Loading](https://neembed.readthedocs.io/en/latest/user_guide/saving_loading.html)
@@ -153,6 +163,7 @@ python examples/train_lorentz.py
 python examples/v04_learnable_structure.py
 python examples/v05_retrieval_workflow.py
 python examples/v06_exact_retrieval_workflow.py
+python examples/v07_objective_comparison.py
 ```
 
 - [examples/train_poincare.py](examples/train_poincare.py) — minimal Poincaré workflow
@@ -162,6 +173,7 @@ python examples/v06_exact_retrieval_workflow.py
 - [examples/v04_learnable_structure.py](examples/v04_learnable_structure.py) — fixed-vs-learnable structure regression diagnostics; not a superiority benchmark
 - [examples/v05_retrieval_workflow.py](examples/v05_retrieval_workflow.py) — explicit hard negatives, Recall@K / MRR, in-memory geodesic reranking, and prototype assignment in one Poincaré regression workflow; not a research benchmark
 - [examples/v06_exact_retrieval_workflow.py](examples/v06_exact_retrieval_workflow.py) — exact corpus search, explicit-ID corpus evaluation, offline hard-negative mining, and the existing three-sequence trainer in one Poincaré regression workflow; not a research benchmark
+- [examples/v07_objective_comparison.py](examples/v07_objective_comparison.py) — deterministic comparison of MNRL, Triplet, MarginMSE, and DistanceMSE under fixed data/initialization with MRR, Recall@K, and nDCG@K diagnostics; not a research benchmark or superiority claim
 - [experiments/README.md](experiments/README.md) — reproducible Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark and interpretation limits
 
 ## License
