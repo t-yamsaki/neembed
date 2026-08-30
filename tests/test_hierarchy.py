@@ -18,7 +18,19 @@ def test_normalizes_tree_deterministically() -> None:
         depths={"leaf": 2, "root": 0, "right": 1, "left": 1},
         contract="tree",
     )
+    reordered = _normalize_hierarchy_supervision(
+        node_ids=("root", "left", "right", "leaf"),
+        parent_child_edges=(
+            ("root", "left"),
+            ("right", "leaf"),
+            ("root", "right"),
+        ),
+        roots=("root",),
+        depths={"root": 0, "left": 1, "right": 1, "leaf": 2},
+        contract="tree",
+    )
 
+    assert normalized == reordered
     assert normalized.node_ids == ("root", "left", "right", "leaf")
     assert normalized.parent_child_edges == (
         ("root", "left"),
