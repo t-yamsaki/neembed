@@ -109,7 +109,7 @@ def _normalize_hierarchy_supervision(
     ):
         raise ValueError("tree hierarchy nodes may have at most one parent")
 
-    _validate_acyclic_hierarchy(
+    topological_order = _validate_acyclic_hierarchy(
         normalized_nodes,
         children_by_parent,
         parents_by_child,
@@ -146,12 +146,26 @@ def _normalize_hierarchy_supervision(
             if isinstance(depth, bool) or not isinstance(depth, int) or depth < 0:
                 raise ValueError("depth values must be non-negative integers")
             depth_mapping[node_id] = depth
-        for parent_id, child_id in edges:
-            if parent_id in depth_mapping and child_id in depth_mapping:
-                if depth_mapping[parent_id] >= depth_mapping[child_id]:
+
+        minimum_depth = {node_id: 0 for node_id in normalized_nodes}
+        for parent_id in topological_order:
+            required_depth = minimum_depth[parent_id]
+            if parent_id in depth_mapping:
+                supplied_depth = depth_mapping[parent_id]
+                if supplied_depth < required_depth:
                     raise ValueError(
-                        "depth values must increase along hierarchy edges"
+                        "depth values must increase along hierarchy edges and paths"
                     )
+                effective_depth = supplied_depth
+            else:
+                effective_depth = required_depth
+
+            for child_id in children_by_parent[parent_id]:
+                minimum_depth[child_id] = max(
+                    minimum_depth[child_id],
+                    effective_depth + 1,
+                )
+
         normalized_depths = tuple(
             (node_id, depth_mapping[node_id])
             for node_id in normalized_nodes
@@ -177,23 +191,22 @@ def _validate_acyclic_hierarchy(
     node_ids: tuple[str, ...],
     children_by_parent: Mapping[str, Sequence[str]],
     parents_by_child: Mapping[str, set[str]],
-) -> None:
-    """Reject directed cycles without materializing transitive closure."""
+) -> tuple[str, ...]:
+    """Reject directed cycles and return a topological order."""
 
     remaining_parents = {
         node_id: len(parents_by_child[node_id]) for node_id in node_ids
     }
     queue = [node_id for node_id in node_ids if remaining_parents[node_id] == 0]
-    visited = 0
     cursor = 0
     while cursor < len(queue):
         parent_id = queue[cursor]
         cursor += 1
-        visited += 1
         for child_id in children_by_parent[parent_id]:
             remaining_parents[child_id] -= 1
             if remaining_parents[child_id] == 0:
                 queue.append(child_id)
 
-    if visited != len(node_ids):
+    if len(queue) != len(node_ids):
         raise ValueError("hierarchy edges must be acyclic")
+    return tuple(queue)
