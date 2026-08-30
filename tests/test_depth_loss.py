@@ -144,6 +144,15 @@ def test_depth_loss_validates_scale_and_aligned_depth_targets() -> None:
     assert torch.isfinite(value)
 
 
+def test_depth_normalization_preserves_tensor_dtype_and_device() -> None:
+    depths = torch.tensor([0.0, 1.0], dtype=torch.float32)
+
+    normalized = ManifoldDepthLoss._normalize_depths(depths, batch_size=2)
+
+    assert normalized.dtype == depths.dtype
+    assert normalized.device == depths.device
+
+
 def test_depth_loss_is_public_and_keeps_depth_metadata_external() -> None:
     model = _ToyDepthModel("poincare", ["node"], [[0.2, 0.0]])
     loss = ManifoldDepthLoss(model)
