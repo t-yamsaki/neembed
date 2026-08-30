@@ -155,6 +155,61 @@ def test_validates_and_orders_optional_depths() -> None:
         )
 
 
+def test_rejects_partial_depths_contradicting_omitted_path_nodes() -> None:
+    ids = ("root", "mid", "leaf")
+    edges = (("root", "mid"), ("mid", "leaf"))
+
+    with pytest.raises(ValueError, match="increase along hierarchy edges"):
+        _normalize_hierarchy_supervision(
+            ids,
+            edges,
+            depths={"root": 5, "leaf": 1},
+        )
+
+    with pytest.raises(ValueError, match="increase along hierarchy edges"):
+        _normalize_hierarchy_supervision(
+            ids,
+            edges,
+            depths={"root": 1, "leaf": 2},
+        )
+
+    normalized = _normalize_hierarchy_supervision(
+        ids,
+        edges,
+        depths={"root": 1, "leaf": 3},
+    )
+    assert normalized.depths == (("root", 1), ("leaf", 3))
+
+
+def test_partial_depths_respect_longest_dag_path() -> None:
+    ids = ("short-root", "long-root", "mid", "leaf")
+    edges = (
+        ("short-root", "leaf"),
+        ("long-root", "mid"),
+        ("mid", "leaf"),
+    )
+
+    with pytest.raises(ValueError, match="increase along hierarchy edges"):
+        _normalize_hierarchy_supervision(
+            ids,
+            edges,
+            depths={"short-root": 0, "long-root": 0, "leaf": 1},
+            contract="dag",
+        )
+
+    normalized = _normalize_hierarchy_supervision(
+        ids,
+        edges,
+        depths={"short-root": 0, "long-root": 0, "leaf": 2},
+        contract="dag",
+    )
+    assert normalized.depths == (
+        ("short-root", 0),
+        ("long-root", 0),
+        ("leaf", 2),
+    )
+
+
 def test_rejects_unknown_contract_and_keeps_helper_internal() -> None:
     with pytest.raises(ValueError, match="tree.*dag"):
         _normalize_hierarchy_supervision(("root",), (), contract="graph")
