@@ -2,13 +2,18 @@
 
 import pytest
 
+import neembed
 from neembed.hierarchy import _normalize_hierarchy_supervision
 
 
 def test_normalizes_tree_deterministically() -> None:
     normalized = _normalize_hierarchy_supervision(
         node_ids=("root", "left", "right", "leaf"),
-        parent_child_edges=(("right", "leaf"), ("root", "right"), ("root", "left")),
+        parent_child_edges=(
+            ("right", "leaf"),
+            ("root", "right"),
+            ("root", "left"),
+        ),
         roots=("root",),
         depths={"leaf": 2, "root": 0, "right": 1, "left": 1},
         contract="tree",
@@ -59,6 +64,8 @@ def test_rejects_malformed_unknown_duplicate_and_self_edges() -> None:
 
     with pytest.raises(ValueError, match="parent_id, child_id"):
         _normalize_hierarchy_supervision(ids, (("root", "child", "extra"),))
+    with pytest.raises(ValueError, match="non-empty strings"):
+        _normalize_hierarchy_supervision(ids, ((1, "child"),))
     with pytest.raises(ValueError, match="reference identifiers"):
         _normalize_hierarchy_supervision(ids, (("missing", "child"),))
     with pytest.raises(ValueError, match="self edges"):
@@ -136,6 +143,9 @@ def test_validates_and_orders_optional_depths() -> None:
         )
 
 
-def test_rejects_unknown_contract_without_exporting_public_api() -> None:
+def test_rejects_unknown_contract_and_keeps_helper_internal() -> None:
     with pytest.raises(ValueError, match="tree.*dag"):
         _normalize_hierarchy_supervision(("root",), (), contract="graph")
+
+    assert "_normalize_hierarchy_supervision" not in neembed.__all__
+    assert "_NormalizedHierarchySupervision" not in neembed.__all__
