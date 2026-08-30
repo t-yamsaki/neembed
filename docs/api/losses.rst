@@ -10,6 +10,9 @@ Loss
 .. autoclass:: neembed.ManifoldTripletLoss
    :members:
 
+.. autoclass:: neembed.ManifoldHierarchyTripletLoss
+   :members:
+
 .. autoclass:: neembed.ManifoldMarginMSELoss
    :members:
 
