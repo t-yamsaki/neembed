@@ -1,5 +1,6 @@
 """neembed package."""
 
+from neembed.depth_loss import ManifoldDepthLoss
 from neembed.evaluator import (
     ManifoldCorpusRetrievalEvaluator,
     ManifoldEmbeddingEvaluator,
@@ -23,6 +24,7 @@ from neembed.trainer import ManifoldTrainer
 
 __all__ = [
     "ManifoldCorpusRetrievalEvaluator",
+    "ManifoldDepthLoss",
     "ManifoldDistanceMSELoss",
     "ManifoldEmbeddingEvaluator",
     "ManifoldGradedCorpusRetrievalEvaluator",
