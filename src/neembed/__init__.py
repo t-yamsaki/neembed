@@ -16,6 +16,7 @@ from neembed.losses import (
 from neembed.mining import mine_hard_negatives
 from neembed.model import ManifoldSentenceTransformer
 from neembed.prototypes import ManifoldPrototypes
+from neembed.radial_loss import ManifoldRadialOrderLoss
 from neembed.retrieval import exact_corpus_search
 from neembed.symmetric_loss import ManifoldSymmetricMultipleNegativesRankingLoss
 from neembed.trainer import ManifoldTrainer
@@ -30,6 +31,7 @@ __all__ = [
     "ManifoldPrototypeAssignmentEvaluator",
     "ManifoldPrototypeHierarchyLoss",
     "ManifoldPrototypes",
+    "ManifoldRadialOrderLoss",
     "ManifoldSentenceTransformer",
     "ManifoldSymmetricMultipleNegativesRankingLoss",
     "ManifoldTrainer",
