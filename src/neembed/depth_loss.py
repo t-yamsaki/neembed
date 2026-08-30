@@ -78,10 +78,12 @@ class ManifoldDepthLoss(nn.Module):
         if target.ndim != 1 or target.shape[0] != batch_size:
             raise ValueError("depths must contain one value per text")
 
-        target = target.to(dtype=torch.float64)
-        if not bool(torch.isfinite(target).all()):
-            raise ValueError("depth values must be finite")
-        if bool((target < 0).any()) or not bool(torch.equal(target, torch.floor(target))):
+        if torch.is_floating_point(target):
+            if not bool(torch.isfinite(target).all()):
+                raise ValueError("depth values must be finite")
+            if not bool(torch.equal(target, torch.floor(target))):
+                raise ValueError("depth values must be non-negative integers")
+        if bool((target < 0).any()):
             raise ValueError("depth values must be non-negative integers")
         return target
 
