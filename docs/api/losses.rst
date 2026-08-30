@@ -18,3 +18,6 @@ Loss
 
 .. autoclass:: neembed.ManifoldRadialOrderLoss
    :members:
+
+.. autoclass:: neembed.ManifoldDepthLoss
+   :members:
