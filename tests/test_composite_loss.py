@@ -213,6 +213,18 @@ def test_composite_validates_weight_and_argument_bundles() -> None:
         loss((["retrieval"],), "not-a-bundle")
 
 
+def test_invalid_hierarchy_bundle_is_rejected_before_retrieval_runs() -> None:
+    retrieval = _FixedLoss(1.0, arity=1)
+    hierarchy = _FixedLoss(1.0, arity=1)
+    loss = ManifoldRetrievalHierarchyLoss(retrieval, hierarchy)
+
+    for hierarchy_inputs in (None, (), "not-a-bundle"):
+        with pytest.raises(ValueError, match="hierarchy_inputs"):
+            loss((["retrieval"],), hierarchy_inputs)
+        assert retrieval.calls == 0
+        assert hierarchy.calls == 0
+
+
 def test_composite_loss_is_public() -> None:
     assert neembed.ManifoldRetrievalHierarchyLoss is ManifoldRetrievalHierarchyLoss
     assert "ManifoldRetrievalHierarchyLoss" in neembed.__all__
