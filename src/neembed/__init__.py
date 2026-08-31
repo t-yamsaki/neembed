@@ -1,5 +1,6 @@
 """neembed package."""
 
+from neembed.composite_loss import ManifoldRetrievalHierarchyLoss
 from neembed.depth_loss import ManifoldDepthLoss
 from neembed.evaluator import (
     ManifoldCorpusRetrievalEvaluator,
@@ -36,6 +37,7 @@ __all__ = [
     "ManifoldPrototypeHierarchyLoss",
     "ManifoldPrototypes",
     "ManifoldRadialOrderLoss",
+    "ManifoldRetrievalHierarchyLoss",
     "ManifoldSentenceTransformer",
     "ManifoldSymmetricMultipleNegativesRankingLoss",
     "ManifoldTrainer",
