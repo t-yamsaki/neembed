@@ -102,15 +102,15 @@ class ManifoldRetrievalHierarchyLoss(nn.Module):
             Scalar composite loss returned by the component objectives.
         """
         retrieval_args = self._normalize_inputs("retrieval_inputs", retrieval_inputs)
-        retrieval_value = self.retrieval_loss(*retrieval_args)
 
         if self.hierarchy_weight == 0.0:
-            return retrieval_value
+            return self.retrieval_loss(*retrieval_args)
         if hierarchy_inputs is None:
             raise ValueError(
                 "hierarchy_inputs are required when hierarchy_weight is positive"
             )
 
         hierarchy_args = self._normalize_inputs("hierarchy_inputs", hierarchy_inputs)
+        retrieval_value = self.retrieval_loss(*retrieval_args)
         hierarchy_value = self.hierarchy_loss(*hierarchy_args)
         return retrieval_value + self.hierarchy_weight * hierarchy_value
