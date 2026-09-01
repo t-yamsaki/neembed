@@ -357,7 +357,7 @@ def test_release_suite_keeps_prior_paths_and_covers_v08_regressions() -> None:
         "test_graded_corpus_evaluator_large_grades.py",
         "test_v07_objective_comparison_example.py",
         "test_hierarchy.py",
-        "test_radial_loss.py",
+        "test_radial_order_loss.py",
         "test_depth_loss.py",
         "test_hierarchy_triplet_loss.py",
         "test_composite_loss.py",
