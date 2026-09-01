@@ -34,6 +34,9 @@ def test_v08_hierarchy_guide_covers_supervision_geometry_and_metrics() -> None:
     ):
         assert term in hierarchy
 
+    assert "roots are not a separate" in hierarchy
+    assert "If roots are supplied" not in hierarchy
+
 
 def test_v08_public_hierarchy_api_is_referenced() -> None:
     losses = _read("docs/api/losses.rst")
