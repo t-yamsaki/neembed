@@ -193,7 +193,7 @@ jobs:
       - name: Fresh install TestPyPI wheel
         run: python -m pip install /tmp/neembed-testpypi/neembed_geoopt-*.whl pytest
 
-      - name: Verify installed version and v0.4-v0.7 smoke
+      - name: Verify installed version and v0.4-v0.8 smoke
         shell: bash
         run: |
           PACKAGE_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
@@ -203,7 +203,8 @@ jobs:
             tests/test_v04_learnable_structure.py \
             tests/test_v05_retrieval_example.py \
             tests/test_v06_exact_retrieval_example.py \
-            tests/test_v07_objective_comparison_example.py
+            tests/test_v07_objective_comparison_example.py \
+            tests/test_v08_hierarchy_learning_example.py
 
       - name: Report TestPyPI-validated source commit
         run: echo "TestPyPI validated source commit ${GITHUB_SHA}"
@@ -284,7 +285,7 @@ jobs:
       - name: Fresh install PyPI wheel
         run: python -m pip install /tmp/neembed-pypi/neembed_geoopt-*.whl pytest
 
-      - name: Verify installed version and v0.4-v0.7 smoke
+      - name: Verify installed version and v0.4-v0.8 smoke
         shell: bash
         run: |
           PACKAGE_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
@@ -294,28 +295,29 @@ jobs:
             tests/test_v04_learnable_structure.py \
             tests/test_v05_retrieval_example.py \
             tests/test_v06_exact_retrieval_example.py \
-            tests/test_v07_objective_comparison_example.py
+            tests/test_v07_objective_comparison_example.py \
+            tests/test_v08_hierarchy_learning_example.py
 
   verify-hosted-docs:
-    name: Verify hosted v0.7 docs
+    name: Verify hosted v0.8 docs
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: smoke-pypi
     runs-on: ubuntu-latest
 
     steps:
-      - name: Verify Read the Docs contains v0.7 objective guidance
+      - name: Verify Read the Docs contains v0.8 hierarchy guidance
         shell: bash
         run: |
           for attempt in 1 2 3 4 5 6; do
             if curl -fsSL \
-              https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html \
-              -o /tmp/neembed-retrieval-objectives.html \
-              && grep -F "v0.7" /tmp/neembed-retrieval-objectives.html >/dev/null; then
-              echo "Hosted Read the Docs contains v0.7 retrieval-objective guidance."
+              https://neembed.readthedocs.io/en/latest/user_guide/hierarchy.html \
+              -o /tmp/neembed-hierarchy.html \
+              && grep -F "v0.8" /tmp/neembed-hierarchy.html >/dev/null; then
+              echo "Hosted Read the Docs contains v0.8 hierarchy guidance."
               exit 0
             fi
             if [ "${attempt}" -eq 6 ]; then
-              echo "Hosted Read the Docs did not expose v0.7 retrieval-objective guidance."
+              echo "Hosted Read the Docs did not expose v0.8 hierarchy guidance."
               exit 1
             fi
             sleep 10
@@ -340,9 +342,9 @@ jobs:
             exit 0
           fi
           cat > release-notes.md <<'EOF'
-          v0.7.0 adds manifold retrieval objectives for aligned Triplet, MarginMSE, direct distance regression, and opt-in symmetric MNRL, plus graded exact-corpus evaluation with nDCG@K.
+          v0.8.0 adds explicit caller-owned hierarchy supervision with radial-order and depth objectives, a directed hierarchy triplet loss, retrieval-plus-hierarchy composition, and hierarchy structure evaluation.
 
-          The v0.6 exact corpus search, multi-positive MRR / Recall@K evaluator, offline hard-negative mining, the v0.5 retrieval surface, Poincaré and Lorentz Geoopt semantics, and the v0.4 learnable-curvature / manifold-prototype path remain supported. The included v0.7 objective-comparison workflow is an engineering regression reference, not a research benchmark or a claim of objective superiority. Hierarchy-native objectives, new manifold families, ANN/vector databases, and distributed retrieval remain out of scope.
+          The v0.7 retrieval objectives and graded nDCG@K evaluation, v0.6 exact corpus retrieval and mining, v0.5 retrieval surface, and v0.4 learnable-curvature / manifold-prototype paths remain supported. The included v0.8 hierarchy workflow is an engineering regression reference, not a research benchmark or a claim of hierarchy-aware superiority. New manifold families, graph databases, GNNs, ontology parsing, ANN/vector databases, and distributed retrieval remain out of scope.
           EOF
           gh release create "${GITHUB_REF_NAME}" \
             --repo "${GITHUB_REPOSITORY}" \
