@@ -6,18 +6,20 @@ spaces while delegating manifold geometry to Geoopt.
 
 The public API is intentionally small: a sentence model, manifold-aware losses,
 a minimal trainer, retrieval evaluators, exact corpus search, offline
-hard-negative mining, and opt-in manifold prototypes. The current development
-API supports Poincare and Lorentz hyperbolic models, fixed or learnable
-curvature, and true manifold-valued prototype parameters while preserving the
-original model-only AdamW path.
+hard-negative mining, explicit hierarchy supervision, and opt-in manifold
+prototypes. The current development API supports Poincare and Lorentz
+hyperbolic models, fixed or learnable curvature, and true manifold-valued
+prototype parameters while preserving the original model-only AdamW path.
 
 Start with :doc:`getting_started/quickstart` if you want the ordinary training
 workflow. For v0.7 objective selection and graded relevance -- MNRL, symmetric
 MNRL, Triplet, MarginMSE, DistanceMSE, and nDCG@K -- see
 :doc:`user_guide/retrieval_objectives`. For the exact retrieval path --
 small-list reranking, exact corpus search, corpus evaluation, and caller-invoked
-hard-negative mining -- see :doc:`user_guide/retrieval`. Read
-:doc:`user_guide/learnable_structure` to distinguish Euclidean trainable
+hard-negative mining -- see :doc:`user_guide/retrieval`. For v0.8 explicit
+hierarchy supervision -- radial order, depth, directed triplets, retrieval-plus-
+hierarchy composition, and structure metrics -- see :doc:`user_guide/hierarchy`.
+Read :doc:`user_guide/learnable_structure` to distinguish Euclidean trainable
 parameters, learnable curvature, and manifold-valued prototypes, or jump to the
 :ref:`api-reference` for class and function details generated from the public
 docstrings.
@@ -38,6 +40,7 @@ docstrings.
    user_guide/training
    user_guide/retrieval_objectives
    user_guide/retrieval
+   user_guide/hierarchy
    user_guide/evaluation
    user_guide/inference
    user_guide/saving_loading
