@@ -117,6 +117,7 @@ class ManifoldHierarchyEvaluator:
         self.parent_child_edges = hierarchy.parent_child_edges
         self.roots = hierarchy.roots
         self.depths = hierarchy.depths
+        self._depths_provided = depths is not None
         self.contract = hierarchy.contract
 
     def __call__(self) -> dict[str, float]:
@@ -153,7 +154,7 @@ class ManifoldHierarchyEvaluator:
                     ),
                 }
 
-                if self.depths:
+                if self._depths_provided:
                     depth_values = [depth for _, depth in self.depths]
                     depth_radii = [
                         float(radii[node_index[node_id]].item())
