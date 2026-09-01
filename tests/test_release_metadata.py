@@ -1,4 +1,4 @@
-"""Release-readiness checks for public v0.7 metadata and contracts."""
+"""Release-readiness checks for public v0.8 metadata and contracts."""
 
 from importlib.metadata import metadata
 from inspect import signature
@@ -7,12 +7,17 @@ from pathlib import Path
 import neembed
 from neembed import (
     ManifoldCorpusRetrievalEvaluator,
+    ManifoldDepthLoss,
     ManifoldDistanceMSELoss,
     ManifoldEmbeddingEvaluator,
     ManifoldGradedCorpusRetrievalEvaluator,
+    ManifoldHierarchyEvaluator,
+    ManifoldHierarchyTripletLoss,
     ManifoldMarginMSELoss,
     ManifoldMultipleNegativesRankingLoss,
     ManifoldPrototypeAssignmentEvaluator,
+    ManifoldRadialOrderLoss,
+    ManifoldRetrievalHierarchyLoss,
     ManifoldSentenceTransformer,
     ManifoldSymmetricMultipleNegativesRankingLoss,
     ManifoldTrainer,
@@ -26,12 +31,12 @@ ROOT = Path(__file__).parents[1]
 DOCUMENTATION_URL = "https://neembed.readthedocs.io/en/latest/"
 
 
-def test_pyproject_declares_v07_public_metadata() -> None:
+def test_pyproject_declares_v08_public_metadata() -> None:
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
     assert 'requires = ["setuptools>=77.0.3"]' in pyproject
     assert 'name = "neembed-geoopt"' in pyproject
-    assert 'version = "0.7.0"' in pyproject
+    assert 'version = "0.8.0"' in pyproject
     assert 'requires-python = ">=3.10"' in pyproject
     assert 'license = "MIT"' in pyproject
     assert 'license-files = ["LICENSE"]' in pyproject
@@ -49,12 +54,12 @@ def test_pyproject_declares_v07_public_metadata() -> None:
         assert f'    "{dependency}",' in pyproject
 
 
-def test_installed_distribution_exposes_v07_metadata() -> None:
+def test_installed_distribution_exposes_v08_metadata() -> None:
     package_metadata = metadata("neembed-geoopt")
     project_urls = package_metadata.get_all("Project-URL") or []
 
     assert package_metadata["Name"] == "neembed-geoopt"
-    assert package_metadata["Version"] == "0.7.0"
+    assert package_metadata["Version"] == "0.8.0"
     assert package_metadata["Requires-Python"] == ">=3.10"
     assert f"Documentation, {DOCUMENTATION_URL}" in project_urls
 
@@ -76,14 +81,15 @@ def test_distribution_name_keeps_neembed_import_package() -> None:
     assert "from neembed import (" in japanese
 
 
-def test_readmes_describe_v07_and_preserve_prior_release_scope() -> None:
+def test_readmes_describe_v08_and_preserve_prior_release_scope() -> None:
     english = (ROOT / "README.md").read_text(encoding="utf-8")
     japanese = (ROOT / "docs" / "README_ja.md").read_text(encoding="utf-8")
 
     for readme in (english, japanese):
         assert "TBD" not in readme
         assert "<YOUR_USERNAME>" not in readme
-        assert "v0.7.0" in readme
+        assert "v0.8.0" in readme
+        assert "v0.7" in readme
         assert "v0.6" in readme
         assert "v0.5" in readme
         assert "v0.4" in readme
@@ -103,13 +109,20 @@ def test_readmes_describe_v07_and_preserve_prior_release_scope() -> None:
         assert "ManifoldSymmetricMultipleNegativesRankingLoss" in readme
         assert "ManifoldGradedCorpusRetrievalEvaluator" in readme
         assert "nDCG@K" in readme
+        assert "ManifoldRadialOrderLoss" in readme
+        assert "ManifoldDepthLoss" in readme
+        assert "ManifoldHierarchyTripletLoss" in readme
+        assert "ManifoldRetrievalHierarchyLoss" in readme
+        assert "ManifoldHierarchyEvaluator" in readme
         assert "ANN" in readme
         assert "MIT License" in readme
         assert DOCUMENTATION_URL in readme
         assert "user_guide/retrieval_objectives.html" in readme
+        assert "user_guide/hierarchy.html" in readme
+        assert "examples/v08_hierarchy_learning.py" in readme
 
-    assert "Package version v0.7.0" in english
-    assert "package version v0.7.0" in japanese
+    assert "Package version v0.8.0" in english
+    assert "package version v0.8.0" in japanese
     assert "fixed-curvature v0.3 path backward-compatible" in english
     assert "fixed-curvature の v0.3 path と後方互換" in japanese
 
@@ -123,12 +136,16 @@ def test_readmes_defer_detailed_guidance_to_read_the_docs() -> None:
     objectives = (
         ROOT / "docs" / "user_guide" / "retrieval_objectives.rst"
     ).read_text(encoding="utf-8")
+    hierarchy = (ROOT / "docs" / "user_guide" / "hierarchy.rst").read_text(
+        encoding="utf-8"
+    )
 
     for readme in (english, japanese):
         assert DOCUMENTATION_URL in readme
         assert "$$" not in readme
         assert "user_guide/retrieval.html" in readme
         assert "user_guide/retrieval_objectives.html" in readme
+        assert "user_guide/hierarchy.html" in readme
 
     assert "## Training objective" not in english
     assert "## Numerical considerations" not in english
@@ -143,9 +160,16 @@ def test_readmes_defer_detailed_guidance_to_read_the_docs() -> None:
     assert "ManifoldTripletLoss" in objectives
     assert "ManifoldMarginMSELoss" in objectives
     assert "ManifoldDistanceMSELoss" in objectives
+    assert "v0.8" in hierarchy
+    assert "ManifoldRadialOrderLoss" in hierarchy
+    assert "ManifoldDepthLoss" in hierarchy
+    assert "ManifoldHierarchyTripletLoss" in hierarchy
+    assert "ManifoldRetrievalHierarchyLoss" in hierarchy
+    assert "ManifoldHierarchyEvaluator" in hierarchy
+    assert "not a benchmark" in hierarchy
 
 
-def test_public_api_preserves_v04_v06_contracts_and_exposes_v07() -> None:
+def test_public_api_preserves_v04_v07_contracts_and_exposes_v08() -> None:
     required_public_names = {
         "ManifoldSentenceTransformer",
         "ManifoldMultipleNegativesRankingLoss",
@@ -162,6 +186,11 @@ def test_public_api_preserves_v04_v06_contracts_and_exposes_v07() -> None:
         "ManifoldDistanceMSELoss",
         "ManifoldSymmetricMultipleNegativesRankingLoss",
         "ManifoldGradedCorpusRetrievalEvaluator",
+        "ManifoldRadialOrderLoss",
+        "ManifoldDepthLoss",
+        "ManifoldHierarchyTripletLoss",
+        "ManifoldRetrievalHierarchyLoss",
+        "ManifoldHierarchyEvaluator",
     }
     assert required_public_names.issubset(set(neembed.__all__))
 
@@ -264,6 +293,41 @@ def test_public_api_preserves_v04_v06_contracts_and_exposes_v07() -> None:
     ):
         assert name in graded_parameters
 
+    assert tuple(signature(ManifoldRadialOrderLoss.forward).parameters) == (
+        "self",
+        "parents",
+        "children",
+    )
+    assert tuple(signature(ManifoldDepthLoss.forward).parameters) == (
+        "self",
+        "texts",
+        "depths",
+    )
+    assert tuple(signature(ManifoldHierarchyTripletLoss.forward).parameters) == (
+        "self",
+        "parents",
+        "children",
+        "unrelated",
+    )
+    composite_parameters = signature(ManifoldRetrievalHierarchyLoss.forward).parameters
+    assert tuple(composite_parameters) == (
+        "self",
+        "retrieval_inputs",
+        "hierarchy_inputs",
+    )
+    assert composite_parameters["hierarchy_inputs"].default is None
+    hierarchy_evaluator_parameters = signature(ManifoldHierarchyEvaluator).parameters
+    for name in (
+        "model",
+        "node_ids",
+        "texts",
+        "parent_child_edges",
+        "depths",
+        "contract",
+    ):
+        assert name in hierarchy_evaluator_parameters
+    assert "roots" not in hierarchy_evaluator_parameters
+
     fit_doc = ManifoldTrainer.fit.__doc__ or ""
     assert "two- or three-sequence batches" in fit_doc
     assert "margin-regression batches" in fit_doc
@@ -271,7 +335,7 @@ def test_public_api_preserves_v04_v06_contracts_and_exposes_v07() -> None:
     assert "(anchors, positives, negatives, target_margin)" in fit_doc
 
 
-def test_release_suite_keeps_prior_paths_and_covers_v07_regressions() -> None:
+def test_release_suite_keeps_prior_paths_and_covers_v08_regressions() -> None:
     required_tests = {
         "test_hard_negatives.py",
         "test_evaluator.py",
@@ -292,32 +356,45 @@ def test_release_suite_keeps_prior_paths_and_covers_v07_regressions() -> None:
         "test_graded_corpus_evaluator.py",
         "test_graded_corpus_evaluator_large_grades.py",
         "test_v07_objective_comparison_example.py",
+        "test_hierarchy.py",
+        "test_radial_loss.py",
+        "test_depth_loss.py",
+        "test_hierarchy_triplet_loss.py",
+        "test_composite_loss.py",
+        "test_hierarchy_evaluator.py",
+        "test_v08_hierarchy_learning_example.py",
+        "test_v08_docs.py",
     }
     assert required_tests.issubset(
         {path.name for path in (ROOT / "tests").glob("test_*.py")}
     )
 
-    v07_example = (
-        ROOT / "tests" / "test_v07_objective_comparison_example.py"
+    v08_example = (
+        ROOT / "tests" / "test_v08_hierarchy_learning_example.py"
     ).read_text(encoding="utf-8")
-    graded = (ROOT / "tests" / "test_graded_corpus_evaluator.py").read_text(
+    hierarchy_validation = (ROOT / "tests" / "test_hierarchy.py").read_text(
         encoding="utf-8"
     )
-    symmetric = (ROOT / "tests" / "test_symmetric_ranking_loss.py").read_text(
+    evaluator = (ROOT / "tests" / "test_hierarchy_evaluator.py").read_text(
+        encoding="utf-8"
+    )
+    composite = (ROOT / "tests" / "test_composite_loss.py").read_text(
         encoding="utf-8"
     )
 
-    assert "test_v07_objective_comparison_is_deterministic_and_finite" in v07_example
-    assert '"ndcg_at_3"' in v07_example
-    assert '"triplet"' in v07_example
-    assert '"margin_mse"' in v07_example
-    assert '"distance_mse"' in v07_example
-    assert "ndcg" in graded.lower()
-    assert "explicit" in symmetric.lower()
-    assert "reverse" in symmetric.lower()
+    assert "test_v08_hierarchy_learning_is_deterministic_finite_and_explicit" in v08_example
+    assert '"retrieval_only"' in v08_example
+    assert '"hierarchy_aware"' in v08_example
+    assert '"parent_child_radial_order_accuracy"' in v08_example
+    assert "acyclic" in hierarchy_validation.lower()
+    assert "tree" in hierarchy_validation.lower()
+    assert "dag" in hierarchy_validation.lower()
+    assert "depth_radius_spearman" in evaluator
+    assert "hierarchy_weight" in composite
+    assert "retrieval" in composite.lower()
 
 
-def test_release_real_stack_covers_v04_through_v07_paths() -> None:
+def test_release_real_stack_covers_v04_through_v08_paths() -> None:
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
         encoding="utf-8"
     )
@@ -335,6 +412,9 @@ def test_release_real_stack_covers_v04_through_v07_paths() -> None:
     ).read_text(encoding="utf-8")
     v07_stack = (
         ROOT / "tests" / "integration" / "test_real_stack_v07.py"
+    ).read_text(encoding="utf-8")
+    v08_stack = (
+        ROOT / "tests" / "integration" / "test_real_stack_v08.py"
     ).read_text(encoding="utf-8")
 
     assert 'HF_HUB_DISABLE_XET: "1"' in workflow
@@ -357,14 +437,16 @@ def test_release_real_stack_covers_v04_through_v07_paths() -> None:
     assert "exact_corpus_search" in v06_stack
     assert "ManifoldCorpusRetrievalEvaluator" in v06_stack
     assert "mine_hard_negatives" in v06_stack
-
     assert 'pytest.mark.parametrize("manifold_name", ["poincare", "lorentz"])' in v07_stack
     assert "ManifoldTripletLoss" in v07_stack
-    assert "ManifoldMarginMSELoss" in v07_stack
-    assert "ManifoldDistanceMSELoss" in v07_stack
-    assert "ManifoldSymmetricMultipleNegativesRankingLoss" in v07_stack
     assert "ManifoldGradedCorpusRetrievalEvaluator" in v07_stack
-    assert '"ndcg_at_3"' in v07_stack
+
+    assert 'pytest.mark.parametrize("manifold_name", ["poincare", "lorentz"])' in v08_stack
+    assert "ManifoldRadialOrderLoss" in v08_stack
+    assert "ManifoldDepthLoss" in v08_stack
+    assert "ManifoldHierarchyTripletLoss" in v08_stack
+    assert "ManifoldRetrievalHierarchyLoss" in v08_stack
+    assert "ManifoldHierarchyEvaluator" in v08_stack
 
 
 def test_release_workflow_builds_checks_and_smokes_exact_validated_packages() -> None:
@@ -395,6 +477,7 @@ def test_release_workflow_builds_checks_and_smokes_exact_validated_packages() ->
     assert "tests/test_v05_retrieval_example.py" in workflow
     assert "tests/test_v06_exact_retrieval_example.py" in workflow
     assert "tests/test_v07_objective_comparison_example.py" in workflow
+    assert "tests/test_v08_hierarchy_learning_example.py" in workflow
     assert "from importlib.metadata import version; import neembed" in workflow
     assert "TestPyPI validated source commit ${GITHUB_SHA}" in workflow
 
@@ -423,14 +506,14 @@ def test_release_workflow_keeps_trusted_publish_tag_and_docs_boundaries() -> Non
     assert "https://test.pypi.org/p/neembed-geoopt" in workflow
     assert "https://pypi.org/p/neembed-geoopt" in workflow
     assert "verify-hosted-docs:" in workflow
-    assert "https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html" in workflow
-    assert 'grep -F "v0.7"' in workflow
+    assert "https://neembed.readthedocs.io/en/latest/user_guide/hierarchy.html" in workflow
+    assert 'grep -F "v0.8"' in workflow
     assert "create-github-release:" in workflow
     assert "needs: [smoke-pypi, verify-hosted-docs]" in workflow
     assert "contents: write" in workflow
     assert 'gh release create "${GITHUB_REF_NAME}"' in workflow
-    assert "v0.7.0 adds manifold retrieval objectives" in workflow
-    assert "not a research benchmark or a claim of objective superiority" in workflow
+    assert "v0.8.0 adds explicit caller-owned hierarchy supervision" in workflow
+    assert "not a research benchmark or a claim of hierarchy-aware superiority" in workflow
 
 
 def test_gitignore_protects_common_public_release_artifacts() -> None:
