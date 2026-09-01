@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [日本語](docs/README_ja.md)
 
-> **Status:** The published package remains v0.7.0. The main branch now also contains the focused v0.8 hierarchy-native learning surface: caller-owned hierarchy supervision, radial/depth/directed losses, retrieval-plus-hierarchy composition, structure evaluation, and a deterministic regression example. The API remains intentionally small and may still evolve before a stable 1.0 release.
+> **Status:** Package version v0.7.0 remains the published release. The main branch now also contains the focused v0.8 hierarchy-native learning surface: caller-owned hierarchy supervision, radial/depth/directed losses, retrieval-plus-hierarchy composition, structure evaluation, and a deterministic regression example. The API remains intentionally small and may still evolve before a stable 1.0 release.
 
 `neembed` is a lightweight integration layer between pretrained Sentence Transformer models and manifold-valued representations. It keeps the pretrained encoder intact, optionally projects its Euclidean output, and delegates hyperbolic geometry to Geoopt.
 
