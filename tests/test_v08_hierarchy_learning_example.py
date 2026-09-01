@@ -19,6 +19,7 @@ class FakeSentenceTransformer(nn.Module):
         super().__init__()
         self.model_name_or_path = model_name_or_path
         self.linear = nn.Linear(5, 7, bias=False)
+        self.dropout = nn.Dropout(p=0.5)
 
     @property
     def device(self) -> torch.device:
@@ -45,7 +46,8 @@ class FakeSentenceTransformer(nn.Module):
         return {"input_features": torch.tensor(rows, dtype=torch.float32)}
 
     def forward(self, features: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-        return {"sentence_embedding": self.linear(features["input_features"])}
+        embedding = self.linear(features["input_features"])
+        return {"sentence_embedding": self.dropout(embedding)}
 
 
 def _load_example() -> dict:
