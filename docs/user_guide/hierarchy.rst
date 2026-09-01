@@ -42,8 +42,8 @@ When an API consumes complete hierarchy metadata, the validation contract is:
 * ``contract="tree"`` means an acyclic directed forest: each node has at most
   one parent. ``contract="dag"`` permits multiple parents while remaining
   acyclic.
-* Roots are the nodes with no incoming edge. If roots are supplied, they must
-  match that inferred set exactly.
+* Roots are inferred as nodes with no incoming edge; roots are not a separate
+  public input on the hierarchy evaluator.
 * Depths are optional caller-owned non-negative integers and may be partial.
   Supplied values must increase consistently along every directed edge and path;
   they are not required to equal a shortest-path depth.
