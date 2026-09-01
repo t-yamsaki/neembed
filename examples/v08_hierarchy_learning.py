@@ -270,7 +270,10 @@ def _train_hierarchy_aware(
                 RETRIEVAL_INPUTS,
                 hierarchy_inputs,
             )
-            total_value = composite(RETRIEVAL_INPUTS, hierarchy_inputs)
+            total_value = (
+                retrieval_value
+                + composite.hierarchy_weight * hierarchy_value
+            )
             objective_diagnostics[name] = {
                 "hierarchy_weight": composite.hierarchy_weight,
                 "retrieval_loss": float(retrieval_value),
