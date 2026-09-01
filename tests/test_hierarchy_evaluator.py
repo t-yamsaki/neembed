@@ -215,6 +215,22 @@ def test_hierarchy_evaluator_omits_depth_metric_without_depths() -> None:
     assert "depth_radius_spearman" not in metrics
 
 
+def test_hierarchy_evaluator_reports_zero_for_explicit_empty_depths() -> None:
+    labels = ["root", "child"]
+    model = _ToyHierarchyModel("poincare", labels, [[0.0, 0.0], [0.2, 0.0]])
+    evaluator = ManifoldHierarchyEvaluator(
+        model=model,
+        node_ids=labels,
+        texts=labels,
+        parent_child_edges=[("root", "child")],
+        depths={},
+    )
+
+    metrics = evaluator()
+
+    assert metrics["depth_radius_spearman"] == pytest.approx(0.0)
+
+
 def test_hierarchy_evaluator_is_public() -> None:
     assert neembed.ManifoldHierarchyEvaluator is ManifoldHierarchyEvaluator
     assert "ManifoldHierarchyEvaluator" in neembed.__all__
