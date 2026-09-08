@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [English README](../README.md)
 
-> **Status:** package version v0.7.0 では、manifold Triplet、MarginMSE、distance regression、symmetric MNRL、graded corpus nDCG@K evaluation、deterministic objective-comparison workflow を追加しつつ、v0.6 の exact retrieval / mining surface と v0.4-v0.5 の公開 contract を維持しています。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
+> **Status:** package version v0.8.0 では、caller-owned hierarchy supervision、radial / depth / directed hierarchy objective、retrieval-plus-hierarchy composition、structure evaluation、deterministic hierarchy regression example を追加しつつ、v0.4-v0.7 の公開 contract を維持しています。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
 
 `neembed` は、pretrained Sentence Transformer と manifold-valued representation をつなぐ軽量な integration layer です。pretrained encoder はそのまま利用し、必要に応じて Euclidean embedding を projection したうえで、双曲幾何の演算を Geoopt に委譲します。
 
@@ -80,9 +80,17 @@ v0.7 では v0.4-v0.6 contract を変えずに、retrieval objective と graded 
 - 既存 binary/multi-positive evaluator の出力を維持したまま nDCG@K を提供する `ManifoldGradedCorpusRetrievalEvaluator`
 - MNRL / Triplet / MarginMSE / DistanceMSE と MRR / Recall@K / nDCG@K を固定条件で比較する deterministic Poincaré example
 
-hierarchy-native retrieval objective は v0.8 で別途扱う予定です。新しい manifold family、ANN / vector database integration、distributed retrieval は v0.7 の対象外です。
+v0.8 では graph framework を導入せず、明示的な hierarchy-native learning を追加します。
 
-manifold-valued な **出力** を返すだけでは Riemannian optimization は必要ありません。encoder / projection parameter と learnable curvature は manifold 上の点ではありません。parameter・optimizer・persistence・numerical behavior の詳細は [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) を参照してください。小規模 in-memory reranking、exact corpus search、外部 ANN system の境界を含む end-to-end retrieval workflow は [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html) にまとめています。v0.7 の objective と graded evaluation の選び方は [Retrieval objectives guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html) を参照してください。
+- caller-owned node ID、parent-child edge、optional depth、directed negative
+- `ManifoldRadialOrderLoss`、`ManifoldDepthLoss`、`ManifoldHierarchyTripletLoss`
+- retrieval objective 1つと hierarchy objective 1つを組み合わせる `ManifoldRetrievalHierarchyLoss`
+- radial-order と depth-vs-radius structure diagnostic を返す `ManifoldHierarchyEvaluator`
+- retrieval-only と hierarchy-aware を比較する deterministic Poincaré regression example
+
+新しい manifold family、ontology parsing、graph-database integration、ANN / vector database integration、distributed retrieval はこの scope の対象外です。
+
+manifold-valued な **出力** を返すだけでは Riemannian optimization は必要ありません。encoder / projection parameter と learnable curvature は manifold 上の点ではありません。parameter・optimizer・persistence・numerical behavior の詳細は [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) を参照してください。小規模 in-memory reranking、exact corpus search、外部 ANN system の境界を含む end-to-end retrieval workflow は [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html) にまとめています。v0.7 の objective と graded evaluation の選び方は [Retrieval objectives guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html)、v0.8 の explicit hierarchy supervision・origin/radius semantics・composition・structure metrics は [Hierarchy-native learning guide](https://neembed.readthedocs.io/en/latest/user_guide/hierarchy.html) を参照してください。
 
 ## インストール
 
@@ -135,7 +143,7 @@ distance = model.distance(embeddings[0], embeddings[1])
 print(float(distance))
 ```
 
-各 anchor は同じ batch index の positive と対応します。off-diagonal candidate は in-batch negative になるため、同じ batch 内で positive を重複させないでください。この model-only path は出力が manifold-valued でも通常の AdamW behavior のままです。目的関数と batching の詳細は [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html)、optional explicit negatives と retrieval evaluation は [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html)、v0.7 の objective / metric 選択は [Retrieval objectives guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html)、trainable manifold prototype を追加する前には [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) を参照してください。
+各 anchor は同じ batch index の positive と対応します。off-diagonal candidate は in-batch negative になるため、同じ batch 内で positive を重複させないでください。この model-only path は出力が manifold-valued でも通常の AdamW behavior のままです。目的関数と batching の詳細は [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html)、optional explicit negatives と retrieval evaluation は [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html)、v0.7 の objective / metric 選択は [Retrieval objectives guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html)、v0.8 の explicit hierarchy supervision は [Hierarchy-native learning guide](https://neembed.readthedocs.io/en/latest/user_guide/hierarchy.html)、trainable manifold prototype を追加する前には [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) を参照してください。
 
 ## ドキュメント
 
@@ -148,6 +156,7 @@ print(float(distance))
 - [Training](https://neembed.readthedocs.io/en/latest/user_guide/training.html)
 - [Retrieval workflow](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html)
 - [Retrieval objectives](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html)
+- [Hierarchy-native learning](https://neembed.readthedocs.io/en/latest/user_guide/hierarchy.html)
 - [Evaluation](https://neembed.readthedocs.io/en/latest/user_guide/evaluation.html)
 - [Inference](https://neembed.readthedocs.io/en/latest/user_guide/inference.html)
 - [Saving and Loading](https://neembed.readthedocs.io/en/latest/user_guide/saving_loading.html)
@@ -164,6 +173,7 @@ python examples/v04_learnable_structure.py
 python examples/v05_retrieval_workflow.py
 python examples/v06_exact_retrieval_workflow.py
 python examples/v07_objective_comparison.py
+python examples/v08_hierarchy_learning.py
 ```
 
 - [examples/train_poincare.py](../examples/train_poincare.py) — 最小の Poincaré workflow
@@ -174,6 +184,7 @@ python examples/v07_objective_comparison.py
 - [examples/v05_retrieval_workflow.py](../examples/v05_retrieval_workflow.py) — explicit hard negatives、Recall@K / MRR、in-memory geodesic reranking、prototype assignment を1つにまとめた Poincaré regression workflow。research benchmark ではありません
 - [examples/v06_exact_retrieval_workflow.py](../examples/v06_exact_retrieval_workflow.py) — exact corpus search、explicit-ID corpus evaluation、offline hard-negative mining、既存 three-sequence trainer を1つにまとめた Poincaré regression workflow。research benchmark ではありません
 - [examples/v07_objective_comparison.py](../examples/v07_objective_comparison.py) — fixed data / initialization で MNRL、Triplet、MarginMSE、DistanceMSE と MRR、Recall@K、nDCG@K を比較する deterministic workflow。research benchmark や superiority claim ではありません
+- [examples/v08_hierarchy_learning.py](../examples/v08_hierarchy_learning.py) — explicit caller-owned hierarchy supervision を使った retrieval-only vs hierarchy-aware の deterministic Poincaré regression。benchmark や superiority claim ではありません
 - [experiments/README.md](../experiments/README.md) — 再現可能な Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark と解釈上の注意
 
 ## License

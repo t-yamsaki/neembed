@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "neembed-geoopt"
-version = "0.7.0"
+version = "0.8.0"
 description = "Fine-tune pretrained sentence embedding models in non-Euclidean spaces with Geoopt."
 readme = "README.md"
 requires-python = ">=3.10"

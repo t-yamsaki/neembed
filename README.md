@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [日本語](docs/README_ja.md)
 
-> **Status:** Package version v0.7.0 remains the published release. The main branch now also contains the focused v0.8 hierarchy-native learning surface: caller-owned hierarchy supervision, radial/depth/directed losses, retrieval-plus-hierarchy composition, structure evaluation, and a deterministic regression example. The API remains intentionally small and may still evolve before a stable 1.0 release.
+> **Status:** Package version v0.8.0 adds caller-owned hierarchy supervision, radial/depth/directed hierarchy objectives, retrieval-plus-hierarchy composition, structure evaluation, and a deterministic hierarchy regression example while preserving all v0.4-v0.7 public paths. The API remains intentionally small and may still evolve before a stable 1.0 release.
 
 `neembed` is a lightweight integration layer between pretrained Sentence Transformer models and manifold-valued representations. It keeps the pretrained encoder intact, optionally projects its Euclidean output, and delegates hyperbolic geometry to Geoopt.
 
@@ -80,7 +80,7 @@ v0.7 expands the retrieval-objective and evaluation surface without changing the
 - `ManifoldGradedCorpusRetrievalEvaluator` with nDCG@K while preserving the existing binary/multi-positive evaluator output
 - a deterministic Poincaré objective-comparison example covering MNRL, Triplet, MarginMSE, DistanceMSE, MRR, Recall@K, and nDCG@K
 
-The v0.8 development surface adds explicit hierarchy-native learning without introducing a graph framework:
+v0.8 adds explicit hierarchy-native learning without introducing a graph framework:
 
 - caller-owned node IDs, parent-child edges, optional depths, and directed negatives
 - `ManifoldRadialOrderLoss`, `ManifoldDepthLoss`, and `ManifoldHierarchyTripletLoss`
