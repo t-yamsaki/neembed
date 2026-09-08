@@ -1,7 +1,9 @@
 """Regression checks for the v0.8 release hardening gates."""
 
+import os
 from pathlib import Path
 import runpy
+import subprocess
 
 import pytest
 import torch
@@ -58,3 +60,35 @@ def test_v08_hosted_docs_gate_requires_release_specific_version_marker() -> None
     assert "v0.8" in stale_v07_html
     assert expected_marker not in stale_v07_html
     assert expected_marker in current_v08_html
+
+
+def test_v08_hosted_docs_gate_derives_version_from_tag_without_checkout(
+    tmp_path: Path,
+) -> None:
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
+        encoding="utf-8"
+    )
+    hosted_docs_job = workflow.split("  verify-hosted-docs:\n", 1)[1].split(
+        "  create-github-release:\n", 1
+    )[0]
+
+    assert 'PACKAGE_VERSION="${GITHUB_REF_NAME#v}"' in hosted_docs_job
+    assert "pyproject.toml" not in hosted_docs_job
+    assert "actions/checkout" not in hosted_docs_job
+
+    env = dict(os.environ)
+    env["GITHUB_REF_NAME"] = "v0.8.0"
+    completed = subprocess.run(
+        [
+            "bash",
+            "-c",
+            'PACKAGE_VERSION="${GITHUB_REF_NAME#v}"; printf "%s" "${PACKAGE_VERSION}"',
+        ],
+        cwd=tmp_path,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.stdout == "0.8.0"
