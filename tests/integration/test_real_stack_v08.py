@@ -28,6 +28,8 @@ pytestmark = [
 ]
 
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+ACTIVE_MARGIN = 10.0
+ACTIVE_RADIAL_SCALE = 10.0
 NODE_IDS = ("root", "animal", "dog", "cat")
 TEXTS = ("root concept", "animal", "dog", "cat")
 EDGES = (("root", "animal"), ("animal", "dog"), ("animal", "cat"))
@@ -53,13 +55,19 @@ def _assert_finite_backward(model: ManifoldSentenceTransformer, loss: torch.Tens
     assert math.isfinite(float(loss.detach()))
     model.zero_grad(set_to_none=True)
     loss.backward()
-    gradients = [
+    projection_gradients = [
         parameter.grad
-        for parameter in model.parameters()
+        for parameter in model.projection.parameters()
         if parameter.requires_grad and parameter.grad is not None
     ]
-    assert gradients
-    assert all(bool(torch.isfinite(gradient).all()) for gradient in gradients)
+    assert projection_gradients, "expected gradients on the trainable projection"
+    assert all(
+        bool(torch.isfinite(gradient).all()) for gradient in projection_gradients
+    )
+    assert any(
+        bool(torch.count_nonzero(gradient).item())
+        for gradient in projection_gradients
+    ), "expected a non-zero gradient on the trainable projection"
 
 
 @pytest.mark.parametrize("manifold_name", ["poincare", "lorentz"])
@@ -68,11 +76,11 @@ def test_v08_real_stack_hierarchy_losses_and_evaluator(manifold_name: str) -> No
 
     _assert_finite_backward(
         model,
-        ManifoldRadialOrderLoss(model=model, margin=0.05)(PARENTS, CHILDREN),
+        ManifoldRadialOrderLoss(model=model, margin=ACTIVE_MARGIN)(PARENTS, CHILDREN),
     )
     _assert_finite_backward(
         model,
-        ManifoldDepthLoss(model=model, radial_scale=0.5)(
+        ManifoldDepthLoss(model=model, radial_scale=ACTIVE_RADIAL_SCALE)(
             TEXTS,
             tuple(DEPTHS[node_id] for node_id in NODE_IDS),
         ),
@@ -81,14 +89,14 @@ def test_v08_real_stack_hierarchy_losses_and_evaluator(manifold_name: str) -> No
         model,
         ManifoldHierarchyTripletLoss(
             model=model,
-            margin=0.05,
-            radial_margin=0.05,
+            margin=ACTIVE_MARGIN,
+            radial_margin=ACTIVE_MARGIN,
             radial_weight=0.5,
         )(PARENTS, CHILDREN, UNRELATED),
     )
 
-    retrieval_loss = ManifoldTripletLoss(model=model, margin=0.05)
-    hierarchy_loss = ManifoldRadialOrderLoss(model=model, margin=0.05)
+    retrieval_loss = ManifoldTripletLoss(model=model, margin=ACTIVE_MARGIN)
+    hierarchy_loss = ManifoldRadialOrderLoss(model=model, margin=ACTIVE_MARGIN)
     composite = ManifoldRetrievalHierarchyLoss(
         retrieval_loss,
         hierarchy_loss,
