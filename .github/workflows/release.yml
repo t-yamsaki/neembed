@@ -305,19 +305,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Verify Read the Docs contains v0.8 hierarchy guidance
+      - name: Verify Read the Docs deployed the release-specific v0.8 build
         shell: bash
         run: |
+          PACKAGE_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          EXPECTED_DOC_TITLE="neembed ${PACKAGE_VERSION}"
           for attempt in 1 2 3 4 5 6; do
             if curl -fsSL \
               https://neembed.readthedocs.io/en/latest/user_guide/hierarchy.html \
               -o /tmp/neembed-hierarchy.html \
+              && grep -F "${EXPECTED_DOC_TITLE}" /tmp/neembed-hierarchy.html >/dev/null \
               && grep -F "v0.8" /tmp/neembed-hierarchy.html >/dev/null; then
-              echo "Hosted Read the Docs contains v0.8 hierarchy guidance."
+              echo "Hosted Read the Docs matches ${EXPECTED_DOC_TITLE} and contains v0.8 hierarchy guidance."
               exit 0
             fi
             if [ "${attempt}" -eq 6 ]; then
-              echo "Hosted Read the Docs did not expose v0.8 hierarchy guidance."
+              echo "Hosted Read the Docs did not expose the ${EXPECTED_DOC_TITLE} hierarchy build."
               exit 1
             fi
             sleep 10
