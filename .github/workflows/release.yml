@@ -308,7 +308,7 @@ jobs:
       - name: Verify Read the Docs deployed the release-specific v0.8 build
         shell: bash
         run: |
-          PACKAGE_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
           EXPECTED_DOC_TITLE="neembed ${PACKAGE_VERSION}"
           for attempt in 1 2 3 4 5 6; do
             if curl -fsSL \
