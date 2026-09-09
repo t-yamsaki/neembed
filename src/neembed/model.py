@@ -17,23 +17,25 @@ class ManifoldSentenceTransformer(nn.Module):
 
     Args:
         model_name_or_path: Sentence Transformer model name or local model path.
-        manifold: Manifold backend name. Supports ``"poincare"`` and ``"lorentz"``.
+        manifold: Manifold backend name. Supports ``"poincare"``, ``"lorentz"``,
+            and ``"euclidean"``.
         embedding_dim: Optional intrinsic output dimension for a learned linear
             projection. If omitted, the encoder embedding dimension is preserved.
             Lorentz embeddings use one additional ambient coordinate.
-        curvature: Positive, finite magnitude of the negative sectional curvature.
-            The same public meaning is used for Poincare and Lorentz geometry.
+        curvature: Positive, finite magnitude of the negative sectional curvature
+            for Poincare and Lorentz. This legacy argument keeps its existing
+            meaning and is not used as Euclidean curvature.
         learnable_curvature: When ``True``, optimize the positive scalar curvature
-            state jointly with the ordinary model parameters. Fixed curvature
-            remains the default. Learnable curvature is not itself a
-            manifold-valued point, so this option alone does not require a
-            Riemannian optimizer.
+            state jointly with the ordinary model parameters. This remains limited
+            to Poincare and Lorentz geometry.
+        sectional_curvature: Signed sectional curvature for new v0.9 constant-
+            curvature backends. Euclidean accepts ``None`` or exactly ``0.0``.
 
     Notes:
-        The returned sentence embeddings are manifold-valued outputs, while the
+        The returned sentence embeddings are geometry-valued outputs, while the
         encoder and optional projection weights remain ordinary Euclidean
-        parameters. True manifold-valued trainable coordinates are introduced
-        separately through :class:`neembed.ManifoldPrototypes`.
+        parameters. Euclidean output is the projection output itself; hyperbolic
+        outputs are mapped with the configured Geoopt manifold.
     """
 
     def __init__(
@@ -44,6 +46,7 @@ class ManifoldSentenceTransformer(nn.Module):
         embedding_dim: int | None = None,
         curvature: float = 1.0,
         learnable_curvature: bool = False,
+        sectional_curvature: float | None = None,
     ) -> None:
         super().__init__()
         self.encoder = SentenceTransformer(model_name_or_path)
@@ -68,35 +71,43 @@ class ManifoldSentenceTransformer(nn.Module):
             self.manifold_name,
             float(curvature),
             self.learnable_curvature,
+            sectional_curvature=sectional_curvature,
         )
         self.manifold.to(self.encoder.device)
 
     @property
     def curvature(self) -> float:
-        """Return the current public curvature magnitude as a Python float.
+        """Return the current legacy curvature magnitude as a Python float.
 
         The value is the positive magnitude of negative sectional curvature for
-        both supported geometries. For Lorentz geometry this converts Geoopt's
-        internal squared-radius parameter ``k`` back to ``1 / k``.
+        Poincare and Lorentz. Euclidean uses ``sectional_curvature`` instead.
         """
         if self.manifold_name == "poincare":
             curvature = self.manifold.c
-        else:
+        elif self.manifold_name == "lorentz":
             curvature = self.manifold.k.reciprocal()
+        else:
+            raise AttributeError(
+                "curvature is only defined for poincare and lorentz; "
+                "use sectional_curvature for euclidean"
+            )
         return float(curvature.detach().cpu())
 
+    @property
+    def sectional_curvature(self) -> float:
+        """Return signed sectional curvature for supported v0.9 geometry."""
+        if self.manifold_name == "euclidean":
+            return 0.0
+        raise AttributeError(
+            "sectional_curvature is currently defined only for euclidean; "
+            "poincare and lorentz keep the legacy curvature magnitude API"
+        )
+
     def forward(self, sentences: Sequence[str]) -> torch.Tensor:
-        """Encode a batch and map embeddings from the origin tangent space.
+        """Encode a batch and return points in the configured geometry.
 
-        Args:
-            sentences: Batch of input texts.
-
-        Returns:
-            Manifold-valued embeddings. Poincaré output has shape
-            ``(batch_size, embedding_dim)``. Lorentz output has shape
-            ``(batch_size, embedding_dim + 1)`` because the hyperboloid uses one
-            additional ambient time-like coordinate. Lorentz geometry is computed
-            in double precision for numerical stability.
+        Euclidean output is the encoder/projection output directly. Poincare and
+        Lorentz map the tangent representation from the manifold origin.
         """
         features = self.encoder.preprocess(list(sentences))
         features = {
@@ -105,6 +116,8 @@ class ManifoldSentenceTransformer(nn.Module):
         }
         encoder_output: dict[str, Any] = self.encoder(features)
         tangent = self.projection(encoder_output["sentence_embedding"])
+        if self.manifold_name == "euclidean":
+            return tangent
         if self.manifold_name == "lorentz":
             tangent = tangent.to(dtype=torch.float64)
             tangent = torch.cat((torch.zeros_like(tangent[..., :1]), tangent), dim=-1)
@@ -116,23 +129,12 @@ class ManifoldSentenceTransformer(nn.Module):
         *,
         convert_to_tensor: bool = False,
     ) -> Any:
-        """Encode text as manifold-valued embeddings for inference.
+        """Encode text as geometry-valued embeddings for inference.
 
-        Args:
-            sentences: A single text or a sequence of texts.
-            convert_to_tensor: Return a ``torch.Tensor`` instead of a NumPy array.
-
-        Returns:
-            A single manifold embedding for string input or a batch for sequence
-            input. The last dimension is ``embedding_dim`` for Poincaré and
-            ``embedding_dim + 1`` for Lorentz. NumPy arrays are returned by default;
-            tensors are returned when ``convert_to_tensor=True``. Lorentz outputs
-            use ``float64`` for the manifold geometry path.
-
-        Notes:
-            Encoding switches the model to evaluation mode and runs under
-            ``torch.inference_mode()``, so returned embeddings do not track
-            gradients.
+        A single string returns one embedding; a sequence returns a batch. The
+        last dimension is ``embedding_dim`` for Poincare and Euclidean and
+        ``embedding_dim + 1`` for Lorentz. NumPy arrays are returned by default;
+        tensors are returned when ``convert_to_tensor=True``.
         """
         single_input = isinstance(sentences, str)
         batch = [sentences] if single_input else list(sentences)
@@ -148,21 +150,7 @@ class ManifoldSentenceTransformer(nn.Module):
         return embeddings.cpu().numpy()
 
     def distance(self, a: Any, b: Any) -> torch.Tensor:
-        """Return the geodesic distance between two manifold embeddings.
-
-        Args:
-            a: First manifold embedding or array-like value.
-            b: Second manifold embedding or array-like value.
-
-        Returns:
-            A tensor containing the manifold geodesic distance.
-
-        Notes:
-            This is an inference helper. Inputs are moved to the model device and
-            geometry dtype, and the distance is computed under ``torch.no_grad()``.
-            Lorentz distance is evaluated in ``float64``; Poincaré keeps the model
-            parameter dtype.
-        """
+        """Return the configured geodesic distance between two embeddings."""
         reference = next(self.parameters())
         geometry_dtype = (
             torch.float64 if self.manifold_name == "lorentz" else reference.dtype
@@ -188,30 +176,7 @@ class ManifoldSentenceTransformer(nn.Module):
         *,
         top_k: int | None = None,
     ) -> list[dict[str, str | int | float]]:
-        """Rank an in-memory candidate list by geodesic distance to a query.
-
-        Args:
-            query: Query text to encode.
-            candidates: Non-empty sequence of candidate texts to rerank.
-            top_k: Number of ranked candidates to return. ``None`` returns the
-                full list. Integer values must be between 1 and the candidate
-                count, inclusive.
-
-        Returns:
-            Plain Python dictionaries ordered by ascending geodesic distance.
-            Each result contains the original ``candidate``, its input ``index``,
-            and the scalar ``distance``. Equal-distance candidates retain their
-            original input order.
-
-        Raises:
-            ValueError: If ``candidates`` is a bare string or empty, or ``top_k``
-                is invalid.
-
-        Notes:
-            This helper is intended for small in-memory reranking. It does not
-            build or persist a search index. Encoding and distance calculation run
-            without gradient tracking through the existing inference helpers.
-        """
+        """Rank an in-memory candidate list by geodesic distance to a query."""
         if isinstance(candidates, str):
             raise ValueError(
                 "candidates must be a sequence of strings, not a single string"
@@ -258,29 +223,21 @@ class ManifoldSentenceTransformer(nn.Module):
         ]
 
     def save_pretrained(self, output_path: str | Path) -> None:
-        """Save the encoder, projection, and sentence-model geometry state.
-
-        Args:
-            output_path: Directory in which to save the model.
-
-        Notes:
-            For learnable curvature, the current public curvature value and its
-            trainable flag are stored in ``neembed_config.json``. External modules
-            such as :class:`neembed.ManifoldPrototypes`, hierarchy metadata, and
-            optimizer state are not included by this helper and should be saved
-            separately when needed.
-        """
+        """Save the encoder, projection, and sentence-model geometry state."""
         output_path = Path(output_path)
         output_path.mkdir(parents=True, exist_ok=True)
 
         self.encoder.save_pretrained(str(output_path / "encoder"))
-        config = {
+        config: dict[str, Any] = {
             "embedding_dim": self._projection_dim,
             "manifold": self.manifold_name,
-            "curvature": self.curvature,
         }
-        if self.learnable_curvature:
-            config["learnable_curvature"] = True
+        if self.manifold_name in {"poincare", "lorentz"}:
+            config["curvature"] = self.curvature
+            if self.learnable_curvature:
+                config["learnable_curvature"] = True
+        else:
+            config["sectional_curvature"] = self.sectional_curvature
         (output_path / "neembed_config.json").write_text(
             json.dumps(config, indent=2) + "\n",
             encoding="utf-8",
@@ -292,27 +249,26 @@ class ManifoldSentenceTransformer(nn.Module):
         cls,
         model_path: str | Path,
     ) -> "ManifoldSentenceTransformer":
-        """Load a model previously saved with :meth:`save_pretrained`.
-
-        Args:
-            model_path: Directory containing a saved neembed model.
-
-        Returns:
-            The reconstructed manifold sentence model, including the saved
-            current public curvature value and curvature trainability. External
-            prototype modules must be reconstructed and loaded separately.
-        """
+        """Load a model previously saved with :meth:`save_pretrained`."""
         model_path = Path(model_path)
         config = json.loads(
             (model_path / "neembed_config.json").read_text(encoding="utf-8")
         )
-        model = cls(
-            str(model_path / "encoder"),
-            manifold=config["manifold"],
-            embedding_dim=config["embedding_dim"],
-            curvature=config["curvature"],
-            learnable_curvature=config.get("learnable_curvature", False),
-        )
+        manifold_name = config["manifold"]
+        kwargs: dict[str, Any] = {
+            "manifold": manifold_name,
+            "embedding_dim": config["embedding_dim"],
+        }
+        if manifold_name in {"poincare", "lorentz"}:
+            kwargs["curvature"] = config["curvature"]
+            kwargs["learnable_curvature"] = config.get(
+                "learnable_curvature",
+                False,
+            )
+        else:
+            kwargs["sectional_curvature"] = config["sectional_curvature"]
+
+        model = cls(str(model_path / "encoder"), **kwargs)
         projection_state = torch.load(
             model_path / "projection.pt",
             map_location="cpu",
