@@ -26,14 +26,21 @@ def get_manifold(
     name: str,
     curvature: float = 1.0,
     learnable: bool = False,
-) -> geoopt.PoincareBall | geoopt.Lorentz:
-    """Return a supported Geoopt manifold with consistent curvature semantics."""
-    if curvature <= 0 or not math.isfinite(curvature):
-        raise ValueError("curvature must be positive and finite")
+    *,
+    sectional_curvature: float | None = None,
+) -> geoopt.PoincareBall | geoopt.Lorentz | geoopt.Euclidean:
+    """Return a supported Geoopt manifold with backward-compatible curvature semantics."""
+    if name in {"poincare", "lorentz"}:
+        if sectional_curvature is not None:
+            raise ValueError(
+                "sectional_curvature must be None for poincare and lorentz"
+            )
+        if curvature <= 0 or not math.isfinite(curvature):
+            raise ValueError("curvature must be positive and finite")
 
-    if name == "poincare":
-        return geoopt.PoincareBall(c=curvature, learnable=learnable)
-    if name == "lorentz":
+        if name == "poincare":
+            return geoopt.PoincareBall(c=curvature, learnable=learnable)
+
         # Geoopt Lorentz ``k`` is the squared hyperboloid radius. A hyperboloid
         # of radius sqrt(k) has sectional curvature -1/k, so public curvature
         # magnitude ``c`` maps to k = 1/c. Geoopt strongly recommends double
@@ -48,5 +55,22 @@ def get_manifold(
             # Geoopt's implementation.
             parametrize.register_parametrization(manifold, "k", _PositiveScalar())
         return manifold
+
+    if name == "euclidean":
+        if learnable:
+            raise ValueError("learnable_curvature is not supported for euclidean")
+        if curvature != 1.0:
+            raise ValueError(
+                "curvature is a legacy poincare/lorentz argument and must remain "
+                "at its default value for euclidean"
+            )
+        if sectional_curvature is None:
+            sectional_curvature = 0.0
+        if not math.isfinite(sectional_curvature) or sectional_curvature != 0.0:
+            raise ValueError("euclidean sectional_curvature must be exactly 0.0")
+        # ndim=1 makes the final embedding dimension one Euclidean manifold
+        # point, so dist() returns the vector L2 norm rather than per-coordinate
+        # absolute differences.
+        return geoopt.Euclidean(ndim=1)
 
     raise ValueError(f"Unsupported manifold: {name}")
