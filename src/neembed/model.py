@@ -18,7 +18,7 @@ class ManifoldSentenceTransformer(nn.Module):
     Args:
         model_name_or_path: Sentence Transformer model name or local model path.
         manifold: Manifold backend name. Supports ``"poincare"``, ``"lorentz"``,
-            ``"euclidean"``, and ``"sphere_projection"``.
+            ``"euclidean"``, ``"sphere_projection"``, and ``"stereographic"``.
         embedding_dim: Optional intrinsic output dimension for a learned linear
             projection. If omitted, the encoder embedding dimension is preserved.
             Lorentz embeddings use one additional ambient coordinate.
@@ -31,7 +31,8 @@ class ManifoldSentenceTransformer(nn.Module):
             Lorentz and is not itself a manifold-valued point.
         sectional_curvature: Signed sectional curvature for new v0.9 constant-
             curvature geometry. Euclidean accepts ``None`` or exactly ``0.0``;
-            SphereProjection requires a finite positive value.
+            SphereProjection requires a finite positive value; Stereographic
+            requires an explicit finite value of any sign.
 
     Notes:
         The returned sentence embeddings are geometry-valued outputs, while the
@@ -112,7 +113,7 @@ class ManifoldSentenceTransformer(nn.Module):
         """Return signed sectional curvature for supported v0.9 geometry."""
         if self.manifold_name == "euclidean":
             return 0.0
-        if self.manifold_name == "sphere_projection":
+        if self.manifold_name in {"sphere_projection", "stereographic"}:
             return float(self.manifold.k.detach().cpu())
         raise AttributeError(
             "sectional_curvature is defined only for v0.9 geometry; "
@@ -126,14 +127,14 @@ class ManifoldSentenceTransformer(nn.Module):
             sentences: Batch of input texts.
 
         Returns:
-            Geometry-valued embeddings. Poincare, Euclidean, and SphereProjection
-            output have shape ``(batch_size, embedding_dim)``. Lorentz output has
-            shape ``(batch_size, embedding_dim + 1)`` because the hyperboloid uses
-            one additional ambient time-like coordinate. Euclidean output is the
-            encoder/projection output directly; SphereProjection and Poincare map
-            the projected tangent vector through the origin exponential map.
-            Lorentz geometry is computed in double precision for numerical
-            stability.
+            Geometry-valued embeddings. Poincare, Euclidean, SphereProjection,
+            and Stereographic output have shape ``(batch_size, embedding_dim)``.
+            Lorentz output has shape ``(batch_size, embedding_dim + 1)`` because
+            the hyperboloid uses one additional ambient time-like coordinate.
+            Euclidean output is the encoder/projection output directly;
+            Poincare, SphereProjection, and Stereographic map the projected tangent
+            vector through the origin exponential map. Lorentz geometry is
+            computed in double precision for numerical stability.
         """
         features = self.encoder.preprocess(list(sentences))
         features = {
@@ -164,16 +165,16 @@ class ManifoldSentenceTransformer(nn.Module):
         Returns:
             A single geometry embedding for string input or a batch for sequence
             input. The last dimension is ``embedding_dim`` for Poincare,
-            Euclidean, and SphereProjection and ``embedding_dim + 1`` for Lorentz.
-            NumPy arrays are returned by default; tensors are returned when
-            ``convert_to_tensor=True``. Lorentz outputs use ``float64`` for the
-            manifold geometry path.
+            Euclidean, SphereProjection, and Stereographic and
+            ``embedding_dim + 1`` for Lorentz. NumPy arrays are returned by
+            default; tensors are returned when ``convert_to_tensor=True``.
+            Lorentz outputs use ``float64`` for the manifold geometry path.
 
         Notes:
             Encoding switches the model to evaluation mode and runs under
             ``torch.inference_mode()``, so returned embeddings do not track
             gradients.
-        """
+    """
         single_input = isinstance(sentences, str)
         batch = [sentences] if single_input else list(sentences)
 
@@ -201,7 +202,8 @@ class ManifoldSentenceTransformer(nn.Module):
             This is an inference helper. Inputs are moved to the model device and
             geometry dtype, and the distance is computed under ``torch.no_grad()``.
             Lorentz distance is evaluated in ``float64``; Poincare, Euclidean,
-            and SphereProjection currently keep the model parameter dtype.
+            SphereProjection, and Stereographic currently keep the model parameter
+            dtype.
         """
         reference = next(self.parameters())
         geometry_dtype = (
