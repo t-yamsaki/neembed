@@ -69,6 +69,10 @@ class ManifoldSentenceTransformer(nn.Module):
         self.manifold_name = manifold
         self.learnable_curvature = bool(learnable_curvature)
         if self.manifold_name in {"poincare", "lorentz"}:
+            if sectional_curvature is not None:
+                raise ValueError(
+                    "sectional_curvature must be None for poincare and lorentz"
+                )
             self.manifold = get_manifold(
                 self.manifold_name,
                 float(curvature),
