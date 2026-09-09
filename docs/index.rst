@@ -19,7 +19,10 @@ small-list reranking, exact corpus search, corpus evaluation, and caller-invoked
 hard-negative mining -- see :doc:`user_guide/retrieval`. For v0.8 explicit
 hierarchy supervision -- radial order, depth, directed triplets, retrieval-plus-
 hierarchy composition, and structure metrics -- see :doc:`user_guide/hierarchy`.
-Read :doc:`user_guide/learnable_structure` to distinguish Euclidean trainable
+For the backward-compatible v0.9 naming and persistence contract for negative,
+zero, and positive sectional curvature, see
+:doc:`user_guide/constant_curvature_semantics`. Read
+:doc:`user_guide/learnable_structure` to distinguish Euclidean trainable
 parameters, learnable curvature, and manifold-valued prototypes, or jump to the
 :ref:`api-reference` for class and function details generated from the public
 docstrings.
@@ -36,6 +39,7 @@ docstrings.
    :caption: User guide
 
    user_guide/architecture
+   user_guide/constant_curvature_semantics
    user_guide/learnable_structure
    user_guide/training
    user_guide/retrieval_objectives
