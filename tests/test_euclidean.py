@@ -111,6 +111,17 @@ def test_euclidean_rejects_legacy_or_learnable_curvature_inputs() -> None:
         get_manifold("poincare", sectional_curvature=-1.0)
 
 
+def test_model_rejects_signed_curvature_for_legacy_geometry(monkeypatch) -> None:
+    _patch_encoder(monkeypatch)
+
+    with pytest.raises(ValueError, match="must be None"):
+        ManifoldSentenceTransformer(
+            "fake-model",
+            manifold="poincare",
+            sectional_curvature=-1.0,
+        )
+
+
 def test_euclidean_forward_is_projection_output_without_manifold_mapping(monkeypatch) -> None:
     model = _make_model(monkeypatch)
     texts = ["a", "abcd"]
