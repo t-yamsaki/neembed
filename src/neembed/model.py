@@ -68,12 +68,19 @@ class ManifoldSentenceTransformer(nn.Module):
 
         self.manifold_name = manifold
         self.learnable_curvature = bool(learnable_curvature)
-        self.manifold = get_manifold(
-            self.manifold_name,
-            float(curvature),
-            self.learnable_curvature,
-            sectional_curvature=sectional_curvature,
-        )
+        if self.manifold_name in {"poincare", "lorentz"}:
+            self.manifold = get_manifold(
+                self.manifold_name,
+                float(curvature),
+                self.learnable_curvature,
+            )
+        else:
+            self.manifold = get_manifold(
+                self.manifold_name,
+                float(curvature),
+                self.learnable_curvature,
+                sectional_curvature=sectional_curvature,
+            )
         self.manifold.to(self.encoder.device)
 
     @property
