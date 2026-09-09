@@ -149,11 +149,12 @@ def test_sphere_projection_forward_uses_origin_expmap_and_returns_valid_points(
     features = model.encoder.preprocess(texts)
     encoder_output = model.encoder(features)["sentence_embedding"]
     tangent = model.projection(encoder_output)
-    expected = model.manifold.expmap0(tangent)
+    expected = model.manifold.expmap0(tangent.to(dtype=torch.float64))
 
     actual = model(texts)
 
     assert actual.shape == (2, 2)
+    assert actual.dtype == torch.float64
     assert torch.isfinite(actual).all()
     assert torch.allclose(actual, expected)
     assert model.manifold.check_point_on_manifold(actual)
