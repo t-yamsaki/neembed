@@ -1,5 +1,7 @@
 """Sentence Transformer integration for manifold-valued embeddings."""
 
+from __future__ import annotations
+
 from collections.abc import Sequence
 import json
 from pathlib import Path
