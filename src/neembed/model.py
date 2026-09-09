@@ -38,7 +38,9 @@ class ManifoldSentenceTransformer(nn.Module):
         The returned sentence embeddings are geometry-valued outputs, while the
         encoder and optional projection weights remain ordinary Euclidean
         parameters. True manifold-valued trainable coordinates are introduced
-        separately through :class:`neembed.ManifoldPrototypes`.
+        separately through :class:`neembed.ManifoldPrototypes`. SphereProjection
+        and Stereographic geometry operations use ``float64`` even when the
+        encoder and projection remain in their ordinary model dtype.
     """
 
     def __init__(
@@ -133,8 +135,9 @@ class ManifoldSentenceTransformer(nn.Module):
             the hyperboloid uses one additional ambient time-like coordinate.
             Euclidean output is the encoder/projection output directly;
             Poincare, SphereProjection, and Stereographic map the projected tangent
-            vector through the origin exponential map. Lorentz geometry is
-            computed in double precision for numerical stability.
+            vector through the origin exponential map. Lorentz, SphereProjection,
+            and Stereographic geometry operations use double precision for
+            numerical stability.
         """
         features = self.encoder.preprocess(list(sentences))
         features = {
@@ -145,8 +148,9 @@ class ManifoldSentenceTransformer(nn.Module):
         tangent = self.projection(encoder_output["sentence_embedding"])
         if self.manifold_name == "euclidean":
             return tangent
-        if self.manifold_name == "lorentz":
+        if self.manifold_name in {"lorentz", "sphere_projection", "stereographic"}:
             tangent = tangent.to(dtype=torch.float64)
+        if self.manifold_name == "lorentz":
             tangent = torch.cat((torch.zeros_like(tangent[..., :1]), tangent), dim=-1)
         return self.manifold.expmap0(tangent)
 
@@ -168,7 +172,8 @@ class ManifoldSentenceTransformer(nn.Module):
             Euclidean, SphereProjection, and Stereographic and
             ``embedding_dim + 1`` for Lorentz. NumPy arrays are returned by
             default; tensors are returned when ``convert_to_tensor=True``.
-            Lorentz outputs use ``float64`` for the manifold geometry path.
+            Lorentz, SphereProjection, and Stereographic outputs use ``float64``
+            for the manifold geometry path.
 
         Notes:
             Encoding switches the model to evaluation mode and runs under
@@ -201,14 +206,16 @@ class ManifoldSentenceTransformer(nn.Module):
         Notes:
             This is an inference helper. Inputs are moved to the model device and
             geometry dtype, and the distance is computed under ``torch.no_grad()``.
-            Lorentz distance is evaluated in ``float64``; Poincare, Euclidean,
-            SphereProjection, and Stereographic currently keep the model parameter
-            dtype.
+            Lorentz, SphereProjection, and Stereographic distance are evaluated in
+            ``float64``. Poincare and Euclidean retain the model parameter dtype.
         """
         reference = next(self.parameters())
-        geometry_dtype = (
-            torch.float64 if self.manifold_name == "lorentz" else reference.dtype
-        )
+        use_double_geometry = self.manifold_name in {
+            "lorentz",
+            "sphere_projection",
+            "stereographic",
+        }
+        geometry_dtype = torch.float64 if use_double_geometry else reference.dtype
         a_tensor = torch.as_tensor(
             a,
             device=reference.device,
