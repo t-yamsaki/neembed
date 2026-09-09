@@ -2,8 +2,8 @@ Constant-curvature semantics for v0.9
 =====================================
 
 This page is the implementation contract for the v0.9 constant-curvature
-follow-on work. It defines names and persistence semantics only; it does not add
-new manifold backends by itself.
+follow-on work. It defines names, validation, and persistence semantics only;
+it does not add new manifold backends by itself.
 
 Existing Poincare and Lorentz contract
 --------------------------------------
@@ -43,8 +43,8 @@ The public name is deliberately not ``k``. Geoopt's Lorentz backend already
 uses ``k`` for the positive squared hyperboloid radius, where ``k = 1 / c``;
 reusing that name publicly would make the two meanings ambiguous.
 
-Constructor and factory names
------------------------------
+Constructor and factory contract
+--------------------------------
 
 The existing calls remain valid without modification:
 
@@ -62,25 +62,60 @@ The existing calls remain valid without modification:
        curvature=2.0,
    )
 
-The v0.9 follow-on implementations use these public manifold names:
+The v0.9 follow-on implementations add one keyword-only argument to the shared
+model constructor and manifold factory:
+
+.. code-block:: text
+
+   sectional_curvature: float | None = None
+
+The existing ``curvature=1.0`` and ``learnable_curvature=False`` defaults stay
+unchanged. ``sectional_curvature`` is the only new public signed-curvature
+keyword; there is no public ``k`` argument.
+
+The same keyword name is used by both entry points:
+
+.. code-block:: python
+
+   ManifoldSentenceTransformer(
+       model_name,
+       manifold="stereographic",
+       sectional_curvature=-2.0,
+   )
+
+   get_manifold(
+       "stereographic",
+       sectional_curvature=-2.0,
+   )
+
+The new manifold names and validation rules are fixed as follows.
+
+``manifold="poincare"`` and ``manifold="lorentz"``
+   Continue to use ``curvature``. ``sectional_curvature`` must be ``None``.
+   Existing ``learnable_curvature`` behavior is unchanged.
 
 ``manifold="euclidean"``
-   Sectional curvature is exactly ``0.0``. No legacy ``curvature`` magnitude is
-   reinterpreted for this backend.
+   Sectional curvature is exactly ``0.0``. ``sectional_curvature`` may be
+   omitted or explicitly set to ``0.0``. ``learnable_curvature=True`` is
+   invalid. The legacy ``curvature`` value is not used as Euclidean curvature.
 
 ``manifold="sphere_projection"``
-   Uses an explicit positive ``sectional_curvature``. This corresponds to
-   Geoopt ``SphereProjection(k=sectional_curvature)``.
+   Requires a finite positive ``sectional_curvature`` and fixed curvature.
+   This corresponds to Geoopt
+   ``SphereProjection(k=sectional_curvature)``.
 
 ``manifold="stereographic"``
-   Uses an explicit finite ``sectional_curvature`` and accepts negative, zero,
-   or positive values. This corresponds to Geoopt
+   Requires a finite ``sectional_curvature`` and accepts negative, zero, or
+   positive values with fixed curvature. This corresponds to Geoopt
    ``Stereographic(k=sectional_curvature)``.
 
-The shared model constructor and ``get_manifold`` factory may be extended with
-a keyword named ``sectional_curvature`` for those new backends. The existing
-``curvature`` keyword remains the legacy Poincare/Lorentz magnitude and must
-not silently become the curvature source for a new manifold name.
+Because the shared constructor and ``get_manifold`` retain the legacy
+``curvature=1.0`` default for source compatibility, new manifold backends do not
+interpret that default as their curvature. If a caller supplies a non-default
+legacy ``curvature`` value together with ``euclidean``, ``sphere_projection``,
+or ``stereographic``, the v0.9 implementation must raise ``ValueError`` rather
+than silently ignore or reinterpret it. This makes accidental use of the old
+keyword visible while preserving calls that rely on the existing default.
 
 For v0.9, signed curvature is fixed. There is no
 ``learnable_sectional_curvature`` contract and no support for learning through
@@ -106,8 +141,8 @@ Validation matrix
      - finite ``> 0``
      - ``K = -curvature``
    * - ``euclidean``
-     - ``sectional_curvature`` metadata
-     - exactly ``0.0``
+     - ``sectional_curvature``
+     - omitted or exactly ``0.0``
      - ``K = 0``
    * - ``sphere_projection``
      - ``sectional_curvature``
@@ -169,10 +204,16 @@ field, and new geometry must not persist Geoopt's implementation-level ``k`` as
 a public field. No configuration-version framework is required for this
 separation because the distinct field names are sufficient.
 
+The follow-on implementations may expose the signed value on new geometry as a
+read-only ``model.sectional_curvature`` property. They must not change the
+meaning of the existing ``model.curvature`` property for Poincare/Lorentz.
+Persistence is defined by the keys above rather than by requiring one unified
+curvature property across every geometry.
+
 Equivalence relationships for follow-on tests
 ---------------------------------------------
 
-The v0.9 geometry issues can use the following relationships for parity tests:
+The v0.9 geometry issues use the following relationships for parity tests:
 
 * ``poincare(curvature=c)`` and
   ``stereographic(sectional_curvature=-c)`` represent the same negative
