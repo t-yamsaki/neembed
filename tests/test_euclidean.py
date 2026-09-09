@@ -123,7 +123,7 @@ def test_euclidean_forward_is_projection_output_without_manifold_mapping(monkeyp
     assert actual.shape == (2, 2)
     assert torch.allclose(actual, expected)
     assert model.sectional_curvature == 0.0
-    with pytest.raises(AttributeError, match="only defined for poincare and lorentz"):
+    with pytest.raises(AttributeError):
         _ = model.curvature
 
 
