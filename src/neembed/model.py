@@ -174,7 +174,7 @@ class ManifoldSentenceTransformer(nn.Module):
             Encoding switches the model to evaluation mode and runs under
             ``torch.inference_mode()``, so returned embeddings do not track
             gradients.
-    """
+        """
         single_input = isinstance(sentences, str)
         batch = [sentences] if single_input else list(sentences)
 
