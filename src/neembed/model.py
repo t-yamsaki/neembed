@@ -18,19 +18,20 @@ class ManifoldSentenceTransformer(nn.Module):
     Args:
         model_name_or_path: Sentence Transformer model name or local model path.
         manifold: Manifold backend name. Supports ``"poincare"``, ``"lorentz"``,
-            and ``"euclidean"``.
+            ``"euclidean"``, and ``"sphere_projection"``.
         embedding_dim: Optional intrinsic output dimension for a learned linear
             projection. If omitted, the encoder embedding dimension is preserved.
             Lorentz embeddings use one additional ambient coordinate.
         curvature: Positive, finite magnitude of the negative sectional curvature.
             The same public meaning is used for Poincare and Lorentz geometry.
-            This legacy argument is not reinterpreted for Euclidean geometry.
+            This legacy argument is not reinterpreted for new v0.9 geometry.
         learnable_curvature: When ``True``, optimize the positive scalar curvature
             state jointly with the ordinary model parameters. Fixed curvature
             remains the default. Learnable curvature is limited to Poincare and
             Lorentz and is not itself a manifold-valued point.
         sectional_curvature: Signed sectional curvature for new v0.9 constant-
-            curvature geometry. Euclidean accepts ``None`` or exactly ``0.0``.
+            curvature geometry. Euclidean accepts ``None`` or exactly ``0.0``;
+            SphereProjection requires a finite positive value.
 
     Notes:
         The returned sentence embeddings are geometry-valued outputs, while the
@@ -89,10 +90,10 @@ class ManifoldSentenceTransformer(nn.Module):
 
     @property
     def curvature(self) -> float:
-        """Return the current public curvature magnitude as a Python float.
+        """Return the current legacy public curvature magnitude as a Python float.
 
         The value is the positive magnitude of negative sectional curvature for
-        Poincare and Lorentz. Euclidean uses the distinct signed
+        Poincare and Lorentz. New v0.9 geometry uses the distinct signed
         ``sectional_curvature`` property instead.
         """
         if self.manifold_name == "poincare":
@@ -102,7 +103,7 @@ class ManifoldSentenceTransformer(nn.Module):
         else:
             raise AttributeError(
                 "curvature is only defined for poincare and lorentz; "
-                "use sectional_curvature for euclidean"
+                "use sectional_curvature for v0.9 geometry"
             )
         return float(curvature.detach().cpu())
 
@@ -111,8 +112,10 @@ class ManifoldSentenceTransformer(nn.Module):
         """Return signed sectional curvature for supported v0.9 geometry."""
         if self.manifold_name == "euclidean":
             return 0.0
+        if self.manifold_name == "sphere_projection":
+            return float(self.manifold.k.detach().cpu())
         raise AttributeError(
-            "sectional_curvature is currently defined only for euclidean; "
+            "sectional_curvature is defined only for v0.9 geometry; "
             "poincare and lorentz keep the legacy curvature magnitude API"
         )
 
@@ -123,12 +126,14 @@ class ManifoldSentenceTransformer(nn.Module):
             sentences: Batch of input texts.
 
         Returns:
-            Geometry-valued embeddings. Poincare and Euclidean output have shape
-            ``(batch_size, embedding_dim)``. Lorentz output has shape
-            ``(batch_size, embedding_dim + 1)`` because the hyperboloid uses one
-            additional ambient time-like coordinate. Euclidean output is the
-            encoder/projection output directly; Lorentz geometry is computed in
-            double precision for numerical stability.
+            Geometry-valued embeddings. Poincare, Euclidean, and SphereProjection
+            output have shape ``(batch_size, embedding_dim)``. Lorentz output has
+            shape ``(batch_size, embedding_dim + 1)`` because the hyperboloid uses
+            one additional ambient time-like coordinate. Euclidean output is the
+            encoder/projection output directly; SphereProjection and Poincare map
+            the projected tangent vector through the origin exponential map.
+            Lorentz geometry is computed in double precision for numerical
+            stability.
         """
         features = self.encoder.preprocess(list(sentences))
         features = {
@@ -158,9 +163,9 @@ class ManifoldSentenceTransformer(nn.Module):
 
         Returns:
             A single geometry embedding for string input or a batch for sequence
-            input. The last dimension is ``embedding_dim`` for Poincare and
-            Euclidean and ``embedding_dim + 1`` for Lorentz. NumPy arrays are
-            returned by default; tensors are returned when
+            input. The last dimension is ``embedding_dim`` for Poincare,
+            Euclidean, and SphereProjection and ``embedding_dim + 1`` for Lorentz.
+            NumPy arrays are returned by default; tensors are returned when
             ``convert_to_tensor=True``. Lorentz outputs use ``float64`` for the
             manifold geometry path.
 
@@ -195,8 +200,8 @@ class ManifoldSentenceTransformer(nn.Module):
         Notes:
             This is an inference helper. Inputs are moved to the model device and
             geometry dtype, and the distance is computed under ``torch.no_grad()``.
-            Lorentz distance is evaluated in ``float64``; Poincare and Euclidean
-            keep the model parameter dtype.
+            Lorentz distance is evaluated in ``float64``; Poincare, Euclidean,
+            and SphereProjection currently keep the model parameter dtype.
         """
         reference = next(self.parameters())
         geometry_dtype = (
@@ -299,8 +304,8 @@ class ManifoldSentenceTransformer(nn.Module):
             output_path: Directory in which to save the model.
 
         Notes:
-            Poincare/Lorentz keep the legacy public ``curvature`` metadata.
-            Euclidean stores the distinct signed ``sectional_curvature`` value.
+            Poincare/Lorentz keep the legacy public ``curvature`` metadata. New
+            v0.9 geometry stores the distinct signed ``sectional_curvature`` value.
             External modules such as :class:`neembed.ManifoldPrototypes`,
             hierarchy metadata, and optimizer state are not included by this
             helper and should be saved separately when needed.
@@ -337,8 +342,8 @@ class ManifoldSentenceTransformer(nn.Module):
 
         Returns:
             The reconstructed geometry-aware sentence model. Poincare/Lorentz
-            retain the saved legacy curvature magnitude and trainability;
-            Euclidean restores its signed sectional-curvature metadata. External
+            retain the saved legacy curvature magnitude and trainability; new
+            v0.9 geometry restores signed sectional-curvature metadata. External
             prototype modules must be reconstructed and loaded separately.
         """
         model_path = Path(model_path)
