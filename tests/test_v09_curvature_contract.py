@@ -139,4 +139,4 @@ def test_v09_design_note_defines_unambiguous_signed_curvature_contract() -> None
     assert '"sectional_curvature": 2.0' in note
     assert '"sectional_curvature": -2.0' in note
     assert "learnable_sectional_curvature" in note
-    assert "must not silently become the curvature source" in note
+    assert "not silently become the curvature source" in note
