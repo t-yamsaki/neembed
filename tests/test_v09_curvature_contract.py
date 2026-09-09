@@ -126,21 +126,22 @@ def test_v09_design_note_defines_unambiguous_signed_curvature_contract() -> None
     note = (
         ROOT / "docs" / "user_guide" / "constant_curvature_semantics.rst"
     ).read_text(encoding="utf-8")
+    normalized_note = " ".join(note.split())
 
-    assert "``sectional_curvature``" in note
-    assert "signed sectional curvature" in note
-    assert "sectional_curvature: float | None = None" in note
-    assert "``sectional_curvature < 0``" in note
-    assert "``sectional_curvature == 0``" in note
-    assert "``sectional_curvature > 0``" in note
-    assert '``manifold="euclidean"``' in note
-    assert '``manifold="sphere_projection"``' in note
-    assert '``manifold="stereographic"``' in note
-    assert "``sectional_curvature`` must be ``None``" in note
-    assert "non-default" in note
-    assert "must raise ``ValueError``" in note
-    assert '"sectional_curvature": 0.0' in note
-    assert '"sectional_curvature": 2.0' in note
-    assert '"sectional_curvature": -2.0' in note
-    assert "learnable_sectional_curvature" in note
-    assert "rather than silently ignore or reinterpret it" in note
+    assert "``sectional_curvature``" in normalized_note
+    assert "signed sectional curvature" in normalized_note
+    assert "sectional_curvature: float | None = None" in normalized_note
+    assert "``sectional_curvature < 0``" in normalized_note
+    assert "``sectional_curvature == 0``" in normalized_note
+    assert "``sectional_curvature > 0``" in normalized_note
+    assert '``manifold="euclidean"``' in normalized_note
+    assert '``manifold="sphere_projection"``' in normalized_note
+    assert '``manifold="stereographic"``' in normalized_note
+    assert "``sectional_curvature`` must be ``None``" in normalized_note
+    assert "non-default" in normalized_note
+    assert "must raise ``ValueError``" in normalized_note
+    assert '"sectional_curvature": 0.0' in normalized_note
+    assert '"sectional_curvature": 2.0' in normalized_note
+    assert '"sectional_curvature": -2.0' in normalized_note
+    assert "learnable_sectional_curvature" in normalized_note
+    assert "rather than silently ignore or reinterpret it" in normalized_note
