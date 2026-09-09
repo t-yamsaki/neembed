@@ -129,14 +129,18 @@ def test_v09_design_note_defines_unambiguous_signed_curvature_contract() -> None
 
     assert "``sectional_curvature``" in note
     assert "signed sectional curvature" in note
+    assert "sectional_curvature: float | None = None" in note
     assert "``sectional_curvature < 0``" in note
     assert "``sectional_curvature == 0``" in note
     assert "``sectional_curvature > 0``" in note
     assert '``manifold="euclidean"``' in note
     assert '``manifold="sphere_projection"``' in note
     assert '``manifold="stereographic"``' in note
+    assert "``sectional_curvature`` must be ``None``" in note
+    assert "non-default" in note
+    assert "must raise ``ValueError``" in note
     assert '"sectional_curvature": 0.0' in note
     assert '"sectional_curvature": 2.0' in note
     assert '"sectional_curvature": -2.0' in note
     assert "learnable_sectional_curvature" in note
-    assert "not silently become the curvature source" in note
+    assert "rather than silently ignore or reinterpret it" in note
