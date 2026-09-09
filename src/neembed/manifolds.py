@@ -28,7 +28,7 @@ def get_manifold(
     learnable: bool = False,
     *,
     sectional_curvature: float | None = None,
-) -> geoopt.PoincareBall | geoopt.Lorentz | geoopt.Euclidean:
+) -> geoopt.PoincareBall | geoopt.Lorentz | geoopt.Euclidean | geoopt.SphereProjection:
     """Return a supported Geoopt manifold with backward-compatible curvature semantics."""
     if name in {"poincare", "lorentz"}:
         if sectional_curvature is not None:
@@ -72,5 +72,26 @@ def get_manifold(
         # point, so dist() returns the vector L2 norm rather than per-coordinate
         # absolute differences.
         return geoopt.Euclidean(ndim=1)
+
+    if name == "sphere_projection":
+        if learnable:
+            raise ValueError(
+                "learnable_curvature is not supported for sphere_projection"
+            )
+        if curvature != 1.0:
+            raise ValueError(
+                "curvature is a legacy poincare/lorentz argument and must remain "
+                "at its default value for sphere_projection"
+            )
+        if sectional_curvature is None:
+            raise ValueError("sphere_projection requires sectional_curvature")
+        if (
+            not math.isfinite(sectional_curvature)
+            or sectional_curvature <= 0.0
+        ):
+            raise ValueError(
+                "sphere_projection sectional_curvature must be positive and finite"
+            )
+        return geoopt.SphereProjection(k=sectional_curvature, learnable=False)
 
     raise ValueError(f"Unsupported manifold: {name}")
