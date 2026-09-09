@@ -28,7 +28,13 @@ def get_manifold(
     learnable: bool = False,
     *,
     sectional_curvature: float | None = None,
-) -> geoopt.PoincareBall | geoopt.Lorentz | geoopt.Euclidean | geoopt.SphereProjection:
+) -> (
+    geoopt.PoincareBall
+    | geoopt.Lorentz
+    | geoopt.Euclidean
+    | geoopt.SphereProjection
+    | geoopt.Stereographic
+):
     """Return a supported Geoopt manifold with backward-compatible curvature semantics."""
     if name in {"poincare", "lorentz"}:
         if sectional_curvature is not None:
@@ -93,5 +99,21 @@ def get_manifold(
                 "sphere_projection sectional_curvature must be positive and finite"
             )
         return geoopt.SphereProjection(k=sectional_curvature, learnable=False)
+
+    if name == "stereographic":
+        if learnable:
+            raise ValueError(
+                "learnable_curvature is not supported for stereographic"
+            )
+        if curvature != 1.0:
+            raise ValueError(
+                "curvature is a legacy poincare/lorentz argument and must remain "
+                "at its default value for stereographic"
+            )
+        if sectional_curvature is None:
+            raise ValueError("stereographic requires sectional_curvature")
+        if not math.isfinite(sectional_curvature):
+            raise ValueError("stereographic sectional_curvature must be finite")
+        return geoopt.Stereographic(k=sectional_curvature, learnable=False)
 
     raise ValueError(f"Unsupported manifold: {name}")
