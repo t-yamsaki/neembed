@@ -1,5 +1,7 @@
 """Sentence Transformer integration for manifold-valued embeddings."""
 
+from __future__ import annotations
+
 from collections.abc import Sequence
 import json
 from pathlib import Path
@@ -10,6 +12,31 @@ from sentence_transformers import SentenceTransformer
 from torch import nn
 
 from neembed.manifolds import get_manifold
+
+
+_STEREOGRAPHIC_DOUBLE_MANIFOLDS = {"sphere_projection", "stereographic"}
+_DOUBLE_GEOMETRY_MANIFOLDS = {
+    "lorentz",
+    "sphere_projection",
+    "stereographic",
+}
+
+
+def _select_geometry_device(
+    manifold_name: str,
+    encoder_device: torch.device | str,
+) -> torch.device:
+    """Choose a device that can represent the configured geometry dtype.
+
+    Apple MPS does not support float64 tensors. SphereProjection and generic
+    Stereographic therefore keep the encoder/projection on MPS but run the
+    float64 manifold path on CPU. Other manifolds preserve their existing
+    device behavior.
+    """
+    device = torch.device(encoder_device)
+    if manifold_name in _STEREOGRAPHIC_DOUBLE_MANIFOLDS and device.type == "mps":
+        return torch.device("cpu")
+    return device
 
 
 class ManifoldSentenceTransformer(nn.Module):
@@ -38,7 +65,11 @@ class ManifoldSentenceTransformer(nn.Module):
         The returned sentence embeddings are geometry-valued outputs, while the
         encoder and optional projection weights remain ordinary Euclidean
         parameters. True manifold-valued trainable coordinates are introduced
-        separately through :class:`neembed.ManifoldPrototypes`.
+        separately through :class:`neembed.ManifoldPrototypes`. SphereProjection
+        and Stereographic geometry operations use ``float64`` even when the
+        encoder and projection remain in their ordinary model dtype. On Apple MPS,
+        those float64 geometry operations fall back to CPU while the encoder and
+        projection remain on MPS.
     """
 
     def __init__(
@@ -87,7 +118,34 @@ class ManifoldSentenceTransformer(nn.Module):
                 self.learnable_curvature,
                 sectional_curvature=sectional_curvature,
             )
-        self.manifold.to(self.encoder.device)
+        self.manifold.to(
+            _select_geometry_device(self.manifold_name, self.encoder.device)
+        )
+
+    def _apply(self, fn, recurse: bool = True):
+        """Apply module transfers while preserving the stereographic dtype policy."""
+        manifold = self._modules.get("manifold")
+        protect_manifold = (
+            self.manifold_name in _STEREOGRAPHIC_DOUBLE_MANIFOLDS
+            and manifold is not None
+        )
+        if not protect_manifold:
+            return super()._apply(fn, recurse=recurse)
+
+        # ``nn.Module.to()`` applies recursively to child modules. Temporarily
+        # exclude the float64 stereographic manifold so a parent ``.to("mps")``
+        # cannot move its curvature state onto unsupported MPS double tensors.
+        self._modules["manifold"] = None
+        try:
+            result = super()._apply(fn, recurse=recurse)
+        finally:
+            self._modules["manifold"] = manifold
+
+        manifold.to(
+            device=_select_geometry_device(self.manifold_name, self.encoder.device),
+            dtype=torch.float64,
+        )
+        return result
 
     @property
     def curvature(self) -> float:
@@ -133,8 +191,10 @@ class ManifoldSentenceTransformer(nn.Module):
             the hyperboloid uses one additional ambient time-like coordinate.
             Euclidean output is the encoder/projection output directly;
             Poincare, SphereProjection, and Stereographic map the projected tangent
-            vector through the origin exponential map. Lorentz geometry is
-            computed in double precision for numerical stability.
+            vector through the origin exponential map. Lorentz, SphereProjection,
+            and Stereographic geometry operations use double precision for
+            numerical stability. SphereProjection/Stereographic use CPU for that
+            double-precision geometry path when the encoder runs on Apple MPS.
         """
         features = self.encoder.preprocess(list(sentences))
         features = {
@@ -145,8 +205,15 @@ class ManifoldSentenceTransformer(nn.Module):
         tangent = self.projection(encoder_output["sentence_embedding"])
         if self.manifold_name == "euclidean":
             return tangent
+        if self.manifold_name in _DOUBLE_GEOMETRY_MANIFOLDS:
+            tangent = tangent.to(
+                device=_select_geometry_device(
+                    self.manifold_name,
+                    self.encoder.device,
+                ),
+                dtype=torch.float64,
+            )
         if self.manifold_name == "lorentz":
-            tangent = tangent.to(dtype=torch.float64)
             tangent = torch.cat((torch.zeros_like(tangent[..., :1]), tangent), dim=-1)
         return self.manifold.expmap0(tangent)
 
@@ -168,7 +235,9 @@ class ManifoldSentenceTransformer(nn.Module):
             Euclidean, SphereProjection, and Stereographic and
             ``embedding_dim + 1`` for Lorentz. NumPy arrays are returned by
             default; tensors are returned when ``convert_to_tensor=True``.
-            Lorentz outputs use ``float64`` for the manifold geometry path.
+            Lorentz, SphereProjection, and Stereographic outputs use ``float64``
+            for the manifold geometry path. SphereProjection/Stereographic tensor
+            outputs are CPU tensors when the encoder uses Apple MPS.
 
         Notes:
             Encoding switches the model to evaluation mode and runs under
@@ -199,24 +268,28 @@ class ManifoldSentenceTransformer(nn.Module):
             A tensor containing the configured geometry distance.
 
         Notes:
-            This is an inference helper. Inputs are moved to the model device and
-            geometry dtype, and the distance is computed under ``torch.no_grad()``.
-            Lorentz distance is evaluated in ``float64``; Poincare, Euclidean,
-            SphereProjection, and Stereographic currently keep the model parameter
-            dtype.
+            This is an inference helper. Inputs are moved to the geometry device
+            and dtype, and the distance is computed under ``torch.no_grad()``.
+            Lorentz, SphereProjection, and Stereographic distance are evaluated in
+            ``float64``. Poincare and Euclidean retain the model parameter dtype.
+            SphereProjection/Stereographic distance uses CPU when the encoder is
+            on Apple MPS because MPS does not support ``float64`` tensors.
         """
         reference = next(self.parameters())
-        geometry_dtype = (
-            torch.float64 if self.manifold_name == "lorentz" else reference.dtype
+        use_double_geometry = self.manifold_name in _DOUBLE_GEOMETRY_MANIFOLDS
+        geometry_dtype = torch.float64 if use_double_geometry else reference.dtype
+        geometry_device = _select_geometry_device(
+            self.manifold_name,
+            self.encoder.device,
         )
         a_tensor = torch.as_tensor(
             a,
-            device=reference.device,
+            device=geometry_device,
             dtype=geometry_dtype,
         )
         b_tensor = torch.as_tensor(
             b,
-            device=reference.device,
+            device=geometry_device,
             dtype=geometry_dtype,
         )
 
