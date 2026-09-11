@@ -5,6 +5,8 @@ import torch
 from torch import nn
 
 import neembed.model as model_module
+from neembed import ManifoldPrototypeHierarchyLoss, ManifoldPrototypes
+from neembed.manifolds import get_manifold
 from neembed.model import ManifoldSentenceTransformer, _select_geometry_device
 
 
@@ -67,7 +69,42 @@ class _SimulatedTransferModule(nn.Module):
         return self
 
 
-def _make_transfer_model(manifold_name: str) -> tuple[ManifoldSentenceTransformer, _RecordingManifold]:
+class _SimulatedProjection(_SimulatedTransferModule):
+    """Keep CPU storage for CI while exposing simulated MPS placement."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.weight = nn.Parameter(torch.tensor([0.02, -0.01], dtype=torch.float32))
+
+
+class _SimulatedPrototypeModel(ManifoldSentenceTransformer):
+    """Minimal sentence model that exercises real manifold/prototype autograd."""
+
+    def __init__(self, manifold_name: str) -> None:
+        nn.Module.__init__(self)
+        self.encoder = _SimulatedTransferModule()
+        self.projection = _SimulatedProjection()
+        self.manifold_name = manifold_name
+        self.embedding_dim = 2
+        self.learnable_curvature = False
+        self.manifold = get_manifold(
+            manifold_name,
+            sectional_curvature=0.5,
+        )
+
+    def forward(self, sentences) -> torch.Tensor:
+        lengths = torch.tensor(
+            [float(len(sentence)) for sentence in sentences],
+            dtype=torch.float32,
+        )
+        tangent = lengths[:, None] * self.projection.weight[None, :]
+        tangent = tangent.to(device="cpu", dtype=torch.float64)
+        return self.manifold.expmap0(tangent)
+
+
+def _make_transfer_model(
+    manifold_name: str,
+) -> tuple[ManifoldSentenceTransformer, _RecordingManifold]:
     model = ManifoldSentenceTransformer.__new__(ManifoldSentenceTransformer)
     nn.Module.__init__(model)
     model.encoder = _SimulatedTransferModule()
@@ -132,3 +169,39 @@ def test_parent_module_to_mps_preserves_cpu_float64_geometry_fallback(
     assert manifold.requested_device == torch.device("cpu")
     assert manifold.requested_dtype == torch.float64
     assert model.manifold is manifold
+
+
+@pytest.mark.parametrize("manifold_name", ["sphere_projection", "stereographic"])
+def test_prototype_hierarchy_loss_to_mps_keeps_prototypes_on_cpu_and_backpropagates(
+    manifold_name: str,
+) -> None:
+    model = _SimulatedPrototypeModel(manifold_name)
+    prototypes = ManifoldPrototypes(model, 3, init_std=0.01)
+    loss_module = ManifoldPrototypeHierarchyLoss(
+        model,
+        prototypes,
+        prototype_ids=("root", "child", "other"),
+        parent_relations=(("child", "root"),),
+    )
+
+    loss_module.to("mps")
+
+    assert model.encoder.device == torch.device("mps")
+    assert model.manifold.k.device == torch.device("cpu")
+    assert model.manifold.k.dtype == torch.float64
+    assert prototypes.prototypes.device == torch.device("cpu")
+    assert prototypes.prototypes.dtype == torch.float64
+
+    loss = loss_module(
+        ("a", "aaaa", "aaaaaaaa"),
+        ("root", "child", "other"),
+    )
+    assert loss.ndim == 0
+    assert torch.isfinite(loss)
+
+    loss.backward()
+    assert model.projection.weight.grad is not None
+    assert torch.isfinite(model.projection.weight.grad).all()
+    assert torch.count_nonzero(model.projection.weight.grad) > 0
+    assert prototypes.prototypes.grad is not None
+    assert torch.isfinite(prototypes.prototypes.grad).all()
