@@ -122,6 +122,31 @@ class ManifoldSentenceTransformer(nn.Module):
             _select_geometry_device(self.manifold_name, self.encoder.device)
         )
 
+    def _apply(self, fn, recurse: bool = True):
+        """Apply module transfers while preserving the stereographic dtype policy."""
+        manifold = self._modules.get("manifold")
+        protect_manifold = (
+            self.manifold_name in _STEREOGRAPHIC_DOUBLE_MANIFOLDS
+            and manifold is not None
+        )
+        if not protect_manifold:
+            return super()._apply(fn, recurse=recurse)
+
+        # ``nn.Module.to()`` applies recursively to child modules. Temporarily
+        # exclude the float64 stereographic manifold so a parent ``.to("mps")``
+        # cannot move its curvature state onto unsupported MPS double tensors.
+        self._modules["manifold"] = None
+        try:
+            result = super()._apply(fn, recurse=recurse)
+        finally:
+            self._modules["manifold"] = manifold
+
+        manifold.to(
+            device=_select_geometry_device(self.manifold_name, self.encoder.device),
+            dtype=torch.float64,
+        )
+        return result
+
     @property
     def curvature(self) -> float:
         """Return the current legacy public curvature magnitude as a Python float.
