@@ -67,6 +67,12 @@ class _RecordingManifold(nn.Module):
         self.requested_dtype = kwargs.get("dtype")
         return self
 
+    def _apply(self, fn, recurse: bool = True):
+        result = super()._apply(fn, recurse=recurse)
+        self.requested_device = self.k.device
+        self.requested_dtype = self.k.dtype
+        return result
+
 
 class _SimulatedTransferModule(nn.Module):
     """Pretend an ordinary child module followed ``.to('mps')`` without MPS CI."""
