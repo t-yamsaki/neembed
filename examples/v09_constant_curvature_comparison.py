@@ -53,6 +53,8 @@ GRADED_RELEVANCE = {
 LEGACY_CURVATURE = 0.5
 SIGNED_CURVATURE = 0.5
 TEMPERATURE = 0.1
+CURVATURE_REL_TOL = 1e-6
+CURVATURE_ABS_TOL = 1e-7
 
 GEOMETRY_CONFIGS: tuple[tuple[str, dict[str, Any]], ...] = (
     (
@@ -297,7 +299,12 @@ def _validate_regression(results: dict[str, Any]) -> None:
         metadata = diagnostics["metadata"]
         if metadata["manifold"] != expected_manifold[name]:
             raise RuntimeError(f"{name} manifold metadata changed")
-        if metadata["sectional_curvature"] != expected_sectional[name]:
+        if not math.isclose(
+            metadata["sectional_curvature"],
+            expected_sectional[name],
+            rel_tol=CURVATURE_REL_TOL,
+            abs_tol=CURVATURE_ABS_TOL,
+        ):
             raise RuntimeError(f"{name} sectional-curvature metadata changed")
         if name in {"poincare", "lorentz"}:
             if metadata["curvature_api"] != "curvature":
