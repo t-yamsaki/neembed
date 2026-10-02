@@ -284,3 +284,149 @@ def test_parent_transfer_is_independent_of_prototype_child_order(
     assert model.manifold.k.device == torch.device("cpu")
     assert model.manifold.k.dtype == torch.float64
     assert prototypes.manifold is model.manifold
+
+
+@pytest.mark.parametrize("manifold_name", ["sphere_projection", "stereographic"])
+def test_model_dtype_casts_never_quantize_fixed_double_curvature(
+    monkeypatch,
+    manifold_name: str,
+) -> None:
+    monkeypatch.setattr(model_module, "SentenceTransformer", _FakeCpuEncoder)
+    model = ManifoldSentenceTransformer(
+        "fake-model",
+        manifold=manifold_name,
+        embedding_dim=2,
+        sectional_curvature=0.1234567890123,
+    )
+    original_curvature = model.manifold.k.detach().clone()
+
+    model.double()
+    assert model.encoder.linear.weight.dtype == torch.float64
+    assert model.projection.weight.dtype == torch.float64
+    assert torch.equal(model.manifold.k, original_curvature)
+
+    model.float()
+    assert model.encoder.linear.weight.dtype == torch.float32
+    assert model.projection.weight.dtype == torch.float32
+    assert model.manifold.k.dtype == torch.float64
+    assert torch.equal(model.manifold.k, original_curvature)
+
+    model.half()
+    assert model.encoder.linear.weight.dtype == torch.float16
+    assert model.projection.weight.dtype == torch.float16
+    assert model.manifold.k.dtype == torch.float64
+    assert torch.equal(model.manifold.k, original_curvature)
+
+    model.to(dtype=torch.float32)
+    assert model.encoder.linear.weight.dtype == torch.float32
+    assert model.projection.weight.dtype == torch.float32
+    assert torch.equal(model.manifold.k, original_curvature)
+
+
+@pytest.mark.parametrize("manifold_name", ["sphere_projection", "stereographic"])
+def test_prototype_dtype_casts_preserve_values_gradients_metadata_and_identity(
+    monkeypatch,
+    manifold_name: str,
+) -> None:
+    monkeypatch.setattr(model_module, "SentenceTransformer", _FakeCpuEncoder)
+    model = ManifoldSentenceTransformer(
+        "fake-model",
+        manifold=manifold_name,
+        embedding_dim=2,
+        sectional_curvature=0.5,
+    )
+    prototypes = ManifoldPrototypes(model, 3, init_std=0.01)
+    parameter = prototypes.prototypes
+    manifold = parameter.manifold
+    values = torch.tensor(
+        [
+            [0.1234567890123, -0.2345678901234],
+            [0.3456789012345, -0.4567890123456],
+            [0.5678901234567, -0.6789012345678],
+        ],
+        dtype=torch.float64,
+    )
+    gradient = torch.tensor(
+        [
+            [0.0123456789012, -0.0234567890123],
+            [0.0345678901234, -0.0456789012345],
+            [0.0567890123456, -0.0678901234567],
+        ],
+        dtype=torch.float64,
+    )
+    with torch.no_grad():
+        parameter.copy_(values)
+    parameter.grad = gradient.clone()
+
+    for convert in (
+        lambda module: module.float(),
+        lambda module: module.half(),
+        lambda module: module.to(device="cpu", dtype=torch.float32),
+    ):
+        convert(prototypes)
+        assert prototypes.prototypes is parameter
+        assert isinstance(parameter, geoopt.ManifoldParameter)
+        assert parameter.manifold is manifold
+        assert parameter.dtype == torch.float64
+        assert torch.equal(parameter, values)
+        assert parameter.grad is not None
+        assert parameter.grad.dtype == torch.float64
+        assert torch.equal(parameter.grad, gradient)
+
+
+@pytest.mark.parametrize("manifold_name", ["sphere_projection", "stereographic"])
+def test_to_empty_mps_empties_geometry_on_cpu_fallback(
+    manifold_name: str,
+) -> None:
+    model = _SimulatedPrototypeModel(manifold_name)
+    prototypes = ManifoldPrototypes(model, 3, init_std=0.01)
+    old_k = model.manifold.k.detach()
+    old_prototypes = prototypes.prototypes.detach()
+
+    model.to_empty(device="mps")
+    prototypes.to_empty(device="mps")
+
+    assert model.encoder.device == torch.device("mps")
+    assert model.manifold.k.device == torch.device("cpu")
+    assert model.manifold.k.dtype == torch.float64
+    assert model.manifold.k.data_ptr() != old_k.data_ptr()
+    assert prototypes.prototypes.device == torch.device("cpu")
+    assert prototypes.prototypes.dtype == torch.float64
+    assert prototypes.prototypes.data_ptr() != old_prototypes.data_ptr()
+
+
+@pytest.mark.parametrize("manifold_name", ["sphere_projection", "stereographic"])
+def test_meta_to_empty_mps_preserves_prototype_gradient_and_optimizer_reference(
+    monkeypatch,
+    manifold_name: str,
+) -> None:
+    monkeypatch.setattr(model_module, "SentenceTransformer", _FakeCpuEncoder)
+    model = ManifoldSentenceTransformer(
+        "fake-model",
+        manifold=manifold_name,
+        embedding_dim=2,
+        sectional_curvature=0.5,
+    )
+    prototypes = ManifoldPrototypes(model, 3, init_std=0.01)
+    parameter = prototypes.prototypes
+    parameter.grad = torch.full_like(parameter, 0.125)
+    optimizer = geoopt.optim.RiemannianAdam([parameter], lr=1e-3)
+
+    prototypes.to("meta")
+    assert prototypes.prototypes is parameter
+    assert optimizer.param_groups[0]["params"][0] is parameter
+    assert parameter.device.type == "meta"
+    assert parameter.grad is not None
+    assert parameter.grad.device.type == "meta"
+
+    prototypes.to_empty(device="mps")
+
+    assert prototypes.prototypes is parameter
+    assert optimizer.param_groups[0]["params"][0] is parameter
+    assert isinstance(parameter, geoopt.ManifoldParameter)
+    assert parameter.manifold is model.manifold
+    assert parameter.device == torch.device("cpu")
+    assert parameter.dtype == torch.float64
+    assert parameter.grad is not None
+    assert parameter.grad.device == torch.device("cpu")
+    assert parameter.grad.dtype == torch.float64
