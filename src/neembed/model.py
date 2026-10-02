@@ -39,6 +39,97 @@ def _select_geometry_device(
     return device
 
 
+def _apply_closure_values(fn) -> dict[str, Any]:
+    """Return closure values for a standard PyTorch ``Module._apply`` transform."""
+    code = getattr(fn, "__code__", None)
+    closure = getattr(fn, "__closure__", None)
+    if code is None or closure is None:
+        return {}
+
+    values: dict[str, Any] = {}
+    for name, cell in zip(code.co_freevars, closure):
+        try:
+            values[name] = cell.cell_contents
+        except ValueError:
+            continue
+    return values
+
+
+def _apply_requests_empty(fn) -> bool:
+    """Return whether ``fn`` represents PyTorch's empty-allocation transform."""
+    qualname = getattr(fn, "__qualname__", "")
+    code = getattr(fn, "__code__", None)
+    names = () if code is None else code.co_names
+    return "Module.to_empty" in qualname or "empty_like" in names
+
+
+def _apply_requested_dtype(fn) -> torch.dtype | None:
+    """Return an explicitly requested floating dtype, when one is detectable."""
+    values = _apply_closure_values(fn)
+    dtype = values.get("dtype")
+    if isinstance(dtype, torch.dtype):
+        return dtype
+
+    qualname = getattr(fn, "__qualname__", "")
+    dtype_methods = {
+        "Module.float": torch.float32,
+        "Module.double": torch.float64,
+        "Module.half": torch.float16,
+        "Module.bfloat16": torch.bfloat16,
+    }
+    for marker, requested_dtype in dtype_methods.items():
+        if marker in qualname:
+            return requested_dtype
+
+    dst_type = values.get("dst_type")
+    if dst_type is not None:
+        try:
+            return torch.empty(0, dtype=torch.float64).type(dst_type).dtype
+        except (RuntimeError, TypeError):
+            return None
+    return None
+
+
+def _fixed_double_apply_fn(
+    manifold_name: str,
+    fn,
+    target_device: torch.device | str,
+):
+    """Translate a module transform while preserving fixed float64 geometry.
+
+    Device movement and empty-allocation semantics are preserved, but requests
+    to narrow floating tensors are deliberately ignored for the fixed-double
+    SphereProjection/Stereographic geometry state. MPS targets are translated to
+    the CPU geometry fallback before any float64 tensor is allocated or copied.
+    """
+    target_device = torch.device(target_device)
+    geometry_device = _select_geometry_device(manifold_name, target_device)
+
+    def geometry_dtype(tensor: torch.Tensor) -> torch.dtype:
+        return torch.float64 if tensor.is_floating_point() else tensor.dtype
+
+    if _apply_requests_empty(fn):
+        return lambda tensor: torch.empty_like(
+            tensor,
+            device=geometry_device,
+            dtype=geometry_dtype(tensor),
+        )
+
+    requested_dtype = _apply_requested_dtype(fn)
+    if target_device.type == "mps" or (
+        requested_dtype is not None and requested_dtype != torch.float64
+    ):
+        def preserve_double(tensor: torch.Tensor) -> torch.Tensor:
+            dtype = geometry_dtype(tensor)
+            if tensor.device == geometry_device and tensor.dtype == dtype:
+                return tensor
+            return tensor.to(device=geometry_device, dtype=dtype)
+
+        return preserve_double
+
+    return fn
+
+
 class ManifoldSentenceTransformer(nn.Module):
     """Map pretrained sentence embeddings onto a configured manifold.
 
@@ -123,7 +214,7 @@ class ManifoldSentenceTransformer(nn.Module):
         )
 
     def _apply(self, fn, recurse: bool = True):
-        """Apply module transforms while preserving fixed-double MPS fallback."""
+        """Apply module transforms while preserving fixed-double geometry state."""
         manifold = self._modules.get("manifold")
         protect_manifold = (
             self.manifold_name in _STEREOGRAPHIC_DOUBLE_MANIFOLDS
@@ -132,34 +223,23 @@ class ManifoldSentenceTransformer(nn.Module):
         if not protect_manifold:
             return super()._apply(fn, recurse=recurse)
 
-        # Transform the ordinary model children first, while keeping the float64
-        # manifold away from an unsupported MPS transfer. The transformed encoder
-        # then tells us whether the manifold really needs the CPU fallback.
+        # Ordinary model state follows the requested transform unchanged. The
+        # protected geometry receives an equivalent transform that preserves its
+        # fixed float64 policy and translates unsupported MPS storage to CPU.
         self._modules["manifold"] = None
         try:
             result = super()._apply(fn, recurse=recurse)
         finally:
             self._modules["manifold"] = manifold
 
-        geometry_device = _select_geometry_device(
+        geometry_fn = _fixed_double_apply_fn(
             self.manifold_name,
+            fn,
             self.encoder.device,
         )
-        if self.encoder.device.type == "mps":
-            # MPS cannot represent float64. If the manifold is meta-backed, the
-            # transform that just succeeded for the encoder is materializing
-            # storage (for example ``to_empty``), so materialize the manifold on
-            # the CPU geometry device instead of trying to copy a meta tensor.
-            if manifold.k.device.type == "meta":
-                manifold.to_empty(device=geometry_device)
-            else:
-                manifold.to(device=geometry_device)
-        else:
-            # Preserve the exact PyTorch transform for all supported non-MPS
-            # targets, including ``to_empty`` and meta-device transitions.
-            manifold._apply(fn, recurse=True)
-
-        manifold.to(dtype=torch.float64)
+        manifold._apply(geometry_fn, recurse=True)
+        if manifold.k.dtype != torch.float64:
+            raise RuntimeError("fixed stereographic curvature must remain float64")
         return result
 
     @property
