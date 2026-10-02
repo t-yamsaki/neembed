@@ -9,7 +9,7 @@ a minimal trainer, retrieval evaluators, exact corpus search, offline
 hard-negative mining, explicit hierarchy supervision, and opt-in manifold
 prototypes. The current development API supports Euclidean, Poincare, Lorentz,
 SphereProjection, and generic signed-curvature Stereographic geometry. Learnable
-curvature remains limited to the backward-compatible Poincare/Lorentz
+curvature remains limited to the backward-compatible Poincare and Lorentz
 positive-magnitude path.
 
 Start with :doc:`getting_started/quickstart` if you want the ordinary training
