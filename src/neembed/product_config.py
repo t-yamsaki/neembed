@@ -25,6 +25,12 @@ _COMPONENT_KEYS = {
     "sectional_curvature",
     "scale",
 }
+_PERSISTED_COMPONENT_BASE_KEYS = {
+    "name",
+    "manifold",
+    "intrinsic_dim",
+    "scale",
+}
 
 
 def _positive_finite(value: Any, *, field: str) -> float:
@@ -199,7 +205,7 @@ class ProductConfig:
             )
         if "components" not in metadata:
             raise ValueError("product metadata requires components")
-        return _normalize_components(metadata["components"])
+        return _load_persisted_components(metadata["components"])
 
 
 def _normalize_component(
@@ -243,6 +249,48 @@ def _normalize_components(components: Any) -> ProductConfig:
             for index, component in enumerate(components)
         )
     )
+
+
+def _load_persisted_components(components: Any) -> ProductConfig:
+    """Load the exact normalized component schema without constructor defaults."""
+    if isinstance(components, (str, bytes)) or not isinstance(components, Sequence):
+        raise ValueError("product metadata components must be a non-empty ordered sequence")
+    if not components:
+        raise ValueError("product metadata components must contain at least one component")
+
+    normalized: list[ProductComponentConfig] = []
+    for index, component in enumerate(components):
+        if not isinstance(component, Mapping):
+            raise ValueError(f"persisted product component {index} must be a mapping")
+
+        manifold = component.get("manifold")
+        if manifold not in _SUPPORTED_COMPONENT_MANIFOLDS:
+            raise ValueError(
+                f"persisted product component {index} has unsupported manifold: {manifold!r}"
+            )
+
+        expected = set(_PERSISTED_COMPONENT_BASE_KEYS)
+        if manifold in {"poincare", "lorentz"}:
+            expected.add("curvature")
+        else:
+            expected.add("sectional_curvature")
+
+        missing = expected - set(component)
+        if missing:
+            joined = ", ".join(sorted(missing))
+            raise ValueError(
+                f"persisted product component {index} missing required field(s): {joined}"
+            )
+        unknown = set(component) - expected
+        if unknown:
+            joined = ", ".join(sorted(str(key) for key in unknown))
+            raise ValueError(
+                f"persisted product component {index} has unsupported field(s): {joined}"
+            )
+
+        normalized.append(_normalize_component(component, index=index))
+
+    return ProductConfig(tuple(normalized))
 
 
 def normalize_product_config(
