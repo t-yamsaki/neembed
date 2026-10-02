@@ -119,9 +119,7 @@ class ProductComponentConfig:
     @property
     def ambient_dim(self) -> int:
         """Width occupied by this component in the packed manifold point."""
-        if self.manifold == "lorentz":
-            return self.intrinsic_dim + 1
-        return self.intrinsic_dim
+        return self.intrinsic_dim + 1 if self.manifold == "lorentz" else self.intrinsic_dim
 
     def to_dict(self) -> dict[str, Any]:
         """Return deterministic JSON-compatible persistence metadata."""
@@ -187,9 +185,7 @@ class ProductConfig:
         """Validate persisted product metadata and return its normalized form."""
         if not isinstance(metadata, Mapping):
             raise ValueError("product metadata must be a mapping")
-
-        allowed_keys = {"type", "version", "components"}
-        unknown = set(metadata) - allowed_keys
+        unknown = set(metadata) - {"type", "version", "components"}
         if unknown:
             joined = ", ".join(sorted(str(key) for key in unknown))
             raise ValueError(f"unsupported product metadata field(s): {joined}")
@@ -212,111 +208,28 @@ def _normalize_component(
     index: int,
 ) -> ProductComponentConfig:
     if isinstance(component, ProductComponentConfig):
-        raw: Mapping[str, Any] = component.to_dict()
-    elif isinstance(component, Mapping):
-        raw = component
-    else:
+        return component
+    if not isinstance(component, Mapping):
         raise ValueError(f"product component {index} must be a mapping")
 
-    unknown = set(raw) - _COMPONENT_KEYS
+    unknown = set(component) - _COMPONENT_KEYS
     if unknown:
         joined = ", ".join(sorted(str(key) for key in unknown))
         raise ValueError(
             f"product component {index} has unsupported field(s): {joined}"
         )
 
-    manifold = raw.get("manifold")
-    if manifold not in _SUPPORTED_COMPONENT_MANIFOLDS:
-        raise ValueError(
-            f"product component {index} has unsupported manifold: {manifold!r}"
+    try:
+        return ProductComponentConfig(
+            name=component.get("name", f"component_{index}"),
+            manifold=component.get("manifold"),
+            intrinsic_dim=component.get("intrinsic_dim"),
+            curvature=component.get("curvature"),
+            sectional_curvature=component.get("sectional_curvature"),
+            scale=component.get("scale", 1.0),
         )
-
-    intrinsic_dim = raw.get("intrinsic_dim")
-    if (
-        isinstance(intrinsic_dim, bool)
-        or not isinstance(intrinsic_dim, int)
-        or intrinsic_dim <= 0
-    ):
-        raise ValueError(
-            f"product component {index} intrinsic_dim must be a positive integer"
-        )
-
-    name = raw.get("name", f"component_{index}")
-    if not isinstance(name, str) or not name or name != name.strip():
-        raise ValueError(
-            f"product component {index} name must be a non-empty trimmed string"
-        )
-
-    scale = _positive_finite(
-        raw.get("scale", 1.0),
-        field=f"product component {index} scale",
-    )
-
-    curvature: float | None = None
-    sectional_curvature: float | None = None
-
-    if manifold in {"poincare", "lorentz"}:
-        if raw.get("sectional_curvature") is not None:
-            raise ValueError(
-                f"product component {index} {manifold} uses curvature, not "
-                "sectional_curvature"
-            )
-        curvature = _positive_finite(
-            raw.get("curvature", 1.0),
-            field=f"product component {index} curvature",
-        )
-    elif manifold == "euclidean":
-        if raw.get("curvature") is not None:
-            raise ValueError(
-                f"product component {index} euclidean does not accept curvature"
-            )
-        raw_sectional = raw.get("sectional_curvature", 0.0)
-        sectional_curvature = _finite(
-            raw_sectional,
-            field=f"product component {index} sectional_curvature",
-        )
-        if sectional_curvature != 0.0:
-            raise ValueError(
-                f"product component {index} euclidean sectional_curvature "
-                "must be exactly 0.0"
-            )
-    elif manifold == "sphere_projection":
-        if raw.get("curvature") is not None:
-            raise ValueError(
-                f"product component {index} sphere_projection does not accept curvature"
-            )
-        if raw.get("sectional_curvature") is None:
-            raise ValueError(
-                f"product component {index} sphere_projection requires "
-                "sectional_curvature"
-            )
-        sectional_curvature = _positive_finite(
-            raw["sectional_curvature"],
-            field=f"product component {index} sectional_curvature",
-        )
-    else:
-        if raw.get("curvature") is not None:
-            raise ValueError(
-                f"product component {index} stereographic does not accept curvature"
-            )
-        if raw.get("sectional_curvature") is None:
-            raise ValueError(
-                f"product component {index} stereographic requires "
-                "sectional_curvature"
-            )
-        sectional_curvature = _finite(
-            raw["sectional_curvature"],
-            field=f"product component {index} sectional_curvature",
-        )
-
-    return ProductComponentConfig(
-        name=name,
-        manifold=manifold,
-        intrinsic_dim=intrinsic_dim,
-        curvature=curvature,
-        sectional_curvature=sectional_curvature,
-        scale=scale,
-    )
+    except ValueError as exc:
+        raise ValueError(f"product component {index} {exc}") from exc
 
 
 def _normalize_components(components: Any) -> ProductConfig:
@@ -324,15 +237,12 @@ def _normalize_components(components: Any) -> ProductConfig:
         raise ValueError("product components must be a non-empty ordered sequence")
     if not components:
         raise ValueError("product components must contain at least one component")
-
-    normalized = tuple(
-        _normalize_component(component, index=index)
-        for index, component in enumerate(components)
+    return ProductConfig(
+        tuple(
+            _normalize_component(component, index=index)
+            for index, component in enumerate(components)
+        )
     )
-    names = [component.name for component in normalized]
-    if len(names) != len(set(names)):
-        raise ValueError("product component names must be unique")
-    return ProductConfig(normalized)
 
 
 def normalize_product_config(
