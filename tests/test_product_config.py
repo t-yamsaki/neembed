@@ -150,7 +150,7 @@ def test_product_config_persistence_round_trip_is_deterministic() -> None:
         ({"manifold": "sphere_projection", "intrinsic_dim": 8}, "requires sectional_curvature"),
         (
             {"manifold": "sphere_projection", "intrinsic_dim": 8, "sectional_curvature": 0.0},
-            "positive finite",
+            "positive and finite",
         ),
         ({"manifold": "stereographic", "intrinsic_dim": 8}, "requires sectional_curvature"),
         (
