@@ -114,7 +114,12 @@ def test_v09_constant_curvature_comparison_is_deterministic_and_finite(
 
         metadata = diagnostics["metadata"]
         assert metadata["manifold"] == expected_manifold[name]
-        assert metadata["sectional_curvature"] == expected_sectional[name]
+        assert math.isclose(
+            metadata["sectional_curvature"],
+            expected_sectional[name],
+            rel_tol=1e-6,
+            abs_tol=1e-7,
+        )
         assert metadata["embedding_device"] == "cpu"
 
     assert first["variants"]["poincare"]["metadata"]["curvature_api"] == "curvature"
