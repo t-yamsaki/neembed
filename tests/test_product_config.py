@@ -81,6 +81,20 @@ def test_product_config_assigns_deterministic_default_names() -> None:
     assert config.component_names == ("component_0", "component_1")
 
 
+def test_constructor_normalization_keeps_convenient_component_defaults() -> None:
+    config = normalize_product_config(
+        [{"manifold": "poincare", "intrinsic_dim": 2}]
+    )
+
+    assert config.components[0] == ProductComponentConfig(
+        name="component_0",
+        manifold="poincare",
+        intrinsic_dim=2,
+        curvature=1.0,
+        scale=1.0,
+    )
+
+
 def test_product_config_persistence_round_trip_is_deterministic() -> None:
     config = normalize_product_config(
         [
@@ -121,6 +135,63 @@ def test_product_config_persistence_round_trip_is_deterministic() -> None:
     assert loaded == config
     assert loaded.to_dict() == metadata
     assert normalize_product_config(metadata) == config
+
+
+@pytest.mark.parametrize(
+    ("component", "missing_field"),
+    [
+        (
+            {
+                "name": "negative",
+                "manifold": "poincare",
+                "intrinsic_dim": 2,
+                "curvature": 1.0,
+                "scale": 1.0,
+            },
+            "name",
+        ),
+        (
+            {
+                "name": "negative",
+                "manifold": "poincare",
+                "intrinsic_dim": 2,
+                "curvature": 1.0,
+                "scale": 1.0,
+            },
+            "curvature",
+        ),
+        (
+            {
+                "name": "negative",
+                "manifold": "poincare",
+                "intrinsic_dim": 2,
+                "curvature": 1.0,
+                "scale": 1.0,
+            },
+            "scale",
+        ),
+        (
+            {
+                "name": "flat",
+                "manifold": "euclidean",
+                "intrinsic_dim": 2,
+                "sectional_curvature": 0.0,
+                "scale": 1.0,
+            },
+            "sectional_curvature",
+        ),
+    ],
+)
+def test_product_config_load_rejects_missing_persisted_fields(
+    component, missing_field
+) -> None:
+    truncated = dict(component)
+    truncated.pop(missing_field)
+
+    with pytest.raises(ValueError, match=rf"missing required field.*{missing_field}"):
+        ProductConfig.from_dict(
+            {"type": "product", "version": 1, "components": [truncated]}
+        )
 
 
 @pytest.mark.parametrize(
