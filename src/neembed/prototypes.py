@@ -43,8 +43,9 @@ class ManifoldPrototypes(nn.Module):
         stabilization projection to Geoopt.
 
         SphereProjection and Stereographic prototypes follow their shared
-        manifold's float64 geometry device. In particular, they remain on CPU
-        when the associated sentence model uses the Apple MPS CPU fallback.
+        manifold's float64 geometry device from initialization onward. In
+        particular, they remain on CPU when the associated sentence model uses
+        the Apple MPS CPU fallback.
 
         Prototype coordinates are external to
         :meth:`neembed.ManifoldSentenceTransformer.save_pretrained`; persist this
@@ -71,10 +72,16 @@ class ManifoldPrototypes(nn.Module):
         self.ambient_dim = self.embedding_dim + int(self.manifold_name == "lorentz")
 
         manifold = model.manifold
+        random_kwargs = {"std": init_std}
+        if self.manifold_name in _STEREOGRAPHIC_DOUBLE_MANIFOLDS:
+            random_kwargs.update(
+                dtype=torch.float64,
+                device=manifold.k.device,
+            )
         initial = manifold.random_normal(
             self.num_prototypes,
             self.ambient_dim,
-            std=init_std,
+            **random_kwargs,
         )
         self.prototypes = geoopt.ManifoldParameter(initial, manifold=manifold)
 
