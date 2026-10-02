@@ -1,10 +1,12 @@
 """Regression coverage for stereographic float64 device selection on Apple MPS."""
 
+import geoopt
 import pytest
 import torch
 from torch import nn
 
 import neembed.model as model_module
+import neembed.prototypes as prototypes_module
 from neembed import ManifoldPrototypeHierarchyLoss, ManifoldPrototypes
 from neembed.manifolds import get_manifold
 from neembed.model import ManifoldSentenceTransformer, _select_geometry_device
@@ -34,6 +36,19 @@ class _FakeMpsEncoder(nn.Module):
     @property
     def device(self) -> torch.device:
         return torch.device("mps")
+
+    def get_embedding_dimension(self) -> int:
+        return 4
+
+
+class _FakeCpuEncoder(nn.Module):
+    def __init__(self, model_name_or_path: str) -> None:
+        super().__init__()
+        self.linear = nn.Linear(3, 4, bias=False)
+
+    @property
+    def device(self) -> torch.device:
+        return self.linear.weight.device
 
     def get_embedding_dimension(self) -> int:
         return 4
@@ -173,6 +188,7 @@ def test_parent_module_to_mps_preserves_cpu_float64_geometry_fallback(
 
 @pytest.mark.parametrize("manifold_name", ["sphere_projection", "stereographic"])
 def test_prototype_hierarchy_loss_to_mps_keeps_prototypes_on_cpu_and_backpropagates(
+    monkeypatch,
     manifold_name: str,
 ) -> None:
     model = _SimulatedPrototypeModel(manifold_name)
@@ -182,6 +198,11 @@ def test_prototype_hierarchy_loss_to_mps_keeps_prototypes_on_cpu_and_backpropaga
         prototypes,
         prototype_ids=("root", "child", "other"),
         parent_relations=(("child", "root"),),
+    )
+    monkeypatch.setattr(
+        prototypes_module,
+        "_infer_apply_device",
+        lambda fn, source_device: torch.device("mps"),
     )
 
     loss_module.to("mps")
@@ -205,3 +226,61 @@ def test_prototype_hierarchy_loss_to_mps_keeps_prototypes_on_cpu_and_backpropaga
     assert torch.count_nonzero(model.projection.weight.grad) > 0
     assert prototypes.prototypes.grad is not None
     assert torch.isfinite(prototypes.prototypes.grad).all()
+
+
+@pytest.mark.parametrize("manifold_name", ["sphere_projection", "stereographic"])
+def test_model_to_empty_materializes_protected_manifold(
+    monkeypatch,
+    manifold_name: str,
+) -> None:
+    monkeypatch.setattr(model_module, "SentenceTransformer", _FakeCpuEncoder)
+    model = ManifoldSentenceTransformer(
+        "fake-model",
+        manifold=manifold_name,
+        embedding_dim=2,
+        sectional_curvature=0.5,
+    )
+
+    model.to("meta")
+    assert model.manifold.k.device.type == "meta"
+
+    model.to_empty(device="cpu")
+
+    assert model.encoder.device == torch.device("cpu")
+    assert model.manifold.k.device == torch.device("cpu")
+    assert model.manifold.k.dtype == torch.float64
+
+
+@pytest.mark.parametrize("manifold_name", ["sphere_projection", "stereographic"])
+def test_parent_transfer_is_independent_of_prototype_child_order(
+    monkeypatch,
+    manifold_name: str,
+) -> None:
+    monkeypatch.setattr(model_module, "SentenceTransformer", _FakeCpuEncoder)
+    model = ManifoldSentenceTransformer(
+        "fake-model",
+        manifold=manifold_name,
+        embedding_dim=2,
+        sectional_curvature=0.5,
+    )
+    prototypes = ManifoldPrototypes(model, 3, init_std=0.01)
+    parent = nn.Module()
+    parent.add_module("prototypes", prototypes)
+    parent.add_module("model", model)
+
+    parent.to("meta")
+
+    assert prototypes.prototypes.device.type == "meta"
+    assert prototypes.prototypes.dtype == torch.float64
+    assert isinstance(prototypes.prototypes, geoopt.ManifoldParameter)
+    assert model.manifold.k.device.type == "meta"
+    assert prototypes.manifold is model.manifold
+
+    parent.to_empty(device="cpu")
+
+    assert prototypes.prototypes.device == torch.device("cpu")
+    assert prototypes.prototypes.dtype == torch.float64
+    assert isinstance(prototypes.prototypes, geoopt.ManifoldParameter)
+    assert model.manifold.k.device == torch.device("cpu")
+    assert model.manifold.k.dtype == torch.float64
+    assert prototypes.manifold is model.manifold
