@@ -291,9 +291,9 @@ Because the shared constructor and ``get_manifold`` retain the legacy
 ``curvature=1.0`` default for source compatibility, new manifold backends do not
 interpret that default as their curvature. If a caller supplies a non-default
 legacy ``curvature`` value together with ``euclidean``, ``sphere_projection``,
-or ``stereographic``, v0.9 raises ``ValueError`` rather than silently ignoring
-or reinterpreting it. This makes accidental use of the old keyword visible while
-preserving calls that rely on the existing default.
+or ``stereographic``, the v0.9 implementation must raise ``ValueError`` rather
+than silently ignore or reinterpret it. This makes accidental use of the old
+keyword visible while preserving calls that rely on the existing default.
 
 For v0.9, signed curvature is fixed. There is no
 ``learnable_sectional_curvature`` contract and no support for learning through
