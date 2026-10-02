@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [日本語](docs/README_ja.md)
 
-> **Status:** Package version v0.8.0 adds caller-owned hierarchy supervision, radial/depth/directed hierarchy objectives, retrieval-plus-hierarchy composition, structure evaluation, and a deterministic hierarchy regression example while preserving all v0.4-v0.7 public paths. The `main` development line is adding v0.9 constant-curvature geometry selection while keeping the existing Poincaré/Lorentz curvature contract backward-compatible. The API remains intentionally small and may still evolve before a stable 1.0 release.
+> **Status:** Package version v0.9.0 adds explicit Euclidean, SphereProjection, and fixed signed-curvature Stereographic geometry, plus a float64 stereographic stability policy and matched constant-curvature regression example, while preserving all v0.4-v0.8 public paths and the existing Poincaré/Lorentz curvature contract. The API remains intentionally small and may still evolve before a stable 1.0 release.
 
 `neembed` is a lightweight integration layer between pretrained Sentence Transformer models and manifold-valued representations. It keeps the pretrained encoder intact, optionally projects its Euclidean output, and delegates constant-curvature geometry to Geoopt.
 
@@ -31,7 +31,7 @@ Hierarchical and tree-like relations can be awkward to represent in a flat Eucli
 - hierarchical labels
 - tree-like semantic relations
 
-The current development API supports Euclidean, Poincaré, Lorentz / Hyperboloid, SphereProjection, and generic signed-curvature Stereographic geometry through the same sentence-model, objective, evaluator, retrieval, and save/load surface. Geometry choice is task-dependent; neembed does not claim that curvature alone guarantees quality gains.
+The current API supports Euclidean, Poincaré, Lorentz / Hyperboloid, SphereProjection, and generic signed-curvature Stereographic geometry through the same sentence-model, objective, evaluator, retrieval, and save/load surface. Geometry choice is task-dependent; neembed does not claim that curvature alone guarantees quality gains.
 
 ## Current scope
 
@@ -88,7 +88,7 @@ v0.8 adds explicit hierarchy-native learning without introducing a graph framewo
 - `ManifoldHierarchyEvaluator` for radial-order and depth-vs-radius structure diagnostics
 - a deterministic Poincaré retrieval-only vs hierarchy-aware regression example
 
-v0.9 development adds constant-curvature geometry selection without changing the legacy hyperbolic curvature meaning:
+v0.9 adds constant-curvature geometry selection without changing the legacy hyperbolic curvature meaning:
 
 - Euclidean as the explicit flat `K=0` backend
 - SphereProjection for fixed positive sectional curvature
@@ -97,7 +97,7 @@ v0.9 development adds constant-curvature geometry selection without changing the
 - float64 geometry operations for SphereProjection/Stereographic, including CPU geometry fallback when the encoder runs on Apple MPS
 - a deterministic matched constant-curvature comparison example for engineering regression, not geometry ranking
 
-Product/mixed-curvature models, advanced SPD/Siegel/Stiefel geometry, ontology parsing, graph-database integration, ANN/vector-database integration, and distributed retrieval remain outside this scope.
+Product/mixed-curvature models, learnable signed curvature crossing zero, advanced SPD/Siegel/Stiefel/Birkhoff geometry, ontology parsing, graph-database integration, ANN/vector-database integration, and distributed retrieval remain outside this scope.
 
 A manifold-valued **output** does not by itself require Riemannian optimization: encoder/projection parameters and learnable curvature are not manifold-valued points. Detailed parameter, optimizer, persistence, and numerical behavior lives in the [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html). The end-to-end retrieval composition and the distinction between small in-memory reranking, exact corpus search, and external ANN systems are documented in the [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html). Objective and graded-evaluation selection for v0.7 is documented in the [Retrieval objectives guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html). Explicit v0.8 hierarchy supervision, origin/radius semantics, composition, and structure metrics are documented in the [Hierarchy-native learning guide](https://neembed.readthedocs.io/en/latest/user_guide/hierarchy.html). v0.9 geometry roles, curvature naming, compatibility, dtype/device behavior, and matched-comparison guidance are documented in the [Constant-curvature geometry guide](https://neembed.readthedocs.io/en/latest/user_guide/constant_curvature_semantics.html).
 
