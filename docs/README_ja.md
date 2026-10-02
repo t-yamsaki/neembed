@@ -4,9 +4,9 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [English README](../README.md)
 
-> **Status:** package version v0.8.0 では、caller-owned hierarchy supervision、radial / depth / directed hierarchy objective、retrieval-plus-hierarchy composition、structure evaluation、deterministic hierarchy regression example を追加しつつ、v0.4-v0.7 の公開 contract を維持しています。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
+> **Status:** package version v0.9.0 では、明示的な Euclidean、SphereProjection、fixed signed-curvature Stereographic、stereographic float64 stability policy、matched constant-curvature regression example を追加しつつ、v0.4-v0.8 の公開 contract と既存 Poincaré/Lorentz curvature semantics を維持しています。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
 
-`neembed` は、pretrained Sentence Transformer と manifold-valued representation をつなぐ軽量な integration layer です。pretrained encoder はそのまま利用し、必要に応じて Euclidean embedding を projection したうえで、双曲幾何の演算を Geoopt に委譲します。
+`neembed` は、pretrained Sentence Transformer と manifold-valued representation をつなぐ軽量な integration layer です。pretrained encoder はそのまま利用し、必要に応じて Euclidean embedding を projection したうえで、constant-curvature geometry の演算を Geoopt に委譲します。
 
 ```text
 Pretrained Sentence Encoder
@@ -31,7 +31,7 @@ Non-Euclidean embedding
 - 階層ラベル
 - 木構造に近い意味関係
 
-現在の API は、Poincaré ball と Lorentz / Hyperboloid を同じ model・loss・trainer・evaluator・sentence-model save/load workflow で扱えます。
+現在の API は、Euclidean、Poincaré ball、Lorentz / Hyperboloid、SphereProjection、generic signed-curvature Stereographic を同じ model・loss・trainer・evaluator・retrieval・save/load workflow で扱えます。geometry choice は task-dependent であり、curvature だけで品質向上が保証されるという主張はしません。
 
 ## 現在のスコープ
 
@@ -88,9 +88,18 @@ v0.8 では graph framework を導入せず、明示的な hierarchy-native lear
 - radial-order と depth-vs-radius structure diagnostic を返す `ManifoldHierarchyEvaluator`
 - retrieval-only と hierarchy-aware を比較する deterministic Poincaré regression example
 
-新しい manifold family、ontology parsing、graph-database integration、ANN / vector database integration、distributed retrieval はこの scope の対象外です。
+v0.9 では legacy hyperbolic curvature の意味を変えず、constant-curvature geometry selection を追加します。
 
-manifold-valued な **出力** を返すだけでは Riemannian optimization は必要ありません。encoder / projection parameter と learnable curvature は manifold 上の点ではありません。parameter・optimizer・persistence・numerical behavior の詳細は [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) を参照してください。小規模 in-memory reranking、exact corpus search、外部 ANN system の境界を含む end-to-end retrieval workflow は [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html) にまとめています。v0.7 の objective と graded evaluation の選び方は [Retrieval objectives guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html)、v0.8 の explicit hierarchy supervision・origin/radius semantics・composition・structure metrics は [Hierarchy-native learning guide](https://neembed.readthedocs.io/en/latest/user_guide/hierarchy.html) を参照してください。
+- flat `K=0` の明示的な baseline として Euclidean
+- fixed positive sectional curvature 用の SphereProjection
+- `K<0`、`K=0`、`K>0` を扱う fixed signed-curvature Stereographic
+- Poincaré/Lorentz の `curvature=c>0` は引き続き `K=-c` の magnitude
+- SphereProjection/Stereographic は float64 geometry path を使い、Apple MPS では encoder/projection を MPS に保ちながら geometry を CPU に fallback
+- geometry ranking ではなく engineering regression を目的とした deterministic matched constant-curvature comparison example
+
+Product/mixed-curvature model、learnable signed curvature crossing zero、advanced SPD/Siegel/Stiefel/Birkhoff geometry、ontology parsing、graph-database integration、ANN / vector database integration、distributed retrieval はこの scope の対象外です。
+
+manifold-valued な **出力** を返すだけでは Riemannian optimization は必要ありません。encoder / projection parameter と learnable curvature は manifold 上の点ではありません。parameter・optimizer・persistence・numerical behavior の詳細は [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) を参照してください。小規模 in-memory reranking、exact corpus search、外部 ANN system の境界を含む end-to-end retrieval workflow は [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html) にまとめています。v0.7 の objective と graded evaluation の選び方は [Retrieval objectives guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html)、v0.8 の explicit hierarchy supervision・origin/radius semantics・composition・structure metrics は [Hierarchy-native learning guide](https://neembed.readthedocs.io/en/latest/user_guide/hierarchy.html)、v0.9 の geometry role・curvature naming・dtype/device policy は [Constant-curvature geometry guide](https://neembed.readthedocs.io/en/latest/user_guide/constant_curvature_semantics.html) を参照してください。
 
 ## インストール
 
@@ -143,7 +152,7 @@ distance = model.distance(embeddings[0], embeddings[1])
 print(float(distance))
 ```
 
-各 anchor は同じ batch index の positive と対応します。off-diagonal candidate は in-batch negative になるため、同じ batch 内で positive を重複させないでください。この model-only path は出力が manifold-valued でも通常の AdamW behavior のままです。目的関数と batching の詳細は [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html)、optional explicit negatives と retrieval evaluation は [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html)、v0.7 の objective / metric 選択は [Retrieval objectives guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html)、v0.8 の explicit hierarchy supervision は [Hierarchy-native learning guide](https://neembed.readthedocs.io/en/latest/user_guide/hierarchy.html)、trainable manifold prototype を追加する前には [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) を参照してください。
+各 anchor は同じ batch index の positive と対応します。off-diagonal candidate は in-batch negative になるため、同じ batch 内で positive を重複させないでください。この model-only path は出力が manifold-valued でも通常の AdamW behavior のままです。目的関数と batching の詳細は [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html)、optional explicit negatives と retrieval evaluation は [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html)、v0.7 の objective / metric 選択は [Retrieval objectives guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html)、v0.8 の explicit hierarchy supervision は [Hierarchy-native learning guide](https://neembed.readthedocs.io/en/latest/user_guide/hierarchy.html)、v0.9 の geometry/curvature semantics は [Constant-curvature geometry guide](https://neembed.readthedocs.io/en/latest/user_guide/constant_curvature_semantics.html)、trainable manifold prototype を追加する前には [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) を参照してください。
 
 ## ドキュメント
 
@@ -152,6 +161,7 @@ print(float(distance))
 - [Installation](https://neembed.readthedocs.io/en/latest/getting_started/installation.html)
 - [Quick Start](https://neembed.readthedocs.io/en/latest/getting_started/quickstart.html)
 - [Architecture](https://neembed.readthedocs.io/en/latest/user_guide/architecture.html)
+- [Constant-curvature geometry](https://neembed.readthedocs.io/en/latest/user_guide/constant_curvature_semantics.html)
 - [Learnable structure](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html)
 - [Training](https://neembed.readthedocs.io/en/latest/user_guide/training.html)
 - [Retrieval workflow](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html)
@@ -174,6 +184,7 @@ python examples/v05_retrieval_workflow.py
 python examples/v06_exact_retrieval_workflow.py
 python examples/v07_objective_comparison.py
 python examples/v08_hierarchy_learning.py
+python examples/v09_constant_curvature_comparison.py
 ```
 
 - [examples/train_poincare.py](../examples/train_poincare.py) — 最小の Poincaré workflow
@@ -185,6 +196,7 @@ python examples/v08_hierarchy_learning.py
 - [examples/v06_exact_retrieval_workflow.py](../examples/v06_exact_retrieval_workflow.py) — exact corpus search、explicit-ID corpus evaluation、offline hard-negative mining、既存 three-sequence trainer を1つにまとめた Poincaré regression workflow。research benchmark ではありません
 - [examples/v07_objective_comparison.py](../examples/v07_objective_comparison.py) — fixed data / initialization で MNRL、Triplet、MarginMSE、DistanceMSE と MRR、Recall@K、nDCG@K を比較する deterministic workflow。research benchmark や superiority claim ではありません
 - [examples/v08_hierarchy_learning.py](../examples/v08_hierarchy_learning.py) — explicit caller-owned hierarchy supervision を使った retrieval-only vs hierarchy-aware の deterministic Poincaré regression。benchmark や superiority claim ではありません
+- [examples/v09_constant_curvature_comparison.py](../examples/v09_constant_curvature_comparison.py) — Euclidean、Poincaré、Lorentz、SphereProjection、signed Stereographic を matched 条件で比較し、retrieval と dtype/device diagnostics を確認する deterministic engineering regression。benchmark や geometry-superiority claim ではありません
 - [experiments/README.md](../experiments/README.md) — 再現可能な Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark と解釈上の注意
 
 ## License
