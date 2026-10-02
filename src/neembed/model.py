@@ -123,7 +123,7 @@ class ManifoldSentenceTransformer(nn.Module):
         )
 
     def _apply(self, fn, recurse: bool = True):
-        """Apply module transfers while preserving the stereographic dtype policy."""
+        """Apply module transforms while preserving fixed-double MPS fallback."""
         manifold = self._modules.get("manifold")
         protect_manifold = (
             self.manifold_name in _STEREOGRAPHIC_DOUBLE_MANIFOLDS
@@ -132,19 +132,34 @@ class ManifoldSentenceTransformer(nn.Module):
         if not protect_manifold:
             return super()._apply(fn, recurse=recurse)
 
-        # ``nn.Module.to()`` applies recursively to child modules. Temporarily
-        # exclude the float64 stereographic manifold so a parent ``.to("mps")``
-        # cannot move its curvature state onto unsupported MPS double tensors.
+        # Transform the ordinary model children first, while keeping the float64
+        # manifold away from an unsupported MPS transfer. The transformed encoder
+        # then tells us whether the manifold really needs the CPU fallback.
         self._modules["manifold"] = None
         try:
             result = super()._apply(fn, recurse=recurse)
         finally:
             self._modules["manifold"] = manifold
 
-        manifold.to(
-            device=_select_geometry_device(self.manifold_name, self.encoder.device),
-            dtype=torch.float64,
+        geometry_device = _select_geometry_device(
+            self.manifold_name,
+            self.encoder.device,
         )
+        if self.encoder.device.type == "mps":
+            # MPS cannot represent float64. If the manifold is meta-backed, the
+            # transform that just succeeded for the encoder is materializing
+            # storage (for example ``to_empty``), so materialize the manifold on
+            # the CPU geometry device instead of trying to copy a meta tensor.
+            if manifold.k.device.type == "meta":
+                manifold.to_empty(device=geometry_device)
+            else:
+                manifold.to(device=geometry_device)
+        else:
+            # Preserve the exact PyTorch transform for all supported non-MPS
+            # targets, including ``to_empty`` and meta-device transitions.
+            manifold._apply(fn, recurse=True)
+
+        manifold.to(dtype=torch.float64)
         return result
 
     @property
