@@ -194,6 +194,28 @@ def test_product_config_load_rejects_missing_persisted_fields(
         )
 
 
+@pytest.mark.parametrize("manifold", [[], {}, ["poincare"]])
+def test_constructor_rejects_non_string_manifold_values(manifold) -> None:
+    with pytest.raises(ValueError, match="manifold.*string"):
+        normalize_product_config([{"manifold": manifold, "intrinsic_dim": 2}])
+
+
+@pytest.mark.parametrize("manifold", [[], {}, ["poincare"]])
+def test_persistence_rejects_non_string_manifold_values(manifold) -> None:
+    component = {
+        "name": "broken",
+        "manifold": manifold,
+        "intrinsic_dim": 2,
+        "curvature": 1.0,
+        "scale": 1.0,
+    }
+
+    with pytest.raises(ValueError, match="persisted product component 0 manifold.*string"):
+        ProductConfig.from_dict(
+            {"type": "product", "version": 1, "components": [component]}
+        )
+
+
 @pytest.mark.parametrize(
     ("component", "message"),
     [
