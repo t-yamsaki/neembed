@@ -220,7 +220,7 @@ class ManifoldSentenceTransformer(nn.Module):
             self.manifold_name in _STEREOGRAPHIC_DOUBLE_MANIFOLDS
             and manifold is not None
         )
-        if not protect_manifold:
+        if not protect_manifold or not recurse:
             return super()._apply(fn, recurse=recurse)
 
         # Ordinary model state follows the requested transform unchanged. The
