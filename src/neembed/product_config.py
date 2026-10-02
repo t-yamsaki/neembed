@@ -51,6 +51,14 @@ def _finite(value: Any, *, field: str) -> float:
     return normalized
 
 
+def _validate_manifold_name(value: Any, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must be a supported manifold name string")
+    if value not in _SUPPORTED_COMPONENT_MANIFOLDS:
+        raise ValueError(f"{field} has unsupported manifold: {value!r}")
+    return value
+
+
 @dataclass(frozen=True)
 class ProductComponentConfig:
     """One normalized component in an ordered mixed-curvature product.
@@ -73,8 +81,8 @@ class ProductComponentConfig:
     def __post_init__(self) -> None:
         if not isinstance(self.name, str) or not self.name or self.name != self.name.strip():
             raise ValueError("name must be a non-empty trimmed string")
-        if self.manifold not in _SUPPORTED_COMPONENT_MANIFOLDS:
-            raise ValueError(f"unsupported manifold: {self.manifold!r}")
+        manifold = _validate_manifold_name(self.manifold, field="manifold")
+        object.__setattr__(self, "manifold", manifold)
         if (
             isinstance(self.intrinsic_dim, bool)
             or not isinstance(self.intrinsic_dim, int)
@@ -84,10 +92,10 @@ class ProductComponentConfig:
 
         object.__setattr__(self, "scale", _positive_finite(self.scale, field="scale"))
 
-        if self.manifold in {"poincare", "lorentz"}:
+        if manifold in {"poincare", "lorentz"}:
             if self.sectional_curvature is not None:
                 raise ValueError(
-                    f"{self.manifold} uses curvature, not sectional_curvature"
+                    f"{manifold} uses curvature, not sectional_curvature"
                 )
             curvature = 1.0 if self.curvature is None else self.curvature
             object.__setattr__(
@@ -98,9 +106,9 @@ class ProductComponentConfig:
             return
 
         if self.curvature is not None:
-            raise ValueError(f"{self.manifold} does not accept curvature")
+            raise ValueError(f"{manifold} does not accept curvature")
 
-        if self.manifold == "euclidean":
+        if manifold == "euclidean":
             sectional = 0.0 if self.sectional_curvature is None else self.sectional_curvature
             sectional = _finite(sectional, field="sectional_curvature")
             if sectional != 0.0:
@@ -109,9 +117,9 @@ class ProductComponentConfig:
             return
 
         if self.sectional_curvature is None:
-            raise ValueError(f"{self.manifold} requires sectional_curvature")
+            raise ValueError(f"{manifold} requires sectional_curvature")
         sectional = _finite(self.sectional_curvature, field="sectional_curvature")
-        if self.manifold == "sphere_projection" and sectional <= 0.0:
+        if manifold == "sphere_projection" and sectional <= 0.0:
             raise ValueError(
                 "sphere_projection sectional_curvature must be positive and finite"
             )
@@ -263,11 +271,10 @@ def _load_persisted_components(components: Any) -> ProductConfig:
         if not isinstance(component, Mapping):
             raise ValueError(f"persisted product component {index} must be a mapping")
 
-        manifold = component.get("manifold")
-        if manifold not in _SUPPORTED_COMPONENT_MANIFOLDS:
-            raise ValueError(
-                f"persisted product component {index} has unsupported manifold: {manifold!r}"
-            )
+        manifold = _validate_manifold_name(
+            component.get("manifold"),
+            field=f"persisted product component {index} manifold",
+        )
 
         expected = set(_PERSISTED_COMPONENT_BASE_KEYS)
         if manifold in {"poincare", "lorentz"}:
