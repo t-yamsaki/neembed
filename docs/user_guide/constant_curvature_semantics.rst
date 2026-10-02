@@ -2,8 +2,8 @@ Constant-curvature semantics for v0.9
 =====================================
 
 This page is the implementation contract for the v0.9 constant-curvature
-follow-on work. It defines names, validation, and persistence semantics only;
-it does not add new manifold backends by itself.
+follow-on work. It defines names, validation, persistence, and numerical dtype
+semantics for the supported constant-curvature backends.
 
 Existing Poincare and Lorentz contract
 --------------------------------------
@@ -224,6 +224,49 @@ The v0.9 geometry issues use the following relationships for parity tests:
 * ``lorentz(curvature=c)`` also has sectional curvature ``-c``, but it uses
   hyperboloid coordinates with one extra ambient coordinate; do not require
   coordinate-wise equality with stereographic representations.
+
+Numerical dtype policy
+----------------------
+
+Geoopt strongly recommends double precision for the stereographic model because
+its projection, conformal-factor, inverse-trigonometric, and distance operations
+can become numerically fragile in ``float32``. neembed therefore treats
+``sphere_projection`` and ``stereographic`` as **float64 geometry paths**.
+
+The policy is deliberately narrower than converting the whole sentence model to
+double precision:
+
+* encoder and optional projection parameters retain their existing dtype, which
+  is commonly ``float32``;
+* after the projection, the tangent vector is promoted to ``torch.float64``
+  before ``expmap0`` for ``sphere_projection`` and ``stereographic``;
+* the Geoopt sectional-curvature tensor ``k`` for those backends is constructed
+  as ``float64``;
+* encoded SphereProjection/Stereographic manifold points are therefore
+  ``float64`` tensors (or ``float64`` NumPy arrays when tensor output is not
+  requested);
+* ``model.distance()`` converts external inputs to ``float64`` before evaluating
+  SphereProjection/Stereographic geodesic distance;
+* exact corpus search, corpus evaluation, and hard-negative mining preserve the
+  encoded ``float64`` values while staging embeddings on CPU and while moving
+  active distance blocks back to the model device.
+
+The cast after the projection remains differentiable: gradients from a
+``float64`` manifold loss flow through the cast back to ordinary projection and
+encoder parameters in their original dtype. The policy therefore improves the
+geometry calculation without doubling the storage of the whole transformer.
+
+Lorentz already uses a separate ``float64`` geometry path and remains unchanged.
+Poincare and Euclidean retain their existing model-parameter dtype in v0.9 for
+backward compatibility; this issue does not silently change their output dtype.
+
+The cost is that SphereProjection/Stereographic embeddings and distance blocks
+use roughly twice the memory of their ``float32`` equivalents, and double
+precision may be slower on some devices. ``float64`` improves robustness but is
+not a guarantee against every extreme radius/curvature regime. v0.9 does not add
+automatic curvature clipping, radius clipping, arbitrary precision, or a mixed-
+precision geometry policy; callers should still treat non-finite values as a
+failed numerical regime rather than silently accepting them.
 
 Scope boundary
 --------------
