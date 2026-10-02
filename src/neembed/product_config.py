@@ -64,6 +64,53 @@ class ProductComponentConfig:
     sectional_curvature: float | None = None
     scale: float = 1.0
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or not self.name or self.name != self.name.strip():
+            raise ValueError("name must be a non-empty trimmed string")
+        if self.manifold not in _SUPPORTED_COMPONENT_MANIFOLDS:
+            raise ValueError(f"unsupported manifold: {self.manifold!r}")
+        if (
+            isinstance(self.intrinsic_dim, bool)
+            or not isinstance(self.intrinsic_dim, int)
+            or self.intrinsic_dim <= 0
+        ):
+            raise ValueError("intrinsic_dim must be a positive integer")
+
+        object.__setattr__(self, "scale", _positive_finite(self.scale, field="scale"))
+
+        if self.manifold in {"poincare", "lorentz"}:
+            if self.sectional_curvature is not None:
+                raise ValueError(
+                    f"{self.manifold} uses curvature, not sectional_curvature"
+                )
+            curvature = 1.0 if self.curvature is None else self.curvature
+            object.__setattr__(
+                self,
+                "curvature",
+                _positive_finite(curvature, field="curvature"),
+            )
+            return
+
+        if self.curvature is not None:
+            raise ValueError(f"{self.manifold} does not accept curvature")
+
+        if self.manifold == "euclidean":
+            sectional = 0.0 if self.sectional_curvature is None else self.sectional_curvature
+            sectional = _finite(sectional, field="sectional_curvature")
+            if sectional != 0.0:
+                raise ValueError("euclidean sectional_curvature must be exactly 0.0")
+            object.__setattr__(self, "sectional_curvature", sectional)
+            return
+
+        if self.sectional_curvature is None:
+            raise ValueError(f"{self.manifold} requires sectional_curvature")
+        sectional = _finite(self.sectional_curvature, field="sectional_curvature")
+        if self.manifold == "sphere_projection" and sectional <= 0.0:
+            raise ValueError(
+                "sphere_projection sectional_curvature must be positive and finite"
+            )
+        object.__setattr__(self, "sectional_curvature", sectional)
+
     @property
     def projection_dim(self) -> int:
         """Width consumed from the ordinary encoder projection."""
@@ -96,6 +143,21 @@ class ProductConfig:
     """Normalized ordered configuration for a flat product of vector geometries."""
 
     components: tuple[ProductComponentConfig, ...]
+
+    def __post_init__(self) -> None:
+        if isinstance(self.components, (str, bytes)) or not isinstance(
+            self.components, Sequence
+        ):
+            raise ValueError("components must be a non-empty ordered sequence")
+        components = tuple(self.components)
+        if not components:
+            raise ValueError("components must contain at least one component")
+        if not all(isinstance(component, ProductComponentConfig) for component in components):
+            raise ValueError("components must contain ProductComponentConfig values")
+        names = [component.name for component in components]
+        if len(names) != len(set(names)):
+            raise ValueError("component names must be unique")
+        object.__setattr__(self, "components", components)
 
     @property
     def projection_dim(self) -> int:
