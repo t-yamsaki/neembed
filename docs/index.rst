@@ -7,9 +7,10 @@ spaces while delegating manifold geometry to Geoopt.
 The public API is intentionally small: a sentence model, manifold-aware losses,
 a minimal trainer, retrieval evaluators, exact corpus search, offline
 hard-negative mining, explicit hierarchy supervision, and opt-in manifold
-prototypes. The current development API supports Poincare and Lorentz
-hyperbolic models, fixed or learnable curvature, and true manifold-valued
-prototype parameters while preserving the original model-only AdamW path.
+prototypes. The current development API supports Euclidean, Poincare, Lorentz,
+SphereProjection, and generic signed-curvature Stereographic geometry. Learnable
+curvature remains limited to the backward-compatible Poincare/Lorentz
+positive-magnitude path.
 
 Start with :doc:`getting_started/quickstart` if you want the ordinary training
 workflow. For v0.7 objective selection and graded relevance -- MNRL, symmetric
@@ -19,9 +20,9 @@ small-list reranking, exact corpus search, corpus evaluation, and caller-invoked
 hard-negative mining -- see :doc:`user_guide/retrieval`. For v0.8 explicit
 hierarchy supervision -- radial order, depth, directed triplets, retrieval-plus-
 hierarchy composition, and structure metrics -- see :doc:`user_guide/hierarchy`.
-For the backward-compatible v0.9 naming and persistence contract for negative,
-zero, and positive sectional curvature, see
-:doc:`user_guide/constant_curvature_semantics`. Read
+For v0.9 geometry selection, curvature naming, compatibility, persistence, and
+float64/device guidance across negative, zero, and positive sectional curvature,
+see :doc:`user_guide/constant_curvature_semantics`. Read
 :doc:`user_guide/learnable_structure` to distinguish Euclidean trainable
 parameters, learnable curvature, and manifold-valued prototypes, or jump to the
 :ref:`api-reference` for class and function details generated from the public
