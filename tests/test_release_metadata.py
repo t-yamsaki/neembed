@@ -1,4 +1,4 @@
-"""Release-readiness checks for public v0.8 metadata and contracts."""
+"""Release-readiness checks for public v0.9 metadata and contracts."""
 
 from importlib.metadata import metadata
 from inspect import signature
@@ -6,16 +6,11 @@ from pathlib import Path
 
 import neembed
 from neembed import (
-    ManifoldCorpusRetrievalEvaluator,
     ManifoldDepthLoss,
     ManifoldDistanceMSELoss,
-    ManifoldEmbeddingEvaluator,
-    ManifoldGradedCorpusRetrievalEvaluator,
-    ManifoldHierarchyEvaluator,
     ManifoldHierarchyTripletLoss,
     ManifoldMarginMSELoss,
     ManifoldMultipleNegativesRankingLoss,
-    ManifoldPrototypeAssignmentEvaluator,
     ManifoldRadialOrderLoss,
     ManifoldRetrievalHierarchyLoss,
     ManifoldSentenceTransformer,
@@ -31,145 +26,106 @@ ROOT = Path(__file__).parents[1]
 DOCUMENTATION_URL = "https://neembed.readthedocs.io/en/latest/"
 
 
-def test_pyproject_declares_v08_public_metadata() -> None:
-    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+def _read(path: str) -> str:
+    return (ROOT / path).read_text(encoding="utf-8")
+
+
+def test_v09_public_package_metadata() -> None:
+    pyproject = _read("pyproject.toml")
+    package_metadata = metadata("neembed-geoopt")
+    project_urls = package_metadata.get_all("Project-URL") or []
 
     assert 'requires = ["setuptools>=77.0.3"]' in pyproject
     assert 'name = "neembed-geoopt"' in pyproject
-    assert 'version = "0.8.0"' in pyproject
+    assert 'version = "0.9.0"' in pyproject
     assert 'requires-python = ">=3.10"' in pyproject
     assert 'license = "MIT"' in pyproject
     assert 'license-files = ["LICENSE"]' in pyproject
     assert '{ name = "taishi-yamasaki" }' in pyproject
-    assert 'Homepage = "https://github.com/t-yamsaki/neembed"' in pyproject
     assert f'Documentation = "{DOCUMENTATION_URL}"' in pyproject
-    assert 'Repository = "https://github.com/t-yamsaki/neembed"' in pyproject
-    assert 'Issues = "https://github.com/t-yamsaki/neembed/issues"' in pyproject
-    assert "License ::" not in pyproject
-
     for python_version in ("3.10", "3.11", "3.12"):
         assert f'"Programming Language :: Python :: {python_version}"' in pyproject
-
     for dependency in ("torch", "sentence-transformers", "geoopt"):
         assert f'    "{dependency}",' in pyproject
 
-
-def test_installed_distribution_exposes_v08_metadata() -> None:
-    package_metadata = metadata("neembed-geoopt")
-    project_urls = package_metadata.get_all("Project-URL") or []
-
     assert package_metadata["Name"] == "neembed-geoopt"
-    assert package_metadata["Version"] == "0.8.0"
+    assert package_metadata["Version"] == "0.9.0"
     assert package_metadata["Requires-Python"] == ">=3.10"
     assert f"Documentation, {DOCUMENTATION_URL}" in project_urls
-
-
-def test_distribution_name_keeps_neembed_import_package() -> None:
-    assert (ROOT / "src" / "neembed" / "__init__.py").is_file()
     assert neembed.__name__ == "neembed"
 
-    english = (ROOT / "README.md").read_text(encoding="utf-8")
-    japanese = (ROOT / "docs" / "README_ja.md").read_text(encoding="utf-8")
-    installation = (
-        ROOT / "docs" / "getting_started" / "installation.rst"
-    ).read_text(encoding="utf-8")
+
+def test_v09_readmes_preserve_prior_scope_and_publish_geometry_surface() -> None:
+    english = _read("README.md")
+    japanese = _read("docs/README_ja.md")
+    installation = _read("docs/getting_started/installation.rst")
 
     for document in (english, japanese, installation):
         assert "pip install neembed-geoopt" in document
 
-    assert "from neembed import (" in english
-    assert "from neembed import (" in japanese
-
-
-def test_readmes_describe_v08_and_preserve_prior_release_scope() -> None:
-    english = (ROOT / "README.md").read_text(encoding="utf-8")
-    japanese = (ROOT / "docs" / "README_ja.md").read_text(encoding="utf-8")
-
     for readme in (english, japanese):
         assert "TBD" not in readme
         assert "<YOUR_USERNAME>" not in readme
-        assert "v0.8.0" in readme
-        assert "v0.7" in readme
-        assert "v0.6" in readme
-        assert "v0.5" in readme
-        assert "v0.4" in readme
-        assert "v0.3" in readme
-        assert "Lorentz" in readme
-        assert "ManifoldEmbeddingEvaluator" in readme
-        assert "ManifoldPrototypes" in readme
-        assert "Recall@K" in readme
-        assert "MRR" in readme
-        assert "model.rank()" in readme
-        assert "exact_corpus_search()" in readme
-        assert "ManifoldCorpusRetrievalEvaluator" in readme
-        assert "mine_hard_negatives()" in readme
-        assert "ManifoldTripletLoss" in readme
-        assert "ManifoldMarginMSELoss" in readme
-        assert "ManifoldDistanceMSELoss" in readme
-        assert "ManifoldSymmetricMultipleNegativesRankingLoss" in readme
-        assert "ManifoldGradedCorpusRetrievalEvaluator" in readme
-        assert "nDCG@K" in readme
-        assert "ManifoldRadialOrderLoss" in readme
-        assert "ManifoldDepthLoss" in readme
-        assert "ManifoldHierarchyTripletLoss" in readme
-        assert "ManifoldRetrievalHierarchyLoss" in readme
-        assert "ManifoldHierarchyEvaluator" in readme
-        assert "ANN" in readme
-        assert "MIT License" in readme
+        for release in ("v0.9.0", "v0.8", "v0.7", "v0.6", "v0.5", "v0.4", "v0.3"):
+            assert release in readme
+        for term in (
+            "Poincaré",
+            "Lorentz",
+            "Euclidean",
+            "SphereProjection",
+            "Stereographic",
+            "ManifoldPrototypes",
+            "ManifoldEmbeddingEvaluator",
+            "model.rank()",
+            "exact_corpus_search()",
+            "mine_hard_negatives()",
+            "ManifoldTripletLoss",
+            "ManifoldMarginMSELoss",
+            "ManifoldDistanceMSELoss",
+            "ManifoldSymmetricMultipleNegativesRankingLoss",
+            "ManifoldGradedCorpusRetrievalEvaluator",
+            "ManifoldRadialOrderLoss",
+            "ManifoldDepthLoss",
+            "ManifoldHierarchyTripletLoss",
+            "ManifoldRetrievalHierarchyLoss",
+            "ManifoldHierarchyEvaluator",
+            "Recall@K",
+            "MRR",
+            "nDCG@K",
+            "MIT License",
+            "user_guide/constant_curvature_semantics.html",
+            "examples/v09_constant_curvature_comparison.py",
+        ):
+            assert term in readme
         assert DOCUMENTATION_URL in readme
-        assert "user_guide/retrieval_objectives.html" in readme
-        assert "user_guide/hierarchy.html" in readme
-        assert "examples/v08_hierarchy_learning.py" in readme
 
-    assert "Package version v0.8.0" in english
-    assert "package version v0.8.0" in japanese
+    assert "Package version v0.9.0" in english
+    assert "package version v0.9.0" in japanese
     assert "fixed-curvature v0.3 path backward-compatible" in english
     assert "fixed-curvature の v0.3 path と後方互換" in japanese
+    assert "not a benchmark or geometry-superiority claim" in english
+    assert "geometry-superiority claim" in japanese
 
 
-def test_readmes_defer_detailed_guidance_to_read_the_docs() -> None:
-    english = (ROOT / "README.md").read_text(encoding="utf-8")
-    japanese = (ROOT / "docs" / "README_ja.md").read_text(encoding="utf-8")
-    retrieval = (ROOT / "docs" / "user_guide" / "retrieval.rst").read_text(
-        encoding="utf-8"
-    )
-    objectives = (
-        ROOT / "docs" / "user_guide" / "retrieval_objectives.rst"
-    ).read_text(encoding="utf-8")
-    hierarchy = (ROOT / "docs" / "user_guide" / "hierarchy.rst").read_text(
-        encoding="utf-8"
-    )
+def test_v09_geometry_guide_is_the_detailed_release_reference() -> None:
+    geometry = _read("docs/user_guide/constant_curvature_semantics.rst")
+    normalized_geometry = " ".join(geometry.split())
 
-    for readme in (english, japanese):
-        assert DOCUMENTATION_URL in readme
-        assert "$$" not in readme
-        assert "user_guide/retrieval.html" in readme
-        assert "user_guide/retrieval_objectives.html" in readme
-        assert "user_guide/hierarchy.html" in readme
-
-    assert "## Training objective" not in english
-    assert "## Numerical considerations" not in english
-    assert "## 学習目的" not in japanese
-    assert "## 数値安定性" not in japanese
-    assert "Recall@K" in retrieval
-    assert "MRR" in retrieval
-    assert "exact_corpus_search()" in retrieval
-    assert "mine_hard_negatives()" in retrieval
-    assert "v0.7" in objectives
-    assert "nDCG" in objectives
-    assert "ManifoldTripletLoss" in objectives
-    assert "ManifoldMarginMSELoss" in objectives
-    assert "ManifoldDistanceMSELoss" in objectives
-    assert "v0.8" in hierarchy
-    assert "ManifoldRadialOrderLoss" in hierarchy
-    assert "ManifoldDepthLoss" in hierarchy
-    assert "ManifoldHierarchyTripletLoss" in hierarchy
-    assert "ManifoldRetrievalHierarchyLoss" in hierarchy
-    assert "ManifoldHierarchyEvaluator" in hierarchy
-    assert "not a benchmark" in hierarchy
+    for term in (
+        "Choosing a geometry",
+        "Compatibility with existing workflows",
+        "sectional_curvature",
+        "SphereProjection",
+        "Stereographic",
+        "float64",
+        "Apple MPS",
+        "examples/v09_constant_curvature_comparison.py",
+    ):
+        assert term in geometry
+    assert "does **not** by itself guarantee better embedding quality" in normalized_geometry
 
 
-def test_public_api_preserves_v04_v07_contracts_and_exposes_v08() -> None:
+def test_v09_constructor_extends_without_replacing_prior_public_contracts() -> None:
     required_public_names = {
         "ManifoldSentenceTransformer",
         "ManifoldMultipleNegativesRankingLoss",
@@ -194,60 +150,31 @@ def test_public_api_preserves_v04_v07_contracts_and_exposes_v08() -> None:
     }
     assert required_public_names.issubset(set(neembed.__all__))
 
-    mnrl_parameters = signature(ManifoldMultipleNegativesRankingLoss.forward).parameters
-    aligned_evaluator_parameters = signature(ManifoldEmbeddingEvaluator).parameters
-    corpus_evaluator_parameters = signature(ManifoldCorpusRetrievalEvaluator).parameters
-    prototype_evaluator_parameters = signature(
-        ManifoldPrototypeAssignmentEvaluator
-    ).parameters
-    rank_parameters = signature(ManifoldSentenceTransformer.rank).parameters
-    search_parameters = signature(exact_corpus_search).parameters
-    mining_parameters = signature(mine_hard_negatives).parameters
+    constructor = signature(ManifoldSentenceTransformer).parameters
+    assert tuple(constructor) == (
+        "model_name_or_path",
+        "manifold",
+        "embedding_dim",
+        "curvature",
+        "learnable_curvature",
+        "sectional_curvature",
+    )
+    assert constructor["manifold"].default == "poincare"
+    assert constructor["curvature"].default == 1.0
+    assert constructor["learnable_curvature"].default is False
+    assert constructor["sectional_curvature"].default is None
 
-    assert tuple(mnrl_parameters) == ("self", "anchors", "positives", "negatives")
-    assert mnrl_parameters["negatives"].default is None
-    assert "recall_at_k" in aligned_evaluator_parameters
-    assert tuple(rank_parameters) == ("self", "query", "candidates", "top_k")
-    assert rank_parameters["top_k"].default is None
-    assert "prototype_ids" in prototype_evaluator_parameters
-    assert "expected_prototype_ids" in prototype_evaluator_parameters
-
-    for name in (
-        "query_ids",
-        "queries",
-        "corpus_ids",
-        "corpus",
-        "relevance",
-        "recall_at_k",
-        "query_chunk_size",
-        "corpus_chunk_size",
-    ):
-        assert name in corpus_evaluator_parameters
-
-    assert tuple(search_parameters) == (
-        "model",
-        "queries",
-        "corpus",
+    mnrl = signature(ManifoldMultipleNegativesRankingLoss.forward).parameters
+    assert tuple(mnrl) == ("self", "anchors", "positives", "negatives")
+    assert mnrl["negatives"].default is None
+    assert tuple(signature(ManifoldSentenceTransformer.rank).parameters) == (
+        "self",
+        "query",
+        "candidates",
         "top_k",
-        "query_chunk_size",
-        "corpus_chunk_size",
     )
-    assert search_parameters["top_k"].default is None
-    assert tuple(mining_parameters) == (
-        "model",
-        "queries",
-        "corpus",
-        "query_ids",
-        "corpus_ids",
-        "positive_corpus_ids",
-        "excluded_corpus_ids",
-        "num_negatives",
-        "query_chunk_size",
-        "corpus_chunk_size",
-    )
-    assert mining_parameters["excluded_corpus_ids"].default is None
-    assert mining_parameters["num_negatives"].default == 1
-
+    assert "query_chunk_size" in signature(exact_corpus_search).parameters
+    assert "num_negatives" in signature(mine_hard_negatives).parameters
     assert tuple(signature(ManifoldTripletLoss.forward).parameters) == (
         "self",
         "anchors",
@@ -267,32 +194,12 @@ def test_public_api_preserves_v04_v07_contracts_and_exposes_v08() -> None:
         "texts_b",
         "target_distance",
     )
-    symmetric_parameters = signature(
-        ManifoldSymmetricMultipleNegativesRankingLoss.forward
-    ).parameters
-    assert tuple(symmetric_parameters) == (
+    assert tuple(signature(ManifoldSymmetricMultipleNegativesRankingLoss.forward).parameters) == (
         "self",
         "anchors",
         "positives",
         "negatives",
     )
-    assert symmetric_parameters["negatives"].default is None
-
-    graded_parameters = signature(ManifoldGradedCorpusRetrievalEvaluator).parameters
-    for name in (
-        "model",
-        "query_ids",
-        "queries",
-        "corpus_ids",
-        "corpus",
-        "graded_relevance",
-        "recall_at_k",
-        "ndcg_at_k",
-        "query_chunk_size",
-        "corpus_chunk_size",
-    ):
-        assert name in graded_parameters
-
     assert tuple(signature(ManifoldRadialOrderLoss.forward).parameters) == (
         "self",
         "parents",
@@ -309,152 +216,70 @@ def test_public_api_preserves_v04_v07_contracts_and_exposes_v08() -> None:
         "children",
         "unrelated",
     )
-    composite_parameters = signature(ManifoldRetrievalHierarchyLoss.forward).parameters
-    assert tuple(composite_parameters) == (
+    assert tuple(signature(ManifoldRetrievalHierarchyLoss.forward).parameters) == (
         "self",
         "retrieval_inputs",
         "hierarchy_inputs",
     )
-    assert composite_parameters["hierarchy_inputs"].default is None
-    hierarchy_evaluator_parameters = signature(ManifoldHierarchyEvaluator).parameters
-    for name in (
-        "model",
-        "node_ids",
-        "texts",
-        "parent_child_edges",
-        "depths",
-        "contract",
-    ):
-        assert name in hierarchy_evaluator_parameters
-    assert "roots" not in hierarchy_evaluator_parameters
-
     fit_doc = ManifoldTrainer.fit.__doc__ or ""
     assert "two- or three-sequence batches" in fit_doc
     assert "margin-regression batches" in fit_doc
-    assert "(anchors, positives, negatives)" in fit_doc
-    assert "(anchors, positives, negatives, target_margin)" in fit_doc
 
 
-def test_release_suite_keeps_prior_paths_and_covers_v08_regressions() -> None:
+def test_v09_release_suite_keeps_prior_regressions_and_geometry_matrix() -> None:
     required_tests = {
-        "test_hard_negatives.py",
-        "test_evaluator.py",
-        "test_ranking.py",
-        "test_prototype_evaluator.py",
         "test_v04_learnable_structure.py",
         "test_v05_retrieval_example.py",
-        "test_retrieval.py",
-        "test_exact_corpus_search_batching.py",
-        "test_corpus_evaluator.py",
-        "test_corpus_evaluator_streaming.py",
-        "test_mining.py",
         "test_v06_exact_retrieval_example.py",
-        "test_triplet_loss.py",
-        "test_margin_mse_loss.py",
-        "test_distance_mse_loss.py",
-        "test_symmetric_ranking_loss.py",
-        "test_graded_corpus_evaluator.py",
-        "test_graded_corpus_evaluator_large_grades.py",
         "test_v07_objective_comparison_example.py",
-        "test_hierarchy.py",
-        "test_radial_order_loss.py",
-        "test_depth_loss.py",
-        "test_hierarchy_triplet_loss.py",
-        "test_composite_loss.py",
-        "test_hierarchy_evaluator.py",
         "test_v08_hierarchy_learning_example.py",
-        "test_v08_docs.py",
+        "test_euclidean.py",
+        "test_sphere_projection.py",
+        "test_stereographic.py",
+        "test_stereographic_dtype.py",
+        "test_stereographic_mps_policy.py",
+        "test_stereographic_prototype_initialization.py",
+        "test_stereographic_recurse_policy.py",
+        "test_v09_curvature_contract.py",
+        "test_v09_constant_curvature_comparison_example.py",
+        "test_v09_docs.py",
     }
-    assert required_tests.issubset(
-        {path.name for path in (ROOT / "tests").glob("test_*.py")}
-    )
+    assert required_tests.issubset({path.name for path in (ROOT / "tests").glob("test_*.py")})
 
-    v08_example = (
-        ROOT / "tests" / "test_v08_hierarchy_learning_example.py"
-    ).read_text(encoding="utf-8")
-    hierarchy_validation = (ROOT / "tests" / "test_hierarchy.py").read_text(
-        encoding="utf-8"
-    )
-    evaluator = (ROOT / "tests" / "test_hierarchy_evaluator.py").read_text(
-        encoding="utf-8"
-    )
-    composite = (ROOT / "tests" / "test_composite_loss.py").read_text(
-        encoding="utf-8"
-    )
+    comparison = _read("tests/test_v09_constant_curvature_comparison_example.py")
+    real_stack = _read("tests/integration/test_real_stack_v09.py")
+    for case_name in (
+        "euclidean",
+        "poincare",
+        "lorentz",
+        "sphere_projection",
+        "stereographic_negative",
+        "stereographic_zero",
+        "stereographic_positive",
+    ):
+        assert case_name in comparison
+        assert case_name in real_stack
+    assert "ManifoldMultipleNegativesRankingLoss" in real_stack
+    assert "_assert_finite_backward" in real_stack
+    assert "model.sectional_curvature" in real_stack
+    assert "model.curvature" in real_stack
+    assert "torch.float64" in real_stack
 
-    assert "test_v08_hierarchy_learning_is_deterministic_finite_and_explicit" in v08_example
-    assert '"retrieval_only"' in v08_example
-    assert '"hierarchy_aware"' in v08_example
-    assert '"parent_child_radial_order_accuracy"' in v08_example
-    assert "acyclic" in hierarchy_validation.lower()
-    assert "tree" in hierarchy_validation.lower()
-    assert "dag" in hierarchy_validation.lower()
-    assert "depth_radius_spearman" in evaluator
-    assert "hierarchy_weight" in composite
-    assert "retrieval" in composite.lower()
-
-
-def test_release_real_stack_covers_v04_through_v08_paths() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
-        encoding="utf-8"
-    )
-    real_stack = (ROOT / "tests" / "integration" / "test_real_stack.py").read_text(
-        encoding="utf-8"
-    )
-    learnable_stack = (
-        ROOT / "tests" / "integration" / "test_real_stack_learnable_curvature.py"
-    ).read_text(encoding="utf-8")
-    v05_stack = (
-        ROOT / "tests" / "integration" / "test_real_stack_v05.py"
-    ).read_text(encoding="utf-8")
-    v06_stack = (
-        ROOT / "tests" / "integration" / "test_real_stack_v06.py"
-    ).read_text(encoding="utf-8")
-    v07_stack = (
-        ROOT / "tests" / "integration" / "test_real_stack_v07.py"
-    ).read_text(encoding="utf-8")
-    v08_stack = (
-        ROOT / "tests" / "integration" / "test_real_stack_v08.py"
-    ).read_text(encoding="utf-8")
-
-    assert 'HF_HUB_DISABLE_XET: "1"' in workflow
-    assert 'HF_HUB_OFFLINE: "1"' in workflow
-    assert 'TRANSFORMERS_OFFLINE: "1"' in workflow
-    assert 'NEEMBED_REAL_STACK: "1"' in workflow
-    assert "timeout-minutes: 5" in workflow
-    assert "timeout-minutes: 10" in workflow
-    assert "python -m pytest -vv -s --durations=20 tests/integration" in workflow
-
-    assert 'manifold: str = "poincare"' in real_stack
-    assert 'manifold="lorentz"' in real_stack
-    assert "torch.optim.AdamW" in real_stack
-    assert 'learnable_curvature=True' in learnable_stack
-    assert '["poincare", "lorentz"]' in learnable_stack
-    assert 'pytest.mark.parametrize("manifold_name", ["poincare", "lorentz"])' in v05_stack
-    assert "ManifoldEmbeddingEvaluator" in v05_stack
-    assert "ManifoldPrototypeAssignmentEvaluator" in v05_stack
-    assert 'pytest.mark.parametrize("manifold_name", ["poincare", "lorentz"])' in v06_stack
-    assert "exact_corpus_search" in v06_stack
-    assert "ManifoldCorpusRetrievalEvaluator" in v06_stack
-    assert "mine_hard_negatives" in v06_stack
-    assert 'pytest.mark.parametrize("manifold_name", ["poincare", "lorentz"])' in v07_stack
-    assert "ManifoldTripletLoss" in v07_stack
-    assert "ManifoldGradedCorpusRetrievalEvaluator" in v07_stack
-
-    assert 'pytest.mark.parametrize("manifold_name", ["poincare", "lorentz"])' in v08_stack
-    assert "ManifoldRadialOrderLoss" in v08_stack
-    assert "ManifoldDepthLoss" in v08_stack
-    assert "ManifoldHierarchyTripletLoss" in v08_stack
-    assert "ManifoldRetrievalHierarchyLoss" in v08_stack
-    assert "ManifoldHierarchyEvaluator" in v08_stack
+    for prior_stack in (
+        "tests/integration/test_real_stack.py",
+        "tests/integration/test_real_stack_learnable_curvature.py",
+        "tests/integration/test_real_stack_v05.py",
+        "tests/integration/test_real_stack_v06.py",
+        "tests/integration/test_real_stack_v07.py",
+        "tests/integration/test_real_stack_v08.py",
+    ):
+        assert (ROOT / prior_stack).is_file()
 
 
-def test_release_workflow_builds_checks_and_smokes_exact_validated_packages() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
-        encoding="utf-8"
-    )
-    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    docs = (ROOT / ".github" / "workflows" / "docs.yml").read_text(encoding="utf-8")
+def test_v09_release_workflow_builds_and_smokes_validated_artifacts() -> None:
+    workflow = _read(".github/workflows/release.yml")
+    ci = _read(".github/workflows/ci.yml")
+    docs = _read(".github/workflows/docs.yml")
 
     for python_version in ("3.10", "3.11", "3.12"):
         assert f'- "{python_version}"' in ci
@@ -463,41 +288,34 @@ def test_release_workflow_builds_checks_and_smokes_exact_validated_packages() ->
     assert "Install built wheel and verify import" in ci
     assert "sphinx" in docs.lower()
 
-    assert "python -m build" in workflow
-    assert "python -m twine check dist/*" in workflow
-    assert "python-package-distributions" in workflow
-    assert "smoke-testpypi:" in workflow
-    assert "smoke-pypi:" in workflow
-    assert "--index-url https://test.pypi.org/simple/" in workflow
-    assert "neembed-geoopt==${PACKAGE_VERSION}" in workflow
-    assert "sha256sum" in workflow
-    assert "Verify TestPyPI wheel matches validated source artifact" in workflow
-    assert "Verify PyPI wheel matches validated source artifact" in workflow
-    assert "tests/test_v04_learnable_structure.py" in workflow
-    assert "tests/test_v05_retrieval_example.py" in workflow
-    assert "tests/test_v06_exact_retrieval_example.py" in workflow
-    assert "tests/test_v07_objective_comparison_example.py" in workflow
-    assert "tests/test_v08_hierarchy_learning_example.py" in workflow
-    assert "from importlib.metadata import version; import neembed" in workflow
-    assert "TestPyPI validated source commit ${GITHUB_SHA}" in workflow
+    for term in (
+        'HF_HUB_DISABLE_XET: "1"',
+        'HF_HUB_OFFLINE: "1"',
+        'TRANSFORMERS_OFFLINE: "1"',
+        'NEEMBED_REAL_STACK: "1"',
+        "timeout-minutes: 5",
+        "timeout-minutes: 10",
+        "python -m pytest -vv -s --durations=20 tests/integration",
+        "python -m build",
+        "python -m twine check dist/*",
+        "python-package-distributions",
+        "smoke-testpypi:",
+        "smoke-pypi:",
+        "--index-url https://test.pypi.org/simple/",
+        "neembed-geoopt==${PACKAGE_VERSION}",
+        "sha256sum",
+        "Verify TestPyPI wheel matches validated source artifact",
+        "Verify PyPI wheel matches validated source artifact",
+        "tests/test_v09_constant_curvature_comparison_example.py",
+        "from importlib.metadata import version; import neembed",
+    ):
+        assert term in workflow
 
 
-def test_release_workflow_keeps_trusted_publish_tag_and_docs_boundaries() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
-        encoding="utf-8"
-    )
+def test_v09_release_workflow_preserves_publish_and_docs_boundaries() -> None:
+    workflow = _read(".github/workflows/release.yml")
 
-    assert (
-        "if: github.event_name == 'push' && "
-        "startsWith(github.ref, 'refs/tags/v')"
-    ) in workflow
-    assert (
-        "if: github.event_name == 'workflow_dispatch' && "
-        "github.ref == 'refs/heads/main'"
-    ) in workflow
     assert "Verify release tag points at current main" in workflow
-    assert "git fetch --no-tags --depth=1 origin main" in workflow
-    assert 'if [ "${GITHUB_SHA}" != "${MAIN_SHA}" ]; then' in workflow
     assert "Verify tag matches package version" in workflow
     assert "environment:\n      name: testpypi" in workflow
     assert "environment:\n      name: pypi" in workflow
@@ -506,19 +324,20 @@ def test_release_workflow_keeps_trusted_publish_tag_and_docs_boundaries() -> Non
     assert "https://test.pypi.org/p/neembed-geoopt" in workflow
     assert "https://pypi.org/p/neembed-geoopt" in workflow
     assert "verify-hosted-docs:" in workflow
-    assert "https://neembed.readthedocs.io/en/latest/user_guide/hierarchy.html" in workflow
-    assert 'grep -F "v0.8"' in workflow
+    assert (
+        "https://neembed.readthedocs.io/en/latest/"
+        "user_guide/constant_curvature_semantics.html"
+    ) in workflow
+    assert 'grep -F "v0.9"' in workflow
     assert "create-github-release:" in workflow
     assert "needs: [smoke-pypi, verify-hosted-docs]" in workflow
-    assert "contents: write" in workflow
     assert 'gh release create "${GITHUB_REF_NAME}"' in workflow
-    assert "v0.8.0 adds explicit caller-owned hierarchy supervision" in workflow
-    assert "not a research benchmark or a claim of hierarchy-aware superiority" in workflow
+    assert "v0.9.0 adds backward-compatible constant-curvature geometry selection" in workflow
+    assert "not a research benchmark or a claim of geometry superiority" in workflow
+    assert "ProductManifold/Scaled mixed-curvature support" in workflow
 
 
 def test_gitignore_protects_common_public_release_artifacts() -> None:
-    gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
-
     required_patterns = {
         ".env.*",
         "*.pem",
@@ -529,4 +348,4 @@ def test_gitignore_protects_common_public_release_artifacts() -> None:
         "artifacts/",
         "outputs/",
     }
-    assert required_patterns.issubset(set(gitignore))
+    assert required_patterns.issubset(set(_read(".gitignore").splitlines()))

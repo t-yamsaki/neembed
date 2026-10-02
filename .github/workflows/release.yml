@@ -193,7 +193,7 @@ jobs:
       - name: Fresh install TestPyPI wheel
         run: python -m pip install /tmp/neembed-testpypi/neembed_geoopt-*.whl pytest
 
-      - name: Verify installed version and v0.4-v0.8 smoke
+      - name: Verify installed version and v0.4-v0.9 smoke
         shell: bash
         run: |
           PACKAGE_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
@@ -204,7 +204,8 @@ jobs:
             tests/test_v05_retrieval_example.py \
             tests/test_v06_exact_retrieval_example.py \
             tests/test_v07_objective_comparison_example.py \
-            tests/test_v08_hierarchy_learning_example.py
+            tests/test_v08_hierarchy_learning_example.py \
+            tests/test_v09_constant_curvature_comparison_example.py
 
       - name: Report TestPyPI-validated source commit
         run: echo "TestPyPI validated source commit ${GITHUB_SHA}"
@@ -285,7 +286,7 @@ jobs:
       - name: Fresh install PyPI wheel
         run: python -m pip install /tmp/neembed-pypi/neembed_geoopt-*.whl pytest
 
-      - name: Verify installed version and v0.4-v0.8 smoke
+      - name: Verify installed version and v0.4-v0.9 smoke
         shell: bash
         run: |
           PACKAGE_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
@@ -296,31 +297,32 @@ jobs:
             tests/test_v05_retrieval_example.py \
             tests/test_v06_exact_retrieval_example.py \
             tests/test_v07_objective_comparison_example.py \
-            tests/test_v08_hierarchy_learning_example.py
+            tests/test_v08_hierarchy_learning_example.py \
+            tests/test_v09_constant_curvature_comparison_example.py
 
   verify-hosted-docs:
-    name: Verify hosted v0.8 docs
+    name: Verify hosted v0.9 docs
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: smoke-pypi
     runs-on: ubuntu-latest
 
     steps:
-      - name: Verify Read the Docs deployed the release-specific v0.8 build
+      - name: Verify Read the Docs deployed the release-specific v0.9 build
         shell: bash
         run: |
           PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
           EXPECTED_DOC_TITLE="neembed ${PACKAGE_VERSION}"
           for attempt in 1 2 3 4 5 6; do
             if curl -fsSL \
-              https://neembed.readthedocs.io/en/latest/user_guide/hierarchy.html \
-              -o /tmp/neembed-hierarchy.html \
-              && grep -F "${EXPECTED_DOC_TITLE}" /tmp/neembed-hierarchy.html >/dev/null \
-              && grep -F "v0.8" /tmp/neembed-hierarchy.html >/dev/null; then
-              echo "Hosted Read the Docs matches ${EXPECTED_DOC_TITLE} and contains v0.8 hierarchy guidance."
+              https://neembed.readthedocs.io/en/latest/user_guide/constant_curvature_semantics.html \
+              -o /tmp/neembed-constant-curvature.html \
+              && grep -F "${EXPECTED_DOC_TITLE}" /tmp/neembed-constant-curvature.html >/dev/null \
+              && grep -F "v0.9" /tmp/neembed-constant-curvature.html >/dev/null; then
+              echo "Hosted Read the Docs matches ${EXPECTED_DOC_TITLE} and contains v0.9 constant-curvature guidance."
               exit 0
             fi
             if [ "${attempt}" -eq 6 ]; then
-              echo "Hosted Read the Docs did not expose the ${EXPECTED_DOC_TITLE} hierarchy build."
+              echo "Hosted Read the Docs did not expose the ${EXPECTED_DOC_TITLE} constant-curvature build."
               exit 1
             fi
             sleep 10
@@ -345,9 +347,9 @@ jobs:
             exit 0
           fi
           cat > release-notes.md <<'EOF'
-          v0.8.0 adds explicit caller-owned hierarchy supervision with radial-order and depth objectives, a directed hierarchy triplet loss, retrieval-plus-hierarchy composition, and hierarchy structure evaluation.
+          v0.9.0 adds backward-compatible constant-curvature geometry selection: an explicit Euclidean K=0 baseline, fixed positive-curvature SphereProjection, and fixed signed-curvature Stereographic, while preserving the established Poincaré/Lorentz curvature-magnitude contract. SphereProjection and Stereographic use the v0.9 float64 numerical-stability policy, including the Apple MPS CPU geometry fallback.
 
-          The v0.7 retrieval objectives and graded nDCG@K evaluation, v0.6 exact corpus retrieval and mining, v0.5 retrieval surface, and v0.4 learnable-curvature / manifold-prototype paths remain supported. The included v0.8 hierarchy workflow is an engineering regression reference, not a research benchmark or a claim of hierarchy-aware superiority. New manifold families, graph databases, GNNs, ontology parsing, ANN/vector databases, and distributed retrieval remain out of scope.
+          The v0.8 hierarchy surface, v0.7 retrieval objectives and graded nDCG@K evaluation, v0.6 exact corpus retrieval and mining, v0.5 retrieval workflow, and v0.4 learnable-curvature / manifold-prototype paths remain supported. The included v0.9 constant-curvature comparison is an engineering regression reference, not a research benchmark or a claim of geometry superiority. ProductManifold/Scaled mixed-curvature support, learnable signed curvature crossing zero, and advanced SPD/Siegel/Stiefel/Birkhoff geometry remain out of scope.
           EOF
           gh release create "${GITHUB_REF_NAME}" \
             --repo "${GITHUB_REPOSITORY}" \
