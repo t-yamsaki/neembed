@@ -8,15 +8,51 @@ import geoopt
 import torch
 from torch import nn
 
-from neembed.model import ManifoldSentenceTransformer, _select_geometry_device
+from neembed.model import (
+    ManifoldSentenceTransformer,
+    _apply_closure_values,
+    _fixed_double_apply_fn,
+)
 
 
 _STEREOGRAPHIC_DOUBLE_MANIFOLDS = {"sphere_projection", "stereographic"}
 
 
 def _infer_apply_device(fn, source_device: torch.device | str) -> torch.device:
-    """Infer the device requested by a PyTorch ``_apply`` transform."""
-    probe = torch.empty(0, dtype=torch.uint8, device=torch.device(source_device))
+    """Infer the target device of a standard PyTorch ``_apply`` transform."""
+    source_device = torch.device(source_device)
+    values = _apply_closure_values(fn)
+    qualname = getattr(fn, "__qualname__", "")
+
+    if "device" in values:
+        device = values["device"]
+        if device is None:
+            if "Module.cuda" in qualname:
+                return torch.device("cuda")
+            if "Module.xpu" in qualname:
+                return torch.device("xpu")
+            if "Module.mtia" in qualname:
+                return torch.device("mtia")
+            return source_device
+        if isinstance(device, int):
+            if "Module.cuda" in qualname:
+                return torch.device("cuda", device)
+            if "Module.xpu" in qualname:
+                return torch.device("xpu", device)
+            if "Module.mtia" in qualname:
+                return torch.device("mtia", device)
+        return torch.device(device)
+
+    if "Module.cpu" in qualname:
+        return torch.device("cpu")
+    if "Module.cuda" in qualname:
+        return torch.device("cuda")
+    if "Module.xpu" in qualname:
+        return torch.device("xpu")
+    if "Module.mtia" in qualname:
+        return torch.device("mtia")
+
+    probe = torch.empty(0, dtype=torch.uint8, device=source_device)
     return fn(probe).device
 
 
@@ -91,81 +127,67 @@ class ManifoldPrototypes(nn.Module):
         )
         self.prototypes = geoopt.ManifoldParameter(initial, manifold=manifold)
 
-    def _ensure_stereographic_parameter(self, manifold) -> None:
-        """Restore Geoopt metadata and the fixed float64 prototype dtype."""
+    def _apply_prototype_parameter(self, fn, manifold) -> None:
+        """Apply a protected transform while preserving parameter identity."""
         parameter = self._parameters["prototypes"]
-        if not isinstance(parameter, geoopt.ManifoldParameter):
-            grad = parameter.grad
-            parameter = geoopt.ManifoldParameter(
-                parameter.detach(),
-                manifold=manifold,
-                requires_grad=parameter.requires_grad,
-            )
-            if grad is not None:
-                parameter.grad = grad
-            self._parameters["prototypes"] = parameter
-
+        gradient = parameter.grad
         with torch.no_grad():
-            if parameter.dtype != torch.float64:
-                parameter.data = parameter.data.to(dtype=torch.float64)
-            if parameter.grad is not None and parameter.grad.dtype != torch.float64:
-                parameter.grad.data = parameter.grad.data.to(dtype=torch.float64)
+            applied = fn(parameter)
+            gradient_applied = None if gradient is None else fn(gradient)
+
+        parameter.grad = None
+        if applied is not parameter:
+            try:
+                parameter.data = applied
+            except RuntimeError:
+                replacement = geoopt.ManifoldParameter(
+                    applied,
+                    manifold=manifold,
+                    requires_grad=parameter.requires_grad,
+                )
+                try:
+                    torch.utils.swap_tensors(parameter, replacement)
+                except Exception:
+                    parameter.grad = gradient
+                    raise
+
+        if gradient_applied is not None:
+            parameter.grad = gradient_applied.requires_grad_(gradient.requires_grad)
+
+        if not isinstance(parameter, geoopt.ManifoldParameter):
+            raise RuntimeError("prototype transform lost ManifoldParameter metadata")
+        if parameter.manifold is not manifold:
+            raise RuntimeError("prototype transform changed the shared manifold")
+        if parameter.dtype != torch.float64:
+            raise RuntimeError("fixed stereographic prototypes must remain float64")
+        if parameter.grad is not None and parameter.grad.dtype != torch.float64:
+            raise RuntimeError("stereographic prototype gradients must remain float64")
 
     def _apply(self, fn, recurse: bool = True):
-        """Apply transforms without sending fixed-double prototypes to MPS."""
+        """Apply transforms without narrowing or sending prototypes to MPS."""
         if self.manifold_name not in _STEREOGRAPHIC_DOUBLE_MANIFOLDS:
             return super()._apply(fn, recurse=recurse)
 
         prototypes = self.prototypes
         manifold = prototypes.manifold
         target_device = _infer_apply_device(fn, prototypes.device)
-        geometry_device = _select_geometry_device(self.manifold_name, target_device)
+        geometry_fn = _fixed_double_apply_fn(
+            self.manifold_name,
+            fn,
+            target_device,
+        )
 
-        if target_device.type != "mps":
-            # Let PyTorch preserve the exact transform semantics for CPU, CUDA,
-            # meta, and ``to_empty``. This makes the requested prototype device
-            # independent of whether a containing module visits the prototypes or
-            # the sentence model first.
-            result = super()._apply(fn, recurse=recurse)
-            self._ensure_stereographic_parameter(manifold)
-            return result
-
-        # MPS cannot represent the float64 prototype. Exclude only this parameter
-        # from the supplied transform while allowing any other module state to
-        # follow normal ``_apply`` semantics.
+        # Preserve normal PyTorch semantics for any non-prototype module state.
+        # The manifold-valued parameter is handled separately so its identity,
+        # Geoopt metadata, gradient, float64 dtype, and MPS CPU fallback remain
+        # intact across dtype casts, device moves, meta transitions, and to_empty.
         self._parameters.pop("prototypes")
         try:
             result = super()._apply(fn, recurse=recurse)
         finally:
             self._parameters["prototypes"] = prototypes
 
-        if prototypes.device.type == "meta":
-            # A transform that successfully maps a meta probe to MPS is a
-            # materializing transform such as ``to_empty``. Materialize the
-            # protected prototype directly on the CPU geometry fallback.
-            materialized = torch.empty(
-                prototypes.shape,
-                device=geometry_device,
-                dtype=torch.float64,
-            )
-            self._parameters["prototypes"] = geoopt.ManifoldParameter(
-                materialized,
-                manifold=manifold,
-                requires_grad=prototypes.requires_grad,
-            )
-        else:
-            with torch.no_grad():
-                prototypes.data = prototypes.data.to(
-                    device=geometry_device,
-                    dtype=torch.float64,
-                )
-                if prototypes.grad is not None:
-                    prototypes.grad.data = prototypes.grad.data.to(
-                        device=geometry_device,
-                        dtype=torch.float64,
-                    )
-
-        self._ensure_stereographic_parameter(manifold)
+        self._apply_prototype_parameter(geometry_fn, manifold)
         return result
 
     @property
