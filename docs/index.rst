@@ -10,7 +10,9 @@ hard-negative mining, explicit hierarchy supervision, and opt-in manifold
 prototypes. The current development API supports Euclidean, Poincare, Lorentz,
 SphereProjection, and generic signed-curvature Stereographic geometry. Learnable
 curvature remains limited to the backward-compatible Poincare and Lorentz
-positive-magnitude path.
+positive-magnitude path. v0.10 development starts with a normalized flat product
+configuration contract for mixing those vector-valued geometries; ProductManifold
+execution follows in subsequent work.
 
 Start with :doc:`getting_started/quickstart` if you want the ordinary training
 workflow. For v0.7 objective selection and graded relevance -- MNRL, symmetric
@@ -24,9 +26,10 @@ For v0.9 geometry selection, curvature naming, compatibility, persistence, and
 float64/device guidance across negative, zero, and positive sectional curvature,
 see :doc:`user_guide/constant_curvature_semantics`. Read
 :doc:`user_guide/learnable_structure` to distinguish Euclidean trainable
-parameters, learnable curvature, and manifold-valued prototypes, or jump to the
-:ref:`api-reference` for class and function details generated from the public
-docstrings.
+parameters, learnable curvature, and manifold-valued prototypes. The minimal
+v0.10 mixed-curvature configuration contract is documented in
+:doc:`api/product_config`, or jump to the :ref:`api-reference` for the rest of
+the class and function details generated from public docstrings.
 
 .. toctree::
    :maxdepth: 2
@@ -59,6 +62,7 @@ API reference
    :maxdepth: 1
 
    api/model
+   api/product_config
    api/losses
    api/trainer
    api/evaluator
