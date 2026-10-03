@@ -194,6 +194,22 @@ def test_product_config_load_rejects_missing_persisted_fields(
         )
 
 
+@pytest.mark.parametrize("version", [1.0, True, "1", None])
+def test_product_config_load_requires_integer_schema_version(version) -> None:
+    component = {
+        "name": "flat",
+        "manifold": "euclidean",
+        "intrinsic_dim": 2,
+        "sectional_curvature": 0.0,
+        "scale": 1.0,
+    }
+
+    with pytest.raises(ValueError, match="unsupported product metadata version"):
+        ProductConfig.from_dict(
+            {"type": "product", "version": version, "components": [component]}
+        )
+
+
 @pytest.mark.parametrize("manifold", [[], {}, ["poincare"]])
 def test_constructor_rejects_non_string_manifold_values(manifold) -> None:
     with pytest.raises(ValueError, match="manifold.*string"):
@@ -214,6 +230,59 @@ def test_persistence_rejects_non_string_manifold_values(manifold) -> None:
         ProductConfig.from_dict(
             {"type": "product", "version": 1, "components": [component]}
         )
+
+
+def test_direct_component_construction_converts_numeric_overflow_to_value_error() -> None:
+    huge = 10**10000
+
+    with pytest.raises(ValueError, match="curvature must be a positive finite number"):
+        ProductComponentConfig(
+            name="negative",
+            manifold="poincare",
+            intrinsic_dim=2,
+            curvature=huge,
+        )
+
+    with pytest.raises(ValueError, match="sectional_curvature must be finite"):
+        ProductComponentConfig(
+            name="signed",
+            manifold="stereographic",
+            intrinsic_dim=2,
+            sectional_curvature=huge,
+        )
+
+    with pytest.raises(ValueError, match="scale must be a positive finite number"):
+        ProductComponentConfig(
+            name="flat",
+            manifold="euclidean",
+            intrinsic_dim=2,
+            scale=huge,
+        )
+
+
+def test_constructor_and_persistence_convert_numeric_overflow_to_value_error() -> None:
+    huge = 10**10000
+
+    with pytest.raises(ValueError, match="curvature must be a positive finite number"):
+        normalize_product_config(
+            [{"manifold": "poincare", "intrinsic_dim": 2, "curvature": huge}]
+        )
+
+    persisted = {
+        "type": "product",
+        "version": 1,
+        "components": [
+            {
+                "name": "signed",
+                "manifold": "stereographic",
+                "intrinsic_dim": 2,
+                "sectional_curvature": huge,
+                "scale": 1.0,
+            }
+        ],
+    }
+    with pytest.raises(ValueError, match="sectional_curvature must be finite"):
+        ProductConfig.from_dict(persisted)
 
 
 @pytest.mark.parametrize(
