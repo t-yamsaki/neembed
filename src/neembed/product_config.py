@@ -36,7 +36,10 @@ _PERSISTED_COMPONENT_BASE_KEYS = {
 def _positive_finite(value: Any, *, field: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{field} must be a positive finite number")
-    normalized = float(value)
+    try:
+        normalized = float(value)
+    except OverflowError as exc:
+        raise ValueError(f"{field} must be a positive finite number") from exc
     if not math.isfinite(normalized) or normalized <= 0.0:
         raise ValueError(f"{field} must be a positive finite number")
     return normalized
@@ -45,7 +48,10 @@ def _positive_finite(value: Any, *, field: str) -> float:
 def _finite(value: Any, *, field: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{field} must be finite")
-    normalized = float(value)
+    try:
+        normalized = float(value)
+    except OverflowError as exc:
+        raise ValueError(f"{field} must be finite") from exc
     if not math.isfinite(normalized):
         raise ValueError(f"{field} must be finite")
     return normalized
@@ -206,10 +212,14 @@ class ProductConfig:
         if metadata.get("type") != _PRODUCT_SCHEMA_TYPE:
             raise ValueError("product metadata type must be 'product'")
         version = metadata.get("version")
-        if isinstance(version, bool) or version != _PRODUCT_SCHEMA_VERSION:
+        if (
+            isinstance(version, bool)
+            or not isinstance(version, int)
+            or version != _PRODUCT_SCHEMA_VERSION
+        ):
             raise ValueError(
                 f"unsupported product metadata version: {version!r}; "
-                f"expected {_PRODUCT_SCHEMA_VERSION}"
+                f"expected integer {_PRODUCT_SCHEMA_VERSION}"
             )
         if "components" not in metadata:
             raise ValueError("product metadata requires components")
