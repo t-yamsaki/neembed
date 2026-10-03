@@ -375,7 +375,7 @@ def test_product_config_load_rejects_unknown_schema_and_fields() -> None:
         )
 
 
-def test_single_manifold_constructor_contract_is_unchanged() -> None:
+def test_single_manifold_constructor_defaults_remain_unchanged() -> None:
     parameters = signature(ManifoldSentenceTransformer).parameters
 
     assert parameters["manifold"].default == "poincare"
@@ -383,4 +383,4 @@ def test_single_manifold_constructor_contract_is_unchanged() -> None:
     assert parameters["curvature"].default == 1.0
     assert parameters["learnable_curvature"].default is False
     assert parameters["sectional_curvature"].default is None
-    assert "product_config" not in parameters
+    assert parameters["product_config"].default is None
