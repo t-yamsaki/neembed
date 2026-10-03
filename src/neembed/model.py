@@ -299,9 +299,10 @@ class ManifoldSentenceTransformer(nn.Module):
     def _apply(self, fn, recurse: bool = True):
         """Apply module transforms while preserving fixed-double geometry state."""
         manifold = self._modules.get("manifold")
+        product_config = getattr(self, "product_config", None)
         product_double = (
-            self.product_config is not None
-            and product_requires_double(self.product_config)
+            product_config is not None
+            and product_requires_double(product_config)
         )
         protect_manifold = manifold is not None and (
             self.manifold_name in _STEREOGRAPHIC_DOUBLE_MANIFOLDS
@@ -317,9 +318,9 @@ class ManifoldSentenceTransformer(nn.Module):
             self._modules["manifold"] = manifold
 
         explicit_geometry_device = None
-        if self.product_config is not None:
+        if product_config is not None:
             explicit_geometry_device = product_geometry_device(
-                self.product_config,
+                product_config,
                 self.encoder.device,
             )
         geometry_fn = _fixed_double_apply_fn(
@@ -330,7 +331,7 @@ class ManifoldSentenceTransformer(nn.Module):
         )
         manifold._apply(geometry_fn, recurse=True)
 
-        if self.product_config is not None:
+        if product_config is not None:
             for component_manifold in manifold.manifolds:
                 if (
                     component_manifold.dtype is not None
