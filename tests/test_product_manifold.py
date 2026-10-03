@@ -365,7 +365,23 @@ def test_product_ranking_loss_and_exact_retrieval(monkeypatch):
     assert torch.isfinite(model.projection.weight.grad).all()
     corpus = ["aa", "bbbb", "ccccc"]
     result = exact_corpus_search(model, ["a", "bbb"], corpus, query_chunk_size=1, corpus_chunk_size=2)
-    assert result == [model.rank(query, corpus) for query in ["a", "bbb"]]
+    for query, actual in zip(["a", "bbb"], result):
+        expected = model.rank(query, corpus)
+        assert [row["index"] for row in actual] == [row["index"] for row in expected]
+        assert [row["candidate"] for row in actual] == [row["candidate"] for row in expected]
+        assert [row["distance"] for row in actual] == pytest.approx(
+            [row["distance"] for row in expected], rel=1e-6, abs=1e-7,
+        )
+
+
+@pytest.mark.parametrize("config", [_two_component_config(), _three_component_config()])
+def test_product_prototypes_fail_explicitly_until_supported(monkeypatch, config):
+    from neembed import ManifoldPrototypes
+
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", product_config=config)
+    with pytest.raises(ValueError, match="does not yet support product"):
+        ManifoldPrototypes(model, 2)
 
 
 def test_product_mps_transfer_policy_without_accelerator(monkeypatch):

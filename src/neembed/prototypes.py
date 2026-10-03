@@ -103,6 +103,8 @@ class ManifoldPrototypes(nn.Module):
         init_std: float = 0.01,
     ) -> None:
         super().__init__()
+        if model.manifold_name == "product":
+            raise ValueError("ManifoldPrototypes does not yet support product models")
         if num_prototypes <= 0:
             raise ValueError("num_prototypes must be positive")
         if init_std <= 0 or not math.isfinite(init_std):

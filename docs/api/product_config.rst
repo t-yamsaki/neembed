@@ -67,6 +67,8 @@ remain on MPS.
 ``scale`` defaults to ``1.0`` and is persisted, but v0.10 Issue #130 does not yet
 apply component scales to distances; scaled product distance is follow-on work.
 Nested products and SPD/Stiefel/Siegel components are not supported.
+``ManifoldPrototypes`` does not yet support product models and rejects them
+explicitly; this runtime support covers sentence embeddings.
 
 ``ProductConfig.to_dict()`` returns versioned JSON-compatible metadata and
 ``ProductConfig.from_dict()`` validates the schema, component order, dimensions,
