@@ -152,37 +152,40 @@ class ManifoldSentenceTransformer(nn.Module):
 
     Args:
         model_name_or_path: Sentence Transformer model name or local model path.
-        manifold: Single-manifold backend name. Supports ``"poincare"``,
-            ``"lorentz"``, ``"euclidean"``, ``"sphere_projection"``, and
-            ``"stereographic"``. ``"product"`` is accepted only together with
-            ``product_config``; otherwise the legacy default remains Poincare.
+        manifold: Manifold backend name. Supports ``"poincare"``, ``"lorentz"``,
+            ``"euclidean"``, ``"sphere_projection"``, and ``"stereographic"``.
+            ``"product"`` is accepted with ``product_config``.
         embedding_dim: Optional intrinsic output dimension for a learned linear
-            projection. In product mode the normalized product ``projection_dim``
-            owns this width; an explicitly supplied value must match it.
+            projection. If omitted, the encoder embedding dimension is preserved.
+            Lorentz embeddings use one additional ambient coordinate. In product
+            mode an explicit value must match ``product_config.projection_dim``.
         curvature: Positive, finite magnitude of the negative sectional curvature.
             The same public meaning is used for Poincare and Lorentz geometry.
             This legacy argument is not reinterpreted for new v0.9 geometry.
         learnable_curvature: When ``True``, optimize the positive scalar curvature
             state jointly with the ordinary model parameters. Fixed curvature
-            remains the default. Learnable curvature is limited to single
-            Poincare/Lorentz geometry and is not supported by product mode.
+            remains the default. Learnable curvature is limited to Poincare and
+            Lorentz and is not itself a manifold-valued point.
         sectional_curvature: Signed sectional curvature for new v0.9 constant-
             curvature geometry. Euclidean accepts ``None`` or exactly ``0.0``;
             SphereProjection requires a finite positive value; Stereographic
             requires an explicit finite value of any sign.
-        product_config: Ordered v0.10 mixed-curvature product configuration. The
-            component dimensions define how projected encoder features are split,
-            mapped, and packed into a Geoopt ``ProductManifold`` point.
+        product_config: Ordered flat product configuration. Component dimensions
+            determine the projection width and split/map/pack layout. Curvature
+            is fixed and configured per component; top-level curvature arguments
+            must retain their defaults.
 
     Notes:
         The returned sentence embeddings are geometry-valued outputs, while the
-        encoder and projection weights remain ordinary Euclidean parameters.
-        Product components share one packed tensor, so a product containing any
-        Lorentz, SphereProjection, or Stereographic component uses ``float64`` for
-        every component. On Apple MPS, such a fixed-double product geometry runs
-        on CPU while the encoder/projection remain on MPS. Component ``scale``
-        values are persisted by the v0.10 contract but are not applied until the
-        scaled-distance follow-on work.
+        encoder and optional projection weights remain ordinary Euclidean
+        parameters. True manifold-valued trainable coordinates are introduced
+        separately through :class:`neembed.ManifoldPrototypes`. SphereProjection
+        and Stereographic geometry operations use ``float64`` even when the
+        encoder and projection remain in their ordinary model dtype. On Apple MPS,
+        those float64 geometry operations fall back to CPU while the encoder and
+        projection remain on MPS. A product containing Lorentz, SphereProjection,
+        or Stereographic uses a common float64 geometry dtype, with CPU fallback
+        on MPS. Component scales are persisted but not yet applied to distances.
     """
 
     def __init__(
@@ -238,20 +241,16 @@ class ManifoldSentenceTransformer(nn.Module):
         elif manifold == "product":
             raise ValueError("manifold='product' requires product_config")
 
-        self.projection: nn.Module
         if self.product_config is not None:
-            projection_dim = self.product_config.projection_dim
-            self._projection_dim = projection_dim
-            self.projection = nn.Linear(encoder_dim, projection_dim)
-            self.embedding_dim = projection_dim
+            embedding_dim = self.product_config.projection_dim
+        self._projection_dim = embedding_dim
+        self.projection: nn.Module
+        if embedding_dim is None:
+            self.projection = nn.Identity()
+            self.embedding_dim = encoder_dim
         else:
-            self._projection_dim = embedding_dim
-            if embedding_dim is None:
-                self.projection = nn.Identity()
-                self.embedding_dim = encoder_dim
-            else:
-                self.projection = nn.Linear(encoder_dim, embedding_dim)
-                self.embedding_dim = embedding_dim
+            self.projection = nn.Linear(encoder_dim, embedding_dim)
+            self.embedding_dim = embedding_dim
         self.projection.to(self.encoder.device)
 
         if self.product_config is not None:
@@ -311,6 +310,9 @@ class ManifoldSentenceTransformer(nn.Module):
         if not protect_manifold or not recurse:
             return super()._apply(fn, recurse=recurse)
 
+        # Ordinary model state follows the requested transform unchanged. The
+        # protected geometry receives an equivalent transform that preserves its
+        # fixed float64 policy and translates unsupported MPS storage to CPU.
         self._modules["manifold"] = None
         try:
             result = super()._apply(fn, recurse=recurse)
@@ -346,7 +348,12 @@ class ManifoldSentenceTransformer(nn.Module):
 
     @property
     def curvature(self) -> float:
-        """Return the current legacy public curvature magnitude as a Python float."""
+        """Return the current legacy public curvature magnitude as a Python float.
+
+        The value is the positive magnitude of negative sectional curvature for
+        Poincare and Lorentz. New v0.9 geometry uses the distinct signed
+        ``sectional_curvature`` property instead.
+        """
         if self.manifold_name == "poincare":
             curvature = self.manifold.c
         elif self.manifold_name == "lorentz":
@@ -379,7 +386,25 @@ class ManifoldSentenceTransformer(nn.Module):
         )
 
     def forward(self, sentences: Sequence[str]) -> torch.Tensor:
-        """Encode a batch and map embeddings into the configured geometry."""
+        """Encode a batch and map embeddings into the configured geometry.
+
+        Args:
+            sentences: Batch of input texts.
+
+        Returns:
+            Geometry-valued embeddings. Poincare, Euclidean, SphereProjection,
+            and Stereographic output have shape ``(batch_size, embedding_dim)``.
+            Lorentz output has shape ``(batch_size, embedding_dim + 1)`` because
+            the hyperboloid uses one additional ambient time-like coordinate.
+            Euclidean output is the encoder/projection output directly;
+            Poincare, SphereProjection, and Stereographic map the projected tangent
+            vector through the origin exponential map. Lorentz, SphereProjection,
+            and Stereographic geometry operations use double precision for
+            numerical stability. SphereProjection/Stereographic use CPU for that
+            double-precision geometry path when the encoder runs on Apple MPS.
+
+        Product output has final width ``product_config.ambient_dim``.
+        """
         features = self.encoder.preprocess(list(sentences))
         features = {
             key: value.to(self.encoder.device) if torch.is_tensor(value) else value
@@ -427,9 +452,26 @@ class ManifoldSentenceTransformer(nn.Module):
     ) -> Any:
         """Encode text as geometry-valued embeddings for inference.
 
-        Product output uses ``product_config.ambient_dim`` as its packed final
-        width. NumPy arrays are returned by default; tensors are returned when
-        ``convert_to_tensor=True``.
+        Args:
+            sentences: A single text or a sequence of texts.
+            convert_to_tensor: Return a ``torch.Tensor`` instead of a NumPy array.
+
+        Returns:
+            A single geometry embedding for string input or a batch for sequence
+            input. The last dimension is ``embedding_dim`` for Poincare,
+            Euclidean, SphereProjection, and Stereographic and
+            ``embedding_dim + 1`` for Lorentz. NumPy arrays are returned by
+            default; tensors are returned when ``convert_to_tensor=True``.
+            Lorentz, SphereProjection, and Stereographic outputs use ``float64``
+            for the manifold geometry path. SphereProjection/Stereographic tensor
+            outputs are CPU tensors when the encoder uses Apple MPS.
+
+        Notes:
+            Encoding switches the model to evaluation mode and runs under
+            ``torch.inference_mode()``, so returned embeddings do not track
+            gradients.
+
+        Product output has final width ``product_config.ambient_dim``.
         """
         single_input = isinstance(sentences, str)
         batch = [sentences] if single_input else list(sentences)
@@ -445,7 +487,25 @@ class ManifoldSentenceTransformer(nn.Module):
         return embeddings.cpu().numpy()
 
     def distance(self, a: Any, b: Any) -> torch.Tensor:
-        """Return the geodesic distance between two geometry embeddings."""
+        """Return the geodesic distance between two geometry embeddings.
+
+        Args:
+            a: First geometry embedding or array-like value.
+            b: Second geometry embedding or array-like value.
+
+        Returns:
+            A tensor containing the configured geometry distance.
+
+        Notes:
+            This is an inference helper. Inputs are moved to the geometry device
+            and dtype, and the distance is computed under ``torch.no_grad()``.
+            Lorentz, SphereProjection, and Stereographic distance are evaluated in
+            ``float64``. Poincare and Euclidean retain the model parameter dtype.
+            SphereProjection/Stereographic distance uses CPU when the encoder is
+            on Apple MPS because MPS does not support ``float64`` tensors.
+
+        Product distance uses the common geometry dtype/device without component scales.
+        """
         reference = next(self.parameters())
         if self.product_config is not None:
             geometry_dtype = product_geometry_dtype(
@@ -485,7 +545,30 @@ class ManifoldSentenceTransformer(nn.Module):
         *,
         top_k: int | None = None,
     ) -> list[dict[str, str | int | float]]:
-        """Rank an in-memory candidate list by geodesic distance to a query."""
+        """Rank an in-memory candidate list by geodesic distance to a query.
+
+        Args:
+            query: Query text to encode.
+            candidates: Non-empty sequence of candidate texts to rerank.
+            top_k: Number of ranked candidates to return. ``None`` returns the
+                full list. Integer values must be between 1 and the candidate
+                count, inclusive.
+
+        Returns:
+            Plain Python dictionaries ordered by ascending geodesic distance.
+            Each result contains the original ``candidate``, its input ``index``,
+            and the scalar ``distance``. Equal-distance candidates retain their
+            original input order.
+
+        Raises:
+            ValueError: If ``candidates`` is a bare string or empty, or ``top_k``
+                is invalid.
+
+        Notes:
+            This helper is intended for small in-memory reranking. It does not
+            build or persist a search index. Encoding and distance calculation run
+            without gradient tracking through the existing inference helpers.
+        """
         if isinstance(candidates, str):
             raise ValueError(
                 "candidates must be a sequence of strings, not a single string"
@@ -532,7 +615,18 @@ class ManifoldSentenceTransformer(nn.Module):
         ]
 
     def save_pretrained(self, output_path: str | Path) -> None:
-        """Save the encoder, projection, and sentence-model geometry state."""
+        """Save the encoder, projection, and sentence-model geometry state.
+
+        Args:
+            output_path: Directory in which to save the model.
+
+        Notes:
+            Poincare/Lorentz keep the legacy public ``curvature`` metadata. New
+            v0.9 geometry stores the distinct signed ``sectional_curvature`` value.
+            External modules such as :class:`neembed.ManifoldPrototypes`,
+            hierarchy metadata, and optimizer state are not included by this
+            helper and should be saved separately when needed.
+        """
         output_path = Path(output_path)
         output_path.mkdir(parents=True, exist_ok=True)
 
@@ -560,38 +654,41 @@ class ManifoldSentenceTransformer(nn.Module):
         cls,
         model_path: str | Path,
     ) -> "ManifoldSentenceTransformer":
-        """Load a model previously saved with :meth:`save_pretrained`."""
+        """Load a model previously saved with :meth:`save_pretrained`.
+
+        Args:
+            model_path: Directory containing a saved neembed model.
+
+        Returns:
+            The reconstructed geometry-aware sentence model. Poincare/Lorentz
+            retain the saved legacy curvature magnitude and trainability; new
+            v0.9 geometry restores signed sectional-curvature metadata. External
+            prototype modules must be reconstructed and loaded separately.
+        """
         model_path = Path(model_path)
         config = json.loads(
             (model_path / "neembed_config.json").read_text(encoding="utf-8")
         )
         manifold_name = config["manifold"]
-
+        kwargs: dict[str, Any] = {
+            "manifold": manifold_name,
+            "embedding_dim": config["embedding_dim"],
+        }
         if manifold_name == "product":
-            product_config = normalize_product_config(config["product_config"])
-            saved_projection_dim = config["embedding_dim"]
-            if saved_projection_dim != product_config.projection_dim:
+            product_config = ProductConfig.from_dict(config["product_config"])
+            if config["embedding_dim"] != product_config.projection_dim:
                 raise ValueError(
                     "saved embedding_dim does not match product_config.projection_dim"
                 )
-            kwargs: dict[str, Any] = {
-                "manifold": "product",
-                "embedding_dim": saved_projection_dim,
-                "product_config": product_config,
-            }
+            kwargs["product_config"] = product_config
+        elif manifold_name in {"poincare", "lorentz"}:
+            kwargs["curvature"] = config["curvature"]
+            kwargs["learnable_curvature"] = config.get(
+                "learnable_curvature",
+                False,
+            )
         else:
-            kwargs = {
-                "manifold": manifold_name,
-                "embedding_dim": config["embedding_dim"],
-            }
-            if manifold_name in {"poincare", "lorentz"}:
-                kwargs["curvature"] = config["curvature"]
-                kwargs["learnable_curvature"] = config.get(
-                    "learnable_curvature",
-                    False,
-                )
-            else:
-                kwargs["sectional_curvature"] = config["sectional_curvature"]
+            kwargs["sectional_curvature"] = config["sectional_curvature"]
 
         model = cls(str(model_path / "encoder"), **kwargs)
         projection_state = torch.load(

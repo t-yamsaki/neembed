@@ -238,3 +238,158 @@ def test_product_save_load_round_trip_preserves_order_parameters_and_embeddings(
         assert torch.equal(tensor, projection_before[name])
     assert before.shape == after.shape == (2, 6)
     assert torch.allclose(before, after, atol=1e-10, rtol=1e-10)
+
+
+@pytest.mark.parametrize("sectional", [-0.5, 0.0, 0.25])
+def test_stereographic_product_split_map_pack_and_distance(monkeypatch, sectional):
+    _patch_encoder(monkeypatch)
+    torch.manual_seed(0)
+    config = _two_component_config() + [{
+        "name": "signed", "manifold": "stereographic",
+        "intrinsic_dim": 3, "sectional_curvature": sectional,
+    }]
+    model = ManifoldSentenceTransformer("fake-model", product_config=config)
+    embeddings = model(["a", "bb", "ccc"])
+    features = model.encoder.preprocess(["a", "bb", "ccc"])
+    tangent = model.projection(model.encoder(features)["sentence_embedding"]).double()
+    chunks = tangent.split([2, 2, 3], dim=-1)
+    expected = model.manifold.pack_point(
+        model.manifold.manifolds[0].expmap0(chunks[0]),
+        chunks[1],
+        model.manifold.manifolds[2].expmap0(chunks[2]),
+    )
+    assert embeddings.dtype == torch.float64
+    assert model.manifold.check_point_on_manifold(embeddings)
+    torch.testing.assert_close(embeddings, expected)
+    a, b = embeddings[:2, None, :], embeddings[None, :, :]
+    distances = model.distance(a.detach().numpy(), b.detach().numpy())
+    assert distances.shape == (2, 3)
+    torch.testing.assert_close(distances, model.manifold.dist(a, b))
+    # Exercise autograd through product geodesics, including the promoted Poincare.
+    loss = model.manifold.dist(embeddings[0], embeddings[1:]).sum()
+    loss.backward()
+    for parameter in (model.encoder.linear.weight, model.projection.weight):
+        assert torch.isfinite(parameter.grad).all()
+        assert torch.count_nonzero(parameter.grad) > 0
+
+
+def test_product_scales_are_metadata_only(monkeypatch):
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", product_config=_three_component_config())
+    config = [dict(component, scale=7.0) for component in _three_component_config()]
+    scaled = ManifoldSentenceTransformer("fake-model", product_config=config)
+    scaled.load_state_dict(model.state_dict())
+    a = model.encode(["a", "bbb"], convert_to_tensor=True)
+    b = scaled.encode(["a", "bbb"], convert_to_tensor=True)
+    torch.testing.assert_close(a, b)
+    torch.testing.assert_close(model.distance(a[0], a[1]), scaled.distance(b[0], b[1]))
+
+
+@pytest.mark.parametrize("damage", ["list", "version", "missing_scale", "unknown", "width"])
+def test_product_load_rejects_corrupted_metadata(monkeypatch, tmp_path, damage):
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", product_config=_three_component_config())
+    model.save_pretrained(tmp_path)
+    path = tmp_path / "neembed_config.json"
+    saved = json.loads(path.read_text())
+    if damage == "list":
+        saved["product_config"] = _three_component_config()
+    elif damage == "version":
+        saved["product_config"]["version"] = 2
+    elif damage == "missing_scale":
+        del saved["product_config"]["components"][0]["scale"]
+    elif damage == "unknown":
+        saved["product_config"]["unexpected"] = True
+    else:
+        saved["embedding_dim"] += 1
+    path.write_text(json.dumps(saved))
+    with pytest.raises(ValueError):
+        ManifoldSentenceTransformer.from_pretrained(tmp_path)
+
+
+def test_product_transforms_preserve_common_double_geometry(monkeypatch):
+    _patch_encoder(monkeypatch)
+    config = _three_component_config() + [_two_component_config()[0]]
+    model = ManifoldSentenceTransformer("fake-model", product_config=config)
+    original = {key: value.clone() for key, value in model.manifold.state_dict().items()}
+    for method, dtype in [("double", torch.float64), ("float", torch.float32),
+                          ("half", torch.float16), ("bfloat16", torch.bfloat16)]:
+        getattr(model, method)()
+        assert model.projection.weight.dtype == dtype
+        for key, value in model.manifold.state_dict().items():
+            assert value.dtype == torch.float64
+            assert value.device.type == "cpu"
+            assert torch.equal(value, original[key])
+    model.to(device="cpu", dtype=torch.float32).cpu()
+    pointers = {key: value.data_ptr() for key, value in model.state_dict().items()}
+    model.to_empty(device="meta", recurse=False)
+    assert pointers == {key: value.data_ptr() for key, value in model.state_dict().items()}
+    model.to("meta")
+    assert all(value.device.type == "meta" for value in model.state_dict().values())
+    model.to_empty(device="cpu")
+    assert all(value.device.type == "cpu" for value in model.state_dict().values())
+    assert all(value.dtype == torch.float64 for value in model.manifold.state_dict().values())
+
+
+@pytest.mark.parametrize("device", ["cuda", "mps"])
+def test_product_accelerator_forward_backward_and_cpu_return(monkeypatch, device):
+    available = torch.cuda.is_available() if device == "cuda" else torch.backends.mps.is_available()
+    if not available:
+        pytest.skip(f"{device} hardware unavailable")
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", product_config=_three_component_config())
+    model = model.cuda() if device == "cuda" else model.to("mps")
+    embeddings = model(["a", "bb"])
+    geometry_device = "cuda" if device == "cuda" else "cpu"
+    assert embeddings.device.type == geometry_device
+    assert embeddings.dtype == torch.float64
+    assert all(value.device.type == geometry_device for value in model.manifold.state_dict().values())
+    embeddings.square().mean().backward()
+    assert torch.isfinite(model.encoder.linear.weight.grad).all()
+    assert torch.isfinite(model.projection.weight.grad).all()
+    model.cpu()
+    assert model(["a"]).device.type == "cpu"
+
+
+def test_product_ranking_loss_and_exact_retrieval(monkeypatch):
+    from neembed.losses import ManifoldMultipleNegativesRankingLoss
+    from neembed.retrieval import exact_corpus_search
+
+    _patch_encoder(monkeypatch)
+    torch.manual_seed(0)
+    model = ManifoldSentenceTransformer("fake-model", product_config=_three_component_config())
+    loss = ManifoldMultipleNegativesRankingLoss(model)(["a", "bbb"], ["aa", "bbbb"])
+    assert torch.isfinite(loss)
+    loss.backward()
+    assert torch.isfinite(model.encoder.linear.weight.grad).all()
+    assert torch.isfinite(model.projection.weight.grad).all()
+    corpus = ["aa", "bbbb", "ccccc"]
+    result = exact_corpus_search(model, ["a", "bbb"], corpus, query_chunk_size=1, corpus_chunk_size=2)
+    assert result == [model.rank(query, corpus) for query in ["a", "bbb"]]
+
+
+def test_product_mps_transfer_policy_without_accelerator(monkeypatch):
+    class SimulatedMpsEncoder(FakeSentenceTransformer):
+        @property
+        def device(self):
+            return torch.device(getattr(self, "target", "cpu"))
+
+        def _apply(self, fn, recurse=True):
+            self.target = "mps"
+            return self
+
+    monkeypatch.setattr(model_module, "SentenceTransformer", SimulatedMpsEncoder)
+    model = ManifoldSentenceTransformer("fake-model", product_config=_three_component_config())
+    # Simulate ordinary child transfers; exercise the real product _apply path.
+    monkeypatch.setattr(model.projection, "_apply", lambda fn, recurse=True: model.projection)
+    original = {key: value.clone() for key, value in model.manifold.state_dict().items()}
+    nn.Sequential(model).to("mps")
+    for key, value in model.manifold.state_dict().items():
+        assert value.device.type == "cpu"
+        assert value.dtype == torch.float64
+        assert torch.equal(value, original[key])
+    model.manifold.to("meta")
+    model.to_empty(device="mps")
+    for value in model.manifold.state_dict().values():
+        assert value.device.type == "cpu"
+        assert value.dtype == torch.float64
