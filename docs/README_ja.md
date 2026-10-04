@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [English README](../README.md)
 
-> **Status:** package version v0.9.0 では、明示的な Euclidean、SphereProjection、fixed signed-curvature Stereographic、stereographic float64 stability policy、matched constant-curvature regression example を追加しつつ、v0.4-v0.8 の公開 contract と既存 Poincaré/Lorentz curvature semantics を維持しています。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
+> **Status:** package version v0.10.0 では、flat mixed-curvature ProductManifold embedding、固定 Geoopt Scaled component metric、全 product 距離による retrieval、名前付き component 距離診断、明示的な component-targeted hierarchy supervision を追加しつつ、v0.4-v0.9 の single-manifold 公開 contract を維持しています。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
 
 `neembed` は、pretrained Sentence Transformer と manifold-valued representation をつなぐ軽量な integration layer です。pretrained encoder はそのまま利用し、必要に応じて Euclidean embedding を projection したうえで、constant-curvature geometry の演算を Geoopt に委譲します。
 
@@ -97,7 +97,7 @@ v0.9 では legacy hyperbolic curvature の意味を変えず、constant-curvatu
 - SphereProjection/Stereographic は float64 geometry path を使い、Apple MPS では encoder/projection を MPS に保ちながら geometry を CPU に fallback
 - geometry ranking ではなく engineering regression を目的とした deterministic matched constant-curvature comparison example
 
-v0.10 development では、固定 component scale を持つ flat mixed-curvature product、全 product 距離による retrieval、名前付き component 距離診断、指定した Poincaré/Lorentz component への hierarchy supervision を追加しています。設定、対応 API、optimizer・保存復元、回帰例は [Mixed-curvature product guide](https://neembed.readthedocs.io/en/latest/user_guide/mixed_curvature.html) を参照してください。geometry を増やしても品質向上が保証されるわけではありません。
+v0.10 では、固定 component scale を持つ flat mixed-curvature product、全 product 距離による retrieval、名前付き component 距離診断、指定した Poincaré/Lorentz component への hierarchy supervision を追加しています。設定、対応 API、optimizer・保存復元、回帰例は [Mixed-curvature product guide](https://neembed.readthedocs.io/en/latest/user_guide/mixed_curvature.html) を参照してください。geometry を増やしても品質向上が保証されるわけではありません。
 
 Nested product、learnable product curvature/scales、learnable signed curvature crossing zero、advanced SPD/Siegel/Stiefel/Birkhoff geometry、ontology parsing、graph-database integration、ANN / vector database integration、distributed retrieval はこの scope の対象外です。
 
@@ -187,6 +187,7 @@ python examples/v06_exact_retrieval_workflow.py
 python examples/v07_objective_comparison.py
 python examples/v08_hierarchy_learning.py
 python examples/v09_constant_curvature_comparison.py
+python examples/v10_mixed_curvature_workflow.py
 ```
 
 - [examples/train_poincare.py](../examples/train_poincare.py) — 最小の Poincaré workflow
@@ -199,6 +200,7 @@ python examples/v09_constant_curvature_comparison.py
 - [examples/v07_objective_comparison.py](../examples/v07_objective_comparison.py) — fixed data / initialization で MNRL、Triplet、MarginMSE、DistanceMSE と MRR、Recall@K、nDCG@K を比較する deterministic workflow。research benchmark や superiority claim ではありません
 - [examples/v08_hierarchy_learning.py](../examples/v08_hierarchy_learning.py) — explicit caller-owned hierarchy supervision を使った retrieval-only vs hierarchy-aware の deterministic Poincaré regression。benchmark や superiority claim ではありません
 - [examples/v09_constant_curvature_comparison.py](../examples/v09_constant_curvature_comparison.py) — Euclidean、Poincaré、Lorentz、SphereProjection、signed Stereographic を matched 条件で比較し、retrieval と dtype/device diagnostics を確認する deterministic engineering regression。benchmark や geometry-superiority claim ではありません
+- [examples/v10_mixed_curvature_workflow.py](../examples/v10_mixed_curvature_workflow.py) — 固定 scale の Poincaré × SphereProjection × Euclidean retrieval、名前指定による hierarchy supervision、component 距離診断、保存復元の回帰例。geometry の性能優位性を示す benchmark ではありません
 - [experiments/README.md](../experiments/README.md) — 再現可能な Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark と解釈上の注意
 
 ## License

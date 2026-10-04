@@ -1,7 +1,7 @@
 Mixed-curvature product embeddings
 ==================================
 
-v0.10 development adds flat Geoopt ProductManifold embeddings to the existing
+v0.10 adds flat Geoopt ProductManifold embeddings to the existing
 sentence encoder, projection, losses, trainer, and save/load workflow. Component
 types, dimensions, names, curvatures, and scales are explicit caller choices.
 More components or more curvature do not guarantee better representations.
