@@ -185,6 +185,8 @@ Numerical caveats
 
 The v0.4 scope remains intentionally narrow: Poincare and Lorentz geometry,
 opt-in learnable curvature, trainable prototypes, and the focused hierarchy
-objective. Product manifolds, mixed-curvature manifold products, automatic
-prototype discovery, and a generalized optimizer framework are not part of
-this API.
+objective. v0.10 flat mixed-curvature products use fixed component curvature
+and scales with ordinary AdamW; they do not support trainable prototypes or
+learnable component geometry. See :doc:`mixed_curvature` for their optimizer
+and persistence contract. Automatic prototype discovery and a generalized
+optimizer framework remain outside scope.

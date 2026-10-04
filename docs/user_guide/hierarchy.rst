@@ -1,6 +1,9 @@
 Hierarchy-native learning
 =========================
 
+See :doc:`mixed_curvature` for v0.10 product configuration and the
+:ref:`product-compatibility` matrix for component-targeted hierarchy support.
+
 v0.8 adds explicit hierarchy supervision without making neembed a graph or
 ontology framework. The caller owns node identifiers, text labels, parent-child
 edges, optional depth labels, and any unrelated-node negatives. neembed only

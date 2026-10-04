@@ -1,6 +1,10 @@
 Evaluator
 =========
 
+See the :ref:`product-compatibility` matrix for full-product retrieval and
+component-targeted hierarchy support, and
+:doc:`../user_guide/mixed_curvature` for diagnostic interpretation.
+
 Retrieval evaluators
 --------------------
 
