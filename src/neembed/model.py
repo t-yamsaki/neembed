@@ -185,7 +185,7 @@ class ManifoldSentenceTransformer(nn.Module):
         those float64 geometry operations fall back to CPU while the encoder and
         projection remain on MPS. A product containing Lorentz, SphereProjection,
         or Stereographic uses a common float64 geometry dtype, with CPU fallback
-        on MPS. Component scales are persisted but not yet applied to distances.
+        on MPS. Component scales are fixed distance multipliers applied through Geoopt.
     """
 
     def __init__(
@@ -504,7 +504,7 @@ class ManifoldSentenceTransformer(nn.Module):
             SphereProjection/Stereographic distance uses CPU when the encoder is
             on Apple MPS because MPS does not support ``float64`` tensors.
 
-        Product distance uses the common geometry dtype/device without component scales.
+        Product distance uses the common geometry dtype/device and configured scales.
         """
         reference = next(self.parameters())
         if self.product_config is not None:
