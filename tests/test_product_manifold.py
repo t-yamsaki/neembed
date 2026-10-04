@@ -419,7 +419,7 @@ def test_product_mps_transfer_policy_without_accelerator(monkeypatch):
     "ManifoldDepthLoss", "ManifoldRadialOrderLoss",
     "ManifoldHierarchyTripletLoss", "ManifoldHierarchyEvaluator",
 ])
-def test_product_radial_hierarchy_apis_reject_before_encoding(monkeypatch, config, api_name):
+def test_product_radial_hierarchy_apis_require_component_before_encoding(monkeypatch, config, api_name):
     import neembed
 
     _patch_encoder(monkeypatch)
@@ -437,7 +437,7 @@ def test_product_radial_hierarchy_apis_reject_before_encoding(monkeypatch, confi
             node_ids=["root", "child"], texts=["a", "bb"],
             parent_child_edges=[("root", "child")], depths={"root": 0, "child": 1},
         )
-    with pytest.raises(ValueError, match=rf"{api_name} does not yet support product models"):
+    with pytest.raises(ValueError, match="requires an explicit component name or index"):
         api(**kwargs)
 
 

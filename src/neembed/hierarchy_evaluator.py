@@ -10,6 +10,7 @@ import torch
 
 from neembed.hierarchy import _normalize_hierarchy_supervision
 from neembed.model import ManifoldSentenceTransformer
+from neembed.hierarchy_geometry import _hierarchy_geometry, _resolve_hierarchy_component
 
 
 def _average_ranks(values: Sequence[float]) -> list[float]:
@@ -69,8 +70,15 @@ class ManifoldHierarchyEvaluator:
     two labeled nodes are available, or either ranked variable has zero variance,
     the association is reported as ``0.0`` to keep evaluation finite and stable.
 
+    For product models, an explicit Poincare/Lorentz component is required.
+    Both distances and origin radii use that component's Geoopt geometry,
+    including fixed scale multipliers. Retrieval remains on the full product.
+
     Args:
         model: Manifold sentence embedding model to evaluate.
+        component: Product component stable name or zero-based index. Required
+            for product models; omit for single-manifold models. Only Poincare
+            and Lorentz product components have supported hierarchy semantics.
         node_ids: Unique caller-owned node identifiers aligned with ``texts``.
         texts: Texts whose embeddings represent the hierarchy nodes.
         parent_child_edges: Directed ``(parent_id, child_id)`` hierarchy edges.
@@ -79,7 +87,7 @@ class ManifoldHierarchyEvaluator:
             acyclic forest whose nodes have at most one parent.
 
     Notes:
-        Evaluation uses ``model.manifold.dist0`` so both Poincare and Lorentz
+        Evaluation uses the supervised geometry's ``dist0`` so Poincare and Lorentz
         workflows use their native geodesic radius. Evaluation runs under
         ``torch.no_grad()`` and restores the model's original train/eval mode.
     """
@@ -93,9 +101,10 @@ class ManifoldHierarchyEvaluator:
         parent_child_edges: Sequence[Sequence[str]],
         depths: Mapping[str, int] | None = None,
         contract: Literal["tree", "dag"] = "dag",
+        component: str | int | None = None,
     ) -> None:
-        if getattr(model, "manifold_name", None) == "product":
-            raise ValueError("ManifoldHierarchyEvaluator does not yet support product models")
+        self._component_index = _resolve_hierarchy_component(model, component)
+        self.component = component
         if isinstance(texts, (str, bytes)):
             raise ValueError("texts must be a sequence of strings, not a string")
         normalized_texts = tuple(texts)
@@ -131,7 +140,10 @@ class ManifoldHierarchyEvaluator:
                     self.texts,
                     convert_to_tensor=True,
                 )
-                radii = self.model.manifold.dist0(embeddings)
+                geometry, embeddings = _hierarchy_geometry(
+                    self.model, embeddings, self._component_index,
+                )
+                radii = geometry.dist0(embeddings)
                 if radii.ndim != 1 or radii.shape[0] != len(self.node_ids):
                     raise ValueError("model must return one manifold embedding per text")
 

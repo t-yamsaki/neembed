@@ -83,9 +83,11 @@ Nested products and SPD/Stiefel/Siegel components are not supported.
 ``ManifoldPrototypes`` does not yet support product models and rejects them
 explicitly; this runtime support covers sentence embeddings.
 The radial hierarchy APIs ``ManifoldDepthLoss``, ``ManifoldRadialOrderLoss``,
-``ManifoldHierarchyTripletLoss``, and ``ManifoldHierarchyEvaluator`` also reject
-product models at construction because Geoopt ``ProductManifold`` has no
-``dist0`` method. Product origin-distance support is not included here.
+``ManifoldHierarchyTripletLoss``, and ``ManifoldHierarchyEvaluator`` require an
+explicit ``component=`` stable name or zero-based index for product models.
+Only Poincare/Lorentz components are supported for hierarchy supervision; all
+retrieval paths continue to use the full product distance. See
+:doc:`../user_guide/hierarchy` for component selection and scaled radial targets.
 
 Product models also support the existing retrieval losses, ``ManifoldTrainer``,
 ``rank()``, ``exact_corpus_search()``, binary/graded corpus evaluation, and offline

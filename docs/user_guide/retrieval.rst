@@ -88,8 +88,9 @@ duplicate texts may have different IDs, and only declared positive, excluded,
 or matching self IDs are filtered by the miner.
 
 See :doc:`../api/product_config` for component dimensions, curvature fields,
-scale validation, and persistence. Product prototype and radial hierarchy APIs
-remain outside this retrieval workflow.
+scale validation, and persistence. Product prototypes remain unsupported;
+component-targeted hierarchy supervision can be combined with full-product
+retrieval as described in :doc:`hierarchy`.
 
 Choose the retrieval path
 -------------------------

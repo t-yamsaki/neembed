@@ -10,6 +10,89 @@ This guide complements :doc:`retrieval_objectives` and :doc:`retrieval` rather
 than replacing them. Retrieval quality and hierarchy structure are separate
 concerns and should be evaluated separately.
 
+Component-targeted product supervision
+--------------------------------------
+
+Mixed-curvature models can reserve one Poincare or Lorentz component for
+hierarchy structure. Pass ``component="hierarchy"`` (a stable configured name)
+or ``component=0`` (a zero-based position) to
+:class:`neembed.ManifoldDepthLoss`,
+:class:`neembed.ManifoldRadialOrderLoss`,
+:class:`neembed.ManifoldHierarchyTripletLoss`, and
+:class:`neembed.ManifoldHierarchyEvaluator`.
+
+Product selection is explicit even if only one component is hyperbolic.
+Missing selections, unknown names, out-of-range indices, booleans, and
+incompatible geometries are rejected at construction. Numeric strings are
+names, not indices. Euclidean, SphereProjection, and generic Stereographic
+components are not enabled for product hierarchy supervision. Single-manifold
+callers omit ``component`` and retain their existing behavior.
+
+All terms of a hierarchy objective use the selected component: for directed
+triplets this includes both parent-child proximity and radial ordering. Points
+are extracted using Geoopt's ambient slice, preserving Lorentz's extra
+coordinate, packed ProductManifold embeddings, and autograd. The selected
+component's fixed ``Scaled`` multiplier applies to pair distances and origin
+radii. Choose ``margin``, ``radial_margin``, and ``radial_scale`` in these scaled
+distance units; changing component scale does not automatically recalibrate
+supervision.
+
+For example, combine full-product retrieval with hierarchy supervision on H in
+an H x S model:
+
+.. code-block:: python
+
+   from neembed import (
+       ManifoldSentenceTransformer, ManifoldMultipleNegativesRankingLoss,
+       ManifoldHierarchyTripletLoss, ManifoldRetrievalHierarchyLoss,
+       ManifoldHierarchyEvaluator, ManifoldTrainer,
+   )
+
+   model = ManifoldSentenceTransformer(
+       "sentence-transformers/all-MiniLM-L6-v2",
+       product_config=[
+           {"name": "hierarchy", "manifold": "poincare",
+            "intrinsic_dim": 8, "curvature": 0.5, "scale": 1.5},
+           {"name": "content", "manifold": "sphere_projection",
+            "intrinsic_dim": 8, "sectional_curvature": 0.25},
+       ],
+   )
+   retrieval = ManifoldMultipleNegativesRankingLoss(model, temperature=0.5)
+   hierarchy = ManifoldHierarchyTripletLoss(model, component="hierarchy")
+   joint = ManifoldRetrievalHierarchyLoss(
+       retrieval, hierarchy, hierarchy_weight=0.3,
+   )
+   trainer = ManifoldTrainer(model, joint)
+   history = trainer.fit([
+       (
+           (["dog", "car"], ["canine", "vehicle"]),
+           (["animal", "vehicle"], ["dog", "car"], ["battery", "cat"]),
+       ),
+   ], epochs=1)
+
+   hierarchy_evaluator = ManifoldHierarchyEvaluator(
+       model=model,
+       node_ids=["animal", "dog"], texts=["animal", "dog"],
+       parent_child_edges=[("animal", "dog")],
+       depths={"animal": 0, "dog": 1},
+       component="hierarchy",
+   )
+   hierarchy_metrics = hierarchy_evaluator()
+
+For H x E, use an Euclidean content component instead. Retrieval objectives,
+``distance()``, ranking, and corpus evaluators continue to use every product
+component. Pure hierarchy losses directly supervise only the selected component
+projection rows; a shared encoder may still change representations used by
+other components. This is a supervision boundary, not independent encoders.
+
+Model checkpoints preserve component names, order, dimensions, curvature and
+scales through the existing product configuration. Recreate losses/evaluators
+after loading with the same component name (recommended) or position; their
+selection and caller-owned hierarchy labels are not added to the model's
+checkpoint schema. Names make the choice explicit if application code later
+reorders a configuration. Selecting multiple components simultaneously and
+automatic role discovery remain outside this API.
+
 Caller-owned hierarchy metadata
 -------------------------------
 
