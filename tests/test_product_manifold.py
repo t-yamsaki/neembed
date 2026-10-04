@@ -580,3 +580,115 @@ def test_valid_scale_dtype_changes_keep_controlled_distance(monkeypatch):
         assert model.manifold.manifolds[0].scale.dtype == dtype
         points = torch.tensor([[0.0], [3.0]], dtype=dtype)
         torch.testing.assert_close(model.distance(*points), torch.tensor(6.0, dtype=dtype))
+
+
+@pytest.mark.parametrize("scales", [(1.0, 1.0), (2.0, 0.5)])
+def test_product_diagnostics_controlled_euclidean_metric(monkeypatch, scales):
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", product_config=[
+        {"name": "total_distance", "manifold": "euclidean", "intrinsic_dim": 1,
+         "scale": scales[0]},
+        {"name": "component_distances", "manifold": "euclidean", "intrinsic_dim": 1,
+         "scale": scales[1]},
+    ])
+    result = model.product_distance_diagnostics([0.0, 0.0], [3.0, 4.0])
+    components = result["component_distances"]
+    assert list(components) == ["total_distance", "component_distances"]
+    torch.testing.assert_close(components["total_distance"], torch.tensor(3.0 * scales[0]))
+    torch.testing.assert_close(components["component_distances"], torch.tensor(4.0 * scales[1]))
+    torch.testing.assert_close(result["total_distance"],
+                               torch.tensor(((3 * scales[0]) ** 2 + (4 * scales[1]) ** 2) ** 0.5))
+    # At coincident points the total retains Geoopt's numerical safeguards.
+    equal = model.product_distance_diagnostics([0.0, 0.0], [0.0, 0.0])
+    assert all(value == 0 for value in equal["component_distances"].values())
+    torch.testing.assert_close(equal["total_distance"], model.distance([0.0, 0.0], [0.0, 0.0]))
+
+
+@pytest.mark.parametrize("component", [
+    {"manifold": "poincare", "curvature": 0.5},
+    {"manifold": "lorentz", "curvature": 0.5},
+    {"manifold": "euclidean"},
+    {"manifold": "sphere_projection", "sectional_curvature": 0.25},
+    {"manifold": "stereographic", "sectional_curvature": -0.5},
+    {"manifold": "stereographic", "sectional_curvature": 0.0},
+    {"manifold": "stereographic", "sectional_curvature": 0.25},
+])
+def test_product_diagnostics_match_direct_submanifolds_and_text_encoding(monkeypatch, component):
+    _patch_encoder(monkeypatch)
+    torch.manual_seed(0)
+    model = ManifoldSentenceTransformer("fake-model", product_config=[
+        dict(component, name="geometry", intrinsic_dim=2, scale=1.25),
+        {"name": "residual", "manifold": "euclidean", "intrinsic_dim": 1, "scale": 0.75},
+    ])
+    # Default NumPy encode outputs are accepted, including broadcast pairwise batches.
+    a = model.encode(["a", "bb"])
+    b = model.encode(["ccc", "dddd", "eeeee"])
+    result = model.product_distance_diagnostics(a[:, None, :], b[None, :, :])
+    dtype = product_geometry_dtype(model.product_config, model.projection.weight.dtype)
+    assert list(result["component_distances"]) == ["geometry", "residual"]
+    a = torch.as_tensor(a, dtype=dtype)
+    b = torch.as_tensor(b, dtype=dtype)
+    widths = [c.ambient_dim for c in model.product_config.components]
+    a_parts, b_parts = torch.split(a, widths, dim=-1), torch.split(b, widths, dim=-1)
+    for (name, actual), geometry, part_a, part_b in zip(
+        result["component_distances"].items(), model.manifold.manifolds, a_parts, b_parts,
+    ):
+        expected = geometry.dist(part_a[:, None], part_b[None])
+        assert actual.shape == (2, 3)
+        assert actual.dtype == dtype and actual.device.type == "cpu"
+        assert not actual.requires_grad
+        assert torch.isfinite(actual).all()
+        torch.testing.assert_close(actual, expected)
+    torch.testing.assert_close(result["total_distance"],
+                               model.manifold.dist(a[:, None], b[None]))
+    torch.testing.assert_close(result["total_distance"], model.distance(a[:, None], b[None]))
+
+
+@pytest.mark.parametrize("training", [True, False])
+def test_product_diagnostics_leave_mode_gradients_and_training_unchanged(monkeypatch, training):
+    from neembed.losses import ManifoldMultipleNegativesRankingLoss
+
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", product_config=_three_component_config())
+    model.train(training)
+    a, b = model(["a", "bb"]), model(["ccc", "dddd"])
+    before = {name: value.clone() for name, value in model.state_dict().items()}
+    result = model.product_distance_diagnostics(a, b)
+    assert model.training == training
+    assert not result["total_distance"].requires_grad
+    assert all(not v.requires_grad for v in result["component_distances"].values())
+    assert all(p.grad is None for p in model.parameters())
+    for name, value in model.state_dict().items():
+        assert torch.equal(value, before[name])
+    loss = ManifoldMultipleNegativesRankingLoss(model)(["a", "bb"], ["ccc", "dddd"])
+    loss.backward()
+    assert torch.isfinite(model.encoder.linear.weight.grad).all()
+    assert torch.isfinite(model.projection.weight.grad).all()
+
+
+@pytest.mark.parametrize("bad", [0.0, [0.0] * 3, [0.0] * 5])
+@pytest.mark.parametrize("input_name", ["a", "b"])
+def test_product_diagnostics_validate_packed_width(monkeypatch, bad, input_name):
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", product_config=_two_component_config())
+    inputs = {"a": [0.0] * 4, "b": [0.0] * 4}
+    inputs[input_name] = bad
+    with pytest.raises(ValueError, match=f"{input_name} must have final dimension 4"):
+        model.product_distance_diagnostics(**inputs)
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"manifold": "poincare"},
+    {"manifold": "lorentz"},
+    {"manifold": "euclidean"},
+    {"manifold": "sphere_projection", "sectional_curvature": 0.25},
+    {"manifold": "stereographic", "sectional_curvature": -0.5},
+])
+def test_single_manifold_diagnostics_reject_without_changing_distance(monkeypatch, kwargs):
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", embedding_dim=2, **kwargs)
+    embeddings = model.encode(["a", "bb"], convert_to_tensor=True)
+    before = model.distance(*embeddings)
+    with pytest.raises(ValueError, match="requires a product model"):
+        model.product_distance_diagnostics(*embeddings)
+    torch.testing.assert_close(model.distance(*embeddings), before)

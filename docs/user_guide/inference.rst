@@ -5,6 +5,11 @@ The model-level public inference helpers are ``encode()``, ``distance()``, and
 ``rank()`` on :class:`neembed.ManifoldSentenceTransformer`. v0.6 also exposes
 :func:`neembed.exact_corpus_search` for exact multi-query text-corpus search.
 
+For product models, ``product_distance_diagnostics()`` reports named component
+distances alongside the unchanged Geoopt total. Encode text first and pass the
+packed embeddings to the helper. See :doc:`../api/product_config` for
+broadcasting, fixed scale semantics, and a diagnostic example.
+
 Encoding text
 -------------
 

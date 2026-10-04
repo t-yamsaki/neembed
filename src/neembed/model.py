@@ -500,26 +500,8 @@ class ManifoldSentenceTransformer(nn.Module):
             return embeddings
         return embeddings.cpu().numpy()
 
-    def distance(self, a: Any, b: Any) -> torch.Tensor:
-        """Return the geodesic distance between two geometry embeddings.
-
-        Args:
-            a: First geometry embedding or array-like value.
-            b: Second geometry embedding or array-like value.
-
-        Returns:
-            A tensor containing the configured geometry distance.
-
-        Notes:
-            This is an inference helper. Inputs are moved to the geometry device
-            and dtype, and the distance is computed under ``torch.no_grad()``.
-            Lorentz, SphereProjection, and Stereographic distance are evaluated in
-            ``float64``. Poincare and Euclidean retain the model parameter dtype.
-            SphereProjection/Stereographic distance uses CPU when the encoder is
-            on Apple MPS because MPS does not support ``float64`` tensors.
-
-        Product distance uses the common geometry dtype/device and configured scales.
-        """
+    def _distance_tensors(self, a: Any, b: Any) -> tuple[torch.Tensor, torch.Tensor]:
+        """Convert distance inputs using the configured geometry policy."""
         reference = next(self.parameters())
         if self.product_config is not None:
             geometry_dtype = product_geometry_dtype(
@@ -549,8 +531,81 @@ class ManifoldSentenceTransformer(nn.Module):
             dtype=geometry_dtype,
         )
 
+        return a_tensor, b_tensor
+
+    def distance(self, a: Any, b: Any) -> torch.Tensor:
+        """Return the geodesic distance between two geometry embeddings.
+
+        Args:
+            a: First geometry embedding or array-like value.
+            b: Second geometry embedding or array-like value.
+
+        Returns:
+            A tensor containing the configured geometry distance.
+
+        Notes:
+            This is an inference helper. Inputs are moved to the geometry device
+            and dtype, and the distance is computed under ``torch.no_grad()``.
+            Lorentz, SphereProjection, and Stereographic distance are evaluated in
+            ``float64``. Poincare and Euclidean retain the model parameter dtype.
+            SphereProjection/Stereographic distance uses CPU when the encoder is
+            on Apple MPS because MPS does not support ``float64`` tensors.
+
+        Product distance uses the common geometry dtype/device and configured scales.
+        """
+        a_tensor, b_tensor = self._distance_tensors(a, b)
+
         with torch.no_grad():
             return self.manifold.dist(a_tensor, b_tensor)
+
+    @torch.no_grad()
+    def product_distance_diagnostics(
+        self, a: Any, b: Any,
+    ) -> dict[str, torch.Tensor | dict[str, torch.Tensor]]:
+        """Report total and named component geodesic distances for a product.
+
+        Args:
+            a: Packed product embedding or array-like batch. The final dimension
+                must equal ``product_config.ambient_dim``.
+            b: Second packed product embedding or batch, with broadcast-compatible
+                leading dimensions. Encode text with ``encode()`` before calling.
+
+        Returns:
+            A dictionary with ``total_distance`` from Geoopt ProductManifold
+            and ``component_distances``, an ordered name-to-tensor dictionary
+            matching product configuration order. Component distances include
+            fixed Scaled multipliers. Each tensor has the broadcast batch shape.
+
+        Raises:
+            ValueError: If the model is not a product or an input has the wrong
+                packed embedding width.
+
+        Notes:
+            All computation is no-grad and uses the same geometry dtype/device
+            as ``distance()``. This helper does not change model mode or training
+            losses. The total is obtained directly from Geoopt, preserving its
+            numerical safeguards rather than recomputing it from diagnostics.
+        """
+        if self.product_config is None:
+            raise ValueError("product_distance_diagnostics requires a product model")
+        a_tensor, b_tensor = self._distance_tensors(a, b)
+        for name, tensor in (("a", a_tensor), ("b", b_tensor)):
+            if tensor.ndim == 0 or tensor.shape[-1] != self.product_config.ambient_dim:
+                raise ValueError(
+                    f"{name} must have final dimension {self.product_config.ambient_dim}"
+                )
+        component_distances = {}
+        for index, (component, manifold) in enumerate(zip(
+            self.product_config.components, self.manifold.manifolds,
+        )):
+            component_distances[component.name] = manifold.dist(
+                self.manifold.take_submanifold_value(a_tensor, index),
+                self.manifold.take_submanifold_value(b_tensor, index),
+            )
+        return {
+            "total_distance": self.manifold.dist(a_tensor, b_tensor),
+            "component_distances": component_distances,
+        }
 
     def rank(
         self,
