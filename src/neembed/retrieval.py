@@ -75,8 +75,8 @@ def _iter_exact_geodesic_distance_blocks(
     can therefore consume one block at a time and keep only the state they need.
 
     Distance calculation delegates to :meth:`ManifoldSentenceTransformer.distance`
-    so Poincare/Lorentz dtype, device, Geoopt semantics, and no-grad behavior stay
-    identical to the existing inference helper.
+    so single-manifold and product dtype/device policies, component scales,
+    Geoopt semantics, and no-grad behavior match the inference helper.
     """
     query_batch = _as_embedding_batch(queries, name="queries")
     corpus_batch = _as_embedding_batch(corpus, name="corpus")
