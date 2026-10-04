@@ -10,7 +10,7 @@ hard-negative mining, explicit hierarchy supervision, and opt-in manifold
 prototypes. The current development API supports Euclidean, Poincare, Lorentz,
 SphereProjection, and generic signed-curvature Stereographic geometry. Learnable
 curvature remains limited to the backward-compatible Poincare and Lorentz
-positive-magnitude path. v0.10 development supports flat mixed-curvature products
+positive-magnitude path. v0.10 supports flat mixed-curvature products
 with fixed component scales, full-product retrieval, named distance diagnostics,
 and component-targeted hierarchy supervision.
 

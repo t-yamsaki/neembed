@@ -59,4 +59,16 @@ jobs:
         run: |
           python -m pip uninstall -y neembed-geoopt
           python -m pip install --no-deps dist/*.whl
-          python -c "import neembed; print(neembed.__file__)"
+          python - <<'PY'
+          from importlib.metadata import version
+          import tomllib
+          import neembed
+          from neembed import ProductConfig, normalize_product_config
+
+          with open("pyproject.toml", "rb") as source:
+              assert version("neembed-geoopt") == tomllib.load(source)["project"]["version"]
+          config = normalize_product_config([{"manifold": "lorentz", "intrinsic_dim": 2}])
+          assert config.projection_dim == 2 and config.ambient_dim == 3
+          assert ProductConfig.from_dict(config.to_dict()) == config
+          print(neembed.__file__)
+          PY

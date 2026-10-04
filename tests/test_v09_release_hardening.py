@@ -106,6 +106,6 @@ def test_v09_release_smoke_includes_constant_curvature_regression() -> None:
         encoding="utf-8"
     )
 
-    assert workflow.count("Verify installed version and v0.4-v0.9 smoke") == 2
+    assert workflow.count("Verify installed version and v0.4-v0.10 smoke") == 2
     assert workflow.count("tests/test_v09_constant_curvature_comparison_example.py") == 2
     assert "not a research benchmark or a claim of geometry superiority" in workflow

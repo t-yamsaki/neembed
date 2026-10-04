@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [日本語](docs/README_ja.md)
 
-> **Status:** Package version v0.9.0 adds explicit Euclidean, SphereProjection, and fixed signed-curvature Stereographic geometry, plus a float64 stereographic stability policy and matched constant-curvature regression example, while preserving all v0.4-v0.8 public paths and the existing Poincaré/Lorentz curvature contract. The API remains intentionally small and may still evolve before a stable 1.0 release.
+> **Status:** Package version v0.10.0 adds flat mixed-curvature ProductManifold embeddings, fixed Geoopt Scaled component metrics, full-product retrieval, named component distance diagnostics, and explicit component-targeted hierarchy supervision, while preserving all v0.4-v0.9 single-manifold public contracts. The API remains intentionally small and may still evolve before a stable 1.0 release.
 
 `neembed` is a lightweight integration layer between pretrained Sentence Transformer models and manifold-valued representations. It keeps the pretrained encoder intact, optionally projects its Euclidean output, and delegates constant-curvature geometry to Geoopt.
 
@@ -97,7 +97,7 @@ v0.9 adds constant-curvature geometry selection without changing the legacy hype
 - float64 geometry operations for SphereProjection/Stereographic, including CPU geometry fallback when the encoder runs on Apple MPS
 - a deterministic matched constant-curvature comparison example for engineering regression, not geometry ranking
 
-v0.10 development adds flat mixed-curvature products with fixed component scales, full-product retrieval, named distance diagnostics, and optional hierarchy supervision on a designated Poincaré/Lorentz component. See the [Mixed-curvature product guide](https://neembed.readthedocs.io/en/latest/user_guide/mixed_curvature.html) for configuration, compatibility, optimizer/persistence behavior, and the regression example. More geometry does not guarantee better task metrics.
+v0.10 adds flat mixed-curvature products with fixed component scales, full-product retrieval, named distance diagnostics, and optional hierarchy supervision on a designated Poincaré/Lorentz component. See the [Mixed-curvature product guide](https://neembed.readthedocs.io/en/latest/user_guide/mixed_curvature.html) for configuration, compatibility, optimizer/persistence behavior, and the regression example. More geometry does not guarantee better task metrics.
 
 Nested products, learnable product curvature/scales, learnable signed curvature crossing zero, advanced SPD/Siegel/Stiefel/Birkhoff geometry, ontology parsing, graph-database integration, ANN/vector-database integration, and distributed retrieval remain outside this scope.
 
