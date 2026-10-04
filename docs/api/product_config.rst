@@ -97,6 +97,55 @@ curvature fields, scale values, and stable names when loading. Model
 ``save_pretrained()`` / ``from_pretrained()`` persist and restore the normalized
 product metadata together with encoder and projection state.
 
+Component distance diagnostics
+------------------------------
+
+``model.product_distance_diagnostics(a, b)`` accepts two packed embeddings or
+embedding batches and reports a simple dictionary:
+
+- ``total_distance`` is the distance returned directly by Geoopt
+  ``ProductManifold.dist``.
+- ``component_distances`` maps each configured component name to its geodesic
+  distance, preserving configuration order. Distances include any fixed
+  ``Scaled`` multiplier.
+
+Inputs use the same geometry dtype/device conversion as ``model.distance()``.
+Their final width must equal ``product_config.ambient_dim``, including Lorentz's
+additional ambient coordinate. Leading dimensions broadcast as for ``distance()``:
+aligned batches produce one distance per pair, while singleton batch dimensions
+produce a query-by-candidate matrix.
+
+For text batches, encode first using the existing inference API:
+
+.. code-block:: python
+
+   queries = model.encode(["dog", "cat"])
+   candidates = model.encode(["mammal", "vehicle"])
+   report = model.product_distance_diagnostics(
+       queries[:, None, :], candidates[None, :, :],
+   )
+   assert report["total_distance"].shape == (2, 2)
+   assert list(report["component_distances"]) == [
+       component.name for component in model.product_config.components
+   ]
+   for name, distances in report["component_distances"].items():
+       print(name, distances)
+
+For the earlier H x S x E configuration, names are ``hierarchy``, ``spherical``,
+and ``residual``. Tensor outputs stay on the geometry device; use
+``tensor.detach().cpu().tolist()`` when a plain Python display is needed.
+
+The diagnostic always runs without gradients and does not change model mode,
+parameters, or loss behavior. Calling ``encode()`` still has its existing effect
+of switching the model to evaluation mode. For training, use the model's normal
+forward path and retrieval losses. Single-manifold models reject this
+product-specific helper.
+
+The total is not recomputed from the component results: Geoopt's own squared
+distance aggregation and numerical safeguards remain authoritative, including
+at coincident points. These distances describe geometry, not attribution,
+learned component importance, or an automatic scale-selection rule.
+
 .. autoclass:: neembed.ProductComponentConfig
    :members:
 
