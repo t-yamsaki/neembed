@@ -87,6 +87,10 @@ The radial hierarchy APIs ``ManifoldDepthLoss``, ``ManifoldRadialOrderLoss``,
 product models at construction because Geoopt ``ProductManifold`` has no
 ``dist0`` method. Product origin-distance support is not included here.
 
+Product models also support the existing retrieval losses, ``ManifoldTrainer``,
+``rank()``, ``exact_corpus_search()``, binary/graded corpus evaluation, and offline
+hard-negative mining. See :doc:`../user_guide/retrieval` for a complete workflow.
+
 ``ProductConfig.to_dict()`` returns versioned JSON-compatible metadata and
 ``ProductConfig.from_dict()`` validates the schema, component order, dimensions,
 curvature fields, scale values, and stable names when loading. Model

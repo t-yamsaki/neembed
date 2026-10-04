@@ -11,6 +11,86 @@ All retrieval paths use the configured Geoopt geodesic distance. Poincare and
 Lorentz therefore keep the same geometry semantics used by ``encode()`` and
 ``distance()`` elsewhere in neembed.
 
+Product embeddings
+------------------
+
+A model with ``product_config`` works with the same retrieval APIs and trainer.
+MNRL (including explicit negatives), symmetric MNRL, Triplet, MarginMSE, and
+DistanceMSE optimize Geoopt's product geodesic distance. Non-unit fixed component
+scales affect both training distances and retrieval rankings. Temperatures,
+triplet margins, and regression targets are caller-chosen in that scaled metric;
+neembed does not calibrate them automatically.
+
+For example, this H x E workflow uses caller-owned IDs for evaluation and
+negative exclusions:
+
+.. code-block:: python
+
+   from neembed import (
+       ManifoldSentenceTransformer, ManifoldMultipleNegativesRankingLoss,
+       ManifoldTrainer, ManifoldCorpusRetrievalEvaluator,
+       exact_corpus_search, mine_hard_negatives,
+   )
+
+   model = ManifoldSentenceTransformer(
+       "sentence-transformers/all-MiniLM-L6-v2",
+       product_config=[
+           {"name": "hierarchy", "manifold": "poincare",
+            "intrinsic_dim": 8, "curvature": 0.5, "scale": 0.7},
+           {"name": "residual", "manifold": "euclidean",
+            "intrinsic_dim": 8, "scale": 1.6},
+       ],
+   )
+   queries = ["Shiba Inu", "electric car"]
+   corpus = ["dog", "canine", "vehicle", "battery"]
+   query_ids = ["q-dog", "q-car"]
+   corpus_ids = ["dog", "canine", "vehicle", "battery"]
+   relevance = {"q-dog": ["dog", "canine"], "q-car": ["vehicle"]}
+
+   ranking = model.rank(queries[0], corpus, top_k=2)
+   results = exact_corpus_search(
+       model, queries, corpus, top_k=2,
+       query_chunk_size=1, corpus_chunk_size=2,
+   )
+   evaluator = ManifoldCorpusRetrievalEvaluator(
+       model=model, queries=queries, query_ids=query_ids,
+       corpus=corpus, corpus_ids=corpus_ids, relevance=relevance,
+       recall_at_k=(1, 2), query_chunk_size=1, corpus_chunk_size=2,
+   )
+   metrics = evaluator()
+   negatives = mine_hard_negatives(
+       model, queries, corpus, query_ids=query_ids, corpus_ids=corpus_ids,
+       positive_corpus_ids=relevance, num_negatives=1,
+       query_chunk_size=1, corpus_chunk_size=2,
+   )
+   trainer = ManifoldTrainer(
+       model, ManifoldMultipleNegativesRankingLoss(model, temperature=0.5),
+   )
+   history = trainer.fit(
+       [(queries, ["dog", "vehicle"],
+         [rows[0]["candidate"] for rows in negatives])],
+       epochs=1, evaluator=evaluator,
+   )
+
+For H x S, replace the Euclidean component with ``sphere_projection`` and a
+positive ``sectional_curvature``. SphereProjection and Lorentz components
+make the entire product geometry use float64; on Apple MPS that geometry runs
+on CPU. The trainer remains the existing ``ManifoldTrainer``.
+
+Exact search and mining encode text in bounded batches and stream distance
+blocks. Binary corpus evaluation uses two passes of those blocks and retains
+only relevant-item rank state; it does not build full corpus rankings. Graded
+evaluation also supports products through
+:class:`neembed.ManifoldGradedCorpusRetrievalEvaluator` and retains top-k results
+for nDCG. As for single manifolds, identical distances retain corpus input order,
+even across chunk boundaries. IDs and relevance remain external metadata:
+duplicate texts may have different IDs, and only declared positive, excluded,
+or matching self IDs are filtered by the miner.
+
+See :doc:`../api/product_config` for component dimensions, curvature fields,
+scale validation, and persistence. Product prototype and radial hierarchy APIs
+remain outside this retrieval workflow.
+
 Choose the retrieval path
 -------------------------
 

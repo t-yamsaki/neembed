@@ -7,9 +7,10 @@ supervision signal should the model optimize?**; the manifold answers **which
 geometry should represent the embeddings?**. Treat those as separate
 experimental factors.
 
-All objectives below use the configured Geoopt geodesic distance. The current
-Poincare and Lorentz model paths therefore keep the same distance semantics used
-by inference and exact retrieval. Choosing a different objective does not
+All objectives below use the configured Geoopt geodesic distance. Single-manifold and mixed-curvature
+product models therefore keep the same distance semantics used by inference and
+exact retrieval, including fixed component scales. The existing trainer accepts
+product models without a separate training path. Choosing a different objective does not
 silently change the manifold, curvature, optimizer policy, or retrieval ranking
 rule.
 
