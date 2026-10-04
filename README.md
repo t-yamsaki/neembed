@@ -185,6 +185,7 @@ python examples/v06_exact_retrieval_workflow.py
 python examples/v07_objective_comparison.py
 python examples/v08_hierarchy_learning.py
 python examples/v09_constant_curvature_comparison.py
+python examples/v10_mixed_curvature_workflow.py
 ```
 
 - [examples/train_poincare.py](examples/train_poincare.py) — minimal Poincaré workflow
@@ -197,6 +198,7 @@ python examples/v09_constant_curvature_comparison.py
 - [examples/v07_objective_comparison.py](examples/v07_objective_comparison.py) — deterministic comparison of MNRL, Triplet, MarginMSE, and DistanceMSE under fixed data/initialization with MRR, Recall@K, and nDCG@K diagnostics; not a research benchmark or superiority claim
 - [examples/v08_hierarchy_learning.py](examples/v08_hierarchy_learning.py) — deterministic retrieval-only vs hierarchy-aware Poincaré regression with explicit caller-owned hierarchy supervision and separate retrieval/structure diagnostics; not a benchmark or superiority claim
 - [examples/v09_constant_curvature_comparison.py](examples/v09_constant_curvature_comparison.py) — deterministic matched comparison of Euclidean, Poincaré, Lorentz, SphereProjection, and signed Stereographic geometry with retrieval and dtype/device diagnostics; engineering regression only, not a benchmark or geometry-superiority claim
+- [examples/v10_mixed_curvature_workflow.py](examples/v10_mixed_curvature_workflow.py) — fixed-scale Poincaré × SphereProjection × Euclidean retrieval plus named hyperbolic-component hierarchy supervision, component distances, and save/load validation; not a benchmark or mixed-curvature superiority claim
 - [experiments/README.md](experiments/README.md) — reproducible Euclidean-vs-Poincaré-vs-Lorentz engineering benchmark and interpretation limits
 
 ## License
