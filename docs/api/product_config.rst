@@ -64,8 +64,21 @@ geometry dtype so all packed components share one dtype. On Apple MPS, such a
 fixed-double product geometry falls back to CPU while the encoder/projection can
 remain on MPS.
 
-``scale`` defaults to ``1.0`` and is persisted, but v0.10 Issue #130 does not yet
-apply component scales to distances; scaled product distance is follow-on work.
+``scale`` defaults to ``1.0``. Non-unit scales wrap each component in Geoopt
+``Scaled`` with a fixed positive distance multiplier. For component distances
+``d_i`` and scales ``s_i``, the product metric is ``sqrt(sum((s_i * d_i)**2))``,
+computed entirely by Geoopt. Scaling changes metric contribution, not component
+dimensionality or encoded coordinates: the encoder tangent is mapped using the
+underlying component manifold, then distances use the scaled product. Unit
+scales retain the unwrapped component and the existing unscaled behavior.
+
+Scales use the common geometry dtype/device and must be representable as positive
+finite values in that dtype, as must their squared metric factors. Dtype changes
+that violate this requirement are rejected before model state is changed.
+Fixed scales are preserved in the existing version-1
+configuration metadata on save/load. Learnable scales are not exposed in this
+release. Models saved during Issue #130 with non-unit metadata-only scales now
+apply those scales when loaded; unit-scale models retain their prior behavior.
 Nested products and SPD/Stiefel/Siegel components are not supported.
 ``ManifoldPrototypes`` does not yet support product models and rejects them
 explicitly; this runtime support covers sentence embeddings.

@@ -273,16 +273,19 @@ def test_stereographic_product_split_map_pack_and_distance(monkeypatch, sectiona
         assert torch.count_nonzero(parameter.grad) > 0
 
 
-def test_product_scales_are_metadata_only(monkeypatch):
+def test_product_scales_change_metric_not_encoded_points(monkeypatch):
     _patch_encoder(monkeypatch)
-    model = ManifoldSentenceTransformer("fake-model", product_config=_three_component_config())
-    config = [dict(component, scale=7.0) for component in _three_component_config()]
-    scaled = ManifoldSentenceTransformer("fake-model", product_config=config)
-    scaled.load_state_dict(model.state_dict())
+    config = [dict(component, scale=1.0) for component in _three_component_config()]
+    model = ManifoldSentenceTransformer("fake-model", product_config=config)
+    scaled = ManifoldSentenceTransformer(
+        "fake-model", product_config=[dict(component, scale=7.0) for component in config],
+    )
+    scaled.encoder.load_state_dict(model.encoder.state_dict())
+    scaled.projection.load_state_dict(model.projection.state_dict())
     a = model.encode(["a", "bbb"], convert_to_tensor=True)
     b = scaled.encode(["a", "bbb"], convert_to_tensor=True)
     torch.testing.assert_close(a, b)
-    torch.testing.assert_close(model.distance(a[0], a[1]), scaled.distance(b[0], b[1]))
+    torch.testing.assert_close(scaled.distance(b[0], b[1]), 7 * model.distance(a[0], a[1]))
 
 
 @pytest.mark.parametrize("damage", ["list", "version", "missing_scale", "unknown", "width"])
@@ -436,3 +439,144 @@ def test_product_radial_hierarchy_apis_reject_before_encoding(monkeypatch, confi
         )
     with pytest.raises(ValueError, match=rf"{api_name} does not yet support product models"):
         api(**kwargs)
+
+
+def test_scaled_euclidean_product_has_controlled_metric(monkeypatch):
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", product_config=[
+        {"manifold": "euclidean", "intrinsic_dim": 1, "scale": 2.0},
+        {"manifold": "euclidean", "intrinsic_dim": 1, "scale": 0.5},
+    ])
+    actual = model.distance([0.0, 0.0], [3.0, 4.0])
+    torch.testing.assert_close(actual, torch.tensor(40.0).sqrt())
+    assert model.product_config.projection_dim == model.product_config.ambient_dim == 2
+    assert all(isinstance(m, geoopt.Scaled) for m in model.manifold.manifolds)
+    assert not any(p.requires_grad for p in model.manifold.parameters())
+
+
+@pytest.mark.parametrize("component", [
+    {"manifold": "poincare", "curvature": 0.5},
+    {"manifold": "lorentz", "curvature": 0.5},
+    {"manifold": "euclidean"},
+    {"manifold": "sphere_projection", "sectional_curvature": 0.25},
+    {"manifold": "stereographic", "sectional_curvature": -0.5},
+    {"manifold": "stereographic", "sectional_curvature": 0.0},
+    {"manifold": "stereographic", "sectional_curvature": 0.25},
+])
+def test_scaled_components_match_independent_geoopt_product(monkeypatch, component):
+    from neembed.manifolds import get_manifold
+
+    _patch_encoder(monkeypatch)
+    torch.manual_seed(0)
+    config = [dict(component, intrinsic_dim=2, scale=2.5),
+              {"manifold": "euclidean", "intrinsic_dim": 1, "scale": 0.75}]
+    model = ManifoldSentenceTransformer("fake-model", product_config=config)
+    embeddings = model(["a", "bb", "ccc"])
+    assert model.manifold.check_point_on_manifold(embeddings)
+    base = get_manifold(component["manifold"], component.get("curvature", 1.0),
+                        sectional_curvature=component.get("sectional_curvature"))
+    base.to(dtype=embeddings.dtype)
+    direct = geoopt.ProductManifold(
+        (geoopt.Scaled(base, 2.5).to(dtype=embeddings.dtype), config[0]["intrinsic_dim"] + int(component["manifold"] == "lorentz")),
+        (geoopt.Scaled(geoopt.Euclidean(ndim=1), 0.75).to(dtype=embeddings.dtype), 1),
+    )
+    a, b = embeddings[:2, None], embeddings[None, :]
+    actual = model.distance(a, b)
+    torch.testing.assert_close(actual, direct.dist(a, b))
+    x, y = embeddings[0], embeddings[1]
+    width = model.product_config.components[0].ambient_dim
+    expected = ((2.5 * base.dist(x[:width], y[:width])) ** 2
+                + (0.75 * torch.linalg.vector_norm(x[width:] - y[width:])) ** 2).sqrt()
+    torch.testing.assert_close(model.distance(x, y), expected)
+    model.manifold.dist(embeddings[0], embeddings[1:]).sum().backward()
+    for p in (model.encoder.linear.weight, model.projection.weight):
+        assert torch.isfinite(p.grad).all()
+        assert torch.count_nonzero(p.grad) > 0
+
+
+def test_unit_scales_keep_unwrapped_product_behavior(monkeypatch):
+    _patch_encoder(monkeypatch)
+    torch.manual_seed(0)
+    config = [dict(c, scale=1.0) for c in _three_component_config()]
+    model = ManifoldSentenceTransformer("fake-model", product_config=config)
+    assert not any(isinstance(m, geoopt.Scaled) for m in model.manifold.manifolds)
+    embeddings = model(["a", "bbb"])
+    direct = geoopt.ProductManifold(
+        (geoopt.Lorentz(k=torch.tensor(2.0, dtype=torch.float64)), 3),
+        (geoopt.SphereProjection(k=torch.tensor(0.25, dtype=torch.float64)), 2),
+        (geoopt.Euclidean(ndim=1), 1),
+    )
+    torch.testing.assert_close(model.distance(*embeddings), direct.dist(*embeddings))
+
+
+def test_nonunit_scales_preserve_double_precision_transforms_and_save_load(monkeypatch, tmp_path):
+    _patch_encoder(monkeypatch)
+    config = [dict(c, scale=s) for c, s in zip(_three_component_config(),
+              [0.123456789012345, 1.23456789012345, 2.3456789012345])]
+    model = ManifoldSentenceTransformer("fake-model", product_config=config)
+    expected_scales = [torch.tensor(c["scale"], dtype=torch.float64) for c in config]
+    for transform in ("half", "bfloat16", "float", "double", "float"):
+        getattr(model, transform)()
+        for m, expected in zip(model.manifold.manifolds, expected_scales):
+            assert m.scale.dtype == torch.float64
+            assert torch.equal(m.scale, expected)
+    before = model.encode(["a", "bb"], convert_to_tensor=True)
+    model.save_pretrained(tmp_path)
+    metadata = json.loads((tmp_path / "neembed_config.json").read_text())
+    loaded = ManifoldSentenceTransformer.from_pretrained(tmp_path)
+    assert metadata["product_config"] == model.product_config.to_dict()
+    assert loaded.product_config == model.product_config
+    after = loaded.encode(["a", "bb"], convert_to_tensor=True)
+    torch.testing.assert_close(before, after)
+    torch.testing.assert_close(model.distance(*before), loaded.distance(*after))
+    for m, expected in zip(loaded.manifold.manifolds, expected_scales):
+        assert torch.equal(m.scale, expected)
+
+
+@pytest.mark.parametrize("scale", [1e-100, 1e100])
+def test_scale_must_be_representable_in_geometry_dtype(monkeypatch, scale):
+    _patch_encoder(monkeypatch)
+    with pytest.raises(ValueError, match="scale.*geometry dtype"):
+        ManifoldSentenceTransformer("fake-model", product_config=[
+            {"manifold": "euclidean", "intrinsic_dim": 1, "scale": scale},
+        ])
+
+
+@pytest.mark.parametrize("scale", [1e-30, 1e20])
+def test_scale_squared_must_be_representable(monkeypatch, scale):
+    _patch_encoder(monkeypatch)
+    with pytest.raises(ValueError, match="scale.*geometry dtype"):
+        ManifoldSentenceTransformer("fake-model", product_config=[
+            {"manifold": "euclidean", "intrinsic_dim": 1, "scale": scale},
+        ])
+
+
+@pytest.mark.parametrize("scale", [1e-8, 1e8, 1e-4, 1e3])
+@pytest.mark.parametrize("transform", [
+    lambda m: m.half(),
+    lambda m: m.to(dtype=torch.float16),
+    lambda m: m.type(torch.HalfTensor),
+])
+def test_invalid_scale_dtype_change_leaves_model_unchanged(monkeypatch, scale, transform):
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", product_config=[
+        {"manifold": "euclidean", "intrinsic_dim": 1, "scale": scale},
+    ])
+    before = {name: value.clone() for name, value in model.state_dict().items()}
+    with pytest.raises(ValueError, match="scale.*geometry dtype"):
+        transform(model)
+    for name, value in model.state_dict().items():
+        assert value.dtype == before[name].dtype
+        assert torch.equal(value, before[name])
+
+
+def test_valid_scale_dtype_changes_keep_controlled_distance(monkeypatch):
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", product_config=[
+        {"manifold": "euclidean", "intrinsic_dim": 1, "scale": 2.0},
+    ])
+    for dtype in (torch.float16, torch.bfloat16, torch.float64, torch.float32):
+        model.to(dtype=dtype)
+        assert model.manifold.manifolds[0].scale.dtype == dtype
+        points = torch.tensor([[0.0], [3.0]], dtype=dtype)
+        torch.testing.assert_close(model.distance(*points), torch.tensor(6.0, dtype=dtype))

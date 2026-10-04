@@ -73,8 +73,8 @@ class ProductComponentConfig:
     geometry mapping. ``ambient_dim`` is the packed point width after mapping;
     Lorentz contributes one additional time-like coordinate.
 
-    ``scale`` is persisted as part of the v0.10 configuration contract but is
-    not applied to distances until scaled product geometry support is added.
+    ``scale`` is a fixed positive distance multiplier, applied through Geoopt
+    ``Scaled`` without changing component dimensions or encoded coordinates.
     """
 
     name: str

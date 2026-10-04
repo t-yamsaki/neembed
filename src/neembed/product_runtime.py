@@ -45,6 +45,17 @@ def product_geometry_dtype(
     return projection_dtype
 
 
+
+def validate_product_scale(scale: torch.Tensor) -> None:
+    """Require both the scale and Geoopt's squared metric factor to be usable."""
+    squared = scale.square()
+    if not bool(torch.isfinite(scale) & (scale > 0)
+                & torch.isfinite(squared) & (squared > 0)):
+        raise ValueError(
+            "component scale and its square must be positive and finite in geometry dtype"
+        )
+
+
 def build_product_manifold(
     config: ProductConfig,
     *,
@@ -69,6 +80,15 @@ def build_product_manifold(
                 sectional_curvature=component.sectional_curvature,
             )
         manifold.to(device=device, dtype=dtype)
+        if component.scale != 1.0:
+            scale = torch.tensor(component.scale, device="cpu", dtype=dtype)
+            validate_product_scale(scale)
+            manifold = geoopt.Scaled(manifold, learnable=False).to(
+                device=device, dtype=dtype,
+            )
+            # Scaled creates its buffer in the default dtype. Copy the configured
+            # value after conversion to avoid quantizing float64 scales.
+            manifold.scale.copy_(scale)
         manifolds_with_shape.append((manifold, component.ambient_dim))
 
     return geoopt.ProductManifold(*manifolds_with_shape)
@@ -104,7 +124,14 @@ def map_product_tangent(
                     (torch.zeros_like(chunk[..., :1]), chunk),
                     dim=-1,
                 )
-            point = component_manifold.expmap0(chunk)
+            # Scaling weights distances between the same encoded points. Using
+            # Scaled.expmap0 would also divide the tangent by the scale.
+            base_manifold = (
+                component_manifold.base
+                if isinstance(component_manifold, geoopt.Scaled)
+                else component_manifold
+            )
+            point = base_manifold.expmap0(chunk)
         points.append(point)
 
     return manifold.pack_point(*points)
