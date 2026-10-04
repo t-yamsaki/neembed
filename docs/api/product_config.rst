@@ -73,7 +73,9 @@ underlying component manifold, then distances use the scaled product. Unit
 scales retain the unwrapped component and the existing unscaled behavior.
 
 Scales use the common geometry dtype/device and must be representable as positive
-finite values in that dtype. Fixed scales are preserved in the existing version-1
+finite values in that dtype, as must their squared metric factors. Dtype changes
+that violate this requirement are rejected before model state is changed.
+Fixed scales are preserved in the existing version-1
 configuration metadata on save/load. Learnable scales are not exposed in this
 release. Models saved during Issue #130 with non-unit metadata-only scales now
 apply those scales when loaded; unit-scale models retain their prior behavior.

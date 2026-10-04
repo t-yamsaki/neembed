@@ -540,3 +540,43 @@ def test_scale_must_be_representable_in_geometry_dtype(monkeypatch, scale):
         ManifoldSentenceTransformer("fake-model", product_config=[
             {"manifold": "euclidean", "intrinsic_dim": 1, "scale": scale},
         ])
+
+
+@pytest.mark.parametrize("scale", [1e-30, 1e20])
+def test_scale_squared_must_be_representable(monkeypatch, scale):
+    _patch_encoder(monkeypatch)
+    with pytest.raises(ValueError, match="scale.*geometry dtype"):
+        ManifoldSentenceTransformer("fake-model", product_config=[
+            {"manifold": "euclidean", "intrinsic_dim": 1, "scale": scale},
+        ])
+
+
+@pytest.mark.parametrize("scale", [1e-8, 1e8, 1e-4, 1e3])
+@pytest.mark.parametrize("transform", [
+    lambda m: m.half(),
+    lambda m: m.to(dtype=torch.float16),
+    lambda m: m.type(torch.HalfTensor),
+])
+def test_invalid_scale_dtype_change_leaves_model_unchanged(monkeypatch, scale, transform):
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", product_config=[
+        {"manifold": "euclidean", "intrinsic_dim": 1, "scale": scale},
+    ])
+    before = {name: value.clone() for name, value in model.state_dict().items()}
+    with pytest.raises(ValueError, match="scale.*geometry dtype"):
+        transform(model)
+    for name, value in model.state_dict().items():
+        assert value.dtype == before[name].dtype
+        assert torch.equal(value, before[name])
+
+
+def test_valid_scale_dtype_changes_keep_controlled_distance(monkeypatch):
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", product_config=[
+        {"manifold": "euclidean", "intrinsic_dim": 1, "scale": 2.0},
+    ])
+    for dtype in (torch.float16, torch.bfloat16, torch.float64, torch.float32):
+        model.to(dtype=dtype)
+        assert model.manifold.manifolds[0].scale.dtype == dtype
+        points = torch.tensor([[0.0], [3.0]], dtype=dtype)
+        torch.testing.assert_close(model.distance(*points), torch.tensor(6.0, dtype=dtype))

@@ -23,6 +23,7 @@ from neembed.product_runtime import (
     product_geometry_device,
     product_geometry_dtype,
     product_requires_double,
+    validate_product_scale,
 )
 
 
@@ -307,6 +308,19 @@ class ManifoldSentenceTransformer(nn.Module):
             self.manifold_name in _STEREOGRAPHIC_DOUBLE_MANIFOLDS
             or product_double
         )
+        # Validate before transforming any state, so a rejected narrowing cast
+        # leaves the entire model unchanged. Fixed-double products do not narrow.
+        if manifold is not None and product_config is not None and not product_double and recurse:
+            requested_dtype = _apply_requested_dtype(fn)
+            if requested_dtype is not None:
+                for component, geometry in zip(product_config.components, manifold.manifolds):
+                    if component.scale != 1.0:
+                        scale = geometry.scale
+                        if scale.is_meta:
+                            scale = torch.tensor(component.scale, dtype=requested_dtype)
+                        else:
+                            scale = scale.detach().to(device="cpu", dtype=requested_dtype)
+                        validate_product_scale(scale)
         if not protect_manifold or not recurse:
             return super()._apply(fn, recurse=recurse)
 

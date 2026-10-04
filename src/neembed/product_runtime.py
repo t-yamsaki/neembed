@@ -45,6 +45,17 @@ def product_geometry_dtype(
     return projection_dtype
 
 
+
+def validate_product_scale(scale: torch.Tensor) -> None:
+    """Require both the scale and Geoopt's squared metric factor to be usable."""
+    squared = scale.square()
+    if not bool(torch.isfinite(scale) & (scale > 0)
+                & torch.isfinite(squared) & (squared > 0)):
+        raise ValueError(
+            "component scale and its square must be positive and finite in geometry dtype"
+        )
+
+
 def build_product_manifold(
     config: ProductConfig,
     *,
@@ -71,8 +82,7 @@ def build_product_manifold(
         manifold.to(device=device, dtype=dtype)
         if component.scale != 1.0:
             scale = torch.tensor(component.scale, device="cpu", dtype=dtype)
-            if not bool(torch.isfinite(scale) & (scale > 0)):
-                raise ValueError("component scale must be positive and finite in geometry dtype")
+            validate_product_scale(scale)
             manifold = geoopt.Scaled(manifold, learnable=False).to(
                 device=device, dtype=dtype,
             )
