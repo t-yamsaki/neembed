@@ -148,6 +148,54 @@ distance aggregation and numerical safeguards remain authoritative, including
 at coincident points. These distances describe geometry, not attribution,
 learned component importance, or an automatic scale-selection rule.
 
+v0.10 end-to-end regression example
+-----------------------------------
+
+Run from the repository root:
+
+.. code-block:: bash
+
+   python examples/v10_mixed_curvature_workflow.py
+
+The example uses a fixed seed and one small
+``Poincare x SphereProjection x Euclidean`` configuration with named components
+``hierarchy``, ``semantic``, and ``residual`` and fixed scales
+``1.5``, ``0.75``, and ``1.0``. These roles and scales are explicitly assigned by
+the caller; they are not discovered from the data.
+
+MNRL trains retrieval on the entire scaled product distance. Directed hierarchy
+triplets supervise only the named Poincare component, using the existing
+composite objective and trainer. The output reports training/objective losses,
+before/after corpus MRR and Recall@K, hierarchy radial-order/depth metrics,
+exact top-k results, and named component distances for query-positive pairs.
+A shared encoder means hierarchy updates may also affect other component
+representations; component supervision is not an independent-encoder claim.
+
+The script saves and reloads the product model, checks configuration identity,
+embeddings, full distances and component diagnostics, and repeats evaluation
+after loading. By default its temporary checkpoint is removed after validation.
+To keep a checkpoint or use a local encoder, run:
+
+.. code-block:: bash
+
+   python examples/v10_mixed_curvature_workflow.py --model ./local_encoder --output ./saved_product
+
+The default encoder is ``sentence-transformers/all-MiniLM-L6-v2`` and may need
+a download. CI replaces it with a deterministic tiny trainable encoder with
+dropout and local persistence; the normal test run requires no model download.
+Both model instances run on CPU to keep the regression device fixed.
+Only fixed component scales are demonstrated because learnable scales are not
+supported by the current product API.
+
+This is an engineering regression diagnostic, not a research benchmark,
+automatic role-discovery method, or mixed-curvature superiority claim. Finite
+losses, checkpoint parity, and deterministic output do not establish that
+retrieval or hierarchy quality improves.
+
+See the `example source
+<https://github.com/t-yamsaki/neembed/blob/main/examples/v10_mixed_curvature_workflow.py>`_
+for the complete caller-owned data and workflow.
+
 .. autoclass:: neembed.ProductComponentConfig
    :members:
 
