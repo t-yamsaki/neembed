@@ -81,7 +81,7 @@ Scalar ``model.curvature`` and ``model.sectional_curvature`` properties reject
 products: inspect ``model.product_config.components`` instead.
 
 Geoopt mapping, distance, and scales
------------------------------------
+------------------------------------
 
 neembed splits the projection in order, applies each underlying component's
 origin map, and delegates packing and total distance to Geoopt. Euclidean mapping
