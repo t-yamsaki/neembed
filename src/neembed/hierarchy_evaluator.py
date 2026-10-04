@@ -94,6 +94,8 @@ class ManifoldHierarchyEvaluator:
         depths: Mapping[str, int] | None = None,
         contract: Literal["tree", "dag"] = "dag",
     ) -> None:
+        if getattr(model, "manifold_name", None) == "product":
+            raise ValueError("ManifoldHierarchyEvaluator does not yet support product models")
         if isinstance(texts, (str, bytes)):
             raise ValueError("texts must be a sequence of strings, not a string")
         normalized_texts = tuple(texts)

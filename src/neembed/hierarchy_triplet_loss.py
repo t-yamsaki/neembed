@@ -54,6 +54,8 @@ class ManifoldHierarchyTripletLoss(nn.Module):
         radial_weight: float = 1.0,
     ) -> None:
         super().__init__()
+        if getattr(model, "manifold_name", None) == "product":
+            raise ValueError("ManifoldHierarchyTripletLoss does not yet support product models")
         if margin < 0 or not math.isfinite(margin):
             raise ValueError("margin must be non-negative and finite")
         if radial_margin < 0 or not math.isfinite(radial_margin):

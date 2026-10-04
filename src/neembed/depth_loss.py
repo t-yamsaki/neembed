@@ -46,6 +46,8 @@ class ManifoldDepthLoss(nn.Module):
         radial_scale: float = 1.0,
     ) -> None:
         super().__init__()
+        if getattr(model, "manifold_name", None) == "product":
+            raise ValueError("ManifoldDepthLoss does not yet support product models")
         if (
             isinstance(radial_scale, bool)
             or radial_scale <= 0

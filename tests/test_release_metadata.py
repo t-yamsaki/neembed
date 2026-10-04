@@ -158,11 +158,13 @@ def test_v09_constructor_extends_without_replacing_prior_public_contracts() -> N
         "curvature",
         "learnable_curvature",
         "sectional_curvature",
+        "product_config",
     )
     assert constructor["manifold"].default == "poincare"
     assert constructor["curvature"].default == 1.0
     assert constructor["learnable_curvature"].default is False
     assert constructor["sectional_curvature"].default is None
+    assert constructor["product_config"].default is None
 
     mnrl = signature(ManifoldMultipleNegativesRankingLoss.forward).parameters
     assert tuple(mnrl) == ("self", "anchors", "positives", "negatives")
