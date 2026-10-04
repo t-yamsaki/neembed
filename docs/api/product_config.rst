@@ -69,6 +69,10 @@ apply component scales to distances; scaled product distance is follow-on work.
 Nested products and SPD/Stiefel/Siegel components are not supported.
 ``ManifoldPrototypes`` does not yet support product models and rejects them
 explicitly; this runtime support covers sentence embeddings.
+The radial hierarchy APIs ``ManifoldDepthLoss``, ``ManifoldRadialOrderLoss``,
+``ManifoldHierarchyTripletLoss``, and ``ManifoldHierarchyEvaluator`` also reject
+product models at construction because Geoopt ``ProductManifold`` has no
+``dist0`` method. Product origin-distance support is not included here.
 
 ``ProductConfig.to_dict()`` returns versioned JSON-compatible metadata and
 ``ProductConfig.from_dict()`` validates the schema, component order, dimensions,

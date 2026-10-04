@@ -42,6 +42,8 @@ class ManifoldRadialOrderLoss(nn.Module):
         margin: float = 0.1,
     ) -> None:
         super().__init__()
+        if getattr(model, "manifold_name", None) == "product":
+            raise ValueError("ManifoldRadialOrderLoss does not yet support product models")
         if margin < 0 or not math.isfinite(margin):
             raise ValueError("margin must be non-negative and finite")
 

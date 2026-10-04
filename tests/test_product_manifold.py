@@ -409,3 +409,30 @@ def test_product_mps_transfer_policy_without_accelerator(monkeypatch):
     for value in model.manifold.state_dict().values():
         assert value.device.type == "cpu"
         assert value.dtype == torch.float64
+
+
+@pytest.mark.parametrize("config", [_two_component_config(), _three_component_config()])
+@pytest.mark.parametrize("api_name", [
+    "ManifoldDepthLoss", "ManifoldRadialOrderLoss",
+    "ManifoldHierarchyTripletLoss", "ManifoldHierarchyEvaluator",
+])
+def test_product_radial_hierarchy_apis_reject_before_encoding(monkeypatch, config, api_name):
+    import neembed
+
+    _patch_encoder(monkeypatch)
+    model = ManifoldSentenceTransformer("fake-model", product_config=config)
+
+    def unexpected_encoding(*args, **kwargs):
+        pytest.fail("unsupported product hierarchy must be rejected before encoding")
+
+    monkeypatch.setattr(model, "forward", unexpected_encoding)
+    monkeypatch.setattr(model, "encode", unexpected_encoding)
+    api = getattr(neembed, api_name)
+    kwargs = {"model": model}
+    if api_name == "ManifoldHierarchyEvaluator":
+        kwargs.update(
+            node_ids=["root", "child"], texts=["a", "bb"],
+            parent_child_edges=[("root", "child")], depths={"root": 0, "child": 1},
+        )
+    with pytest.raises(ValueError, match=rf"{api_name} does not yet support product models"):
+        api(**kwargs)
