@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from neembed.model import ManifoldSentenceTransformer
+from neembed.hierarchy_geometry import _hierarchy_geometry, _resolve_hierarchy_component
 
 
 class ManifoldRadialOrderLoss(nn.Module):
@@ -29,8 +30,15 @@ class ManifoldRadialOrderLoss(nn.Module):
     squared-radius parameter ``k`` equals ``1 / curvature`` under neembed's
     public curvature convention.
 
+    For product models, an explicit Poincare/Lorentz component is required.
+    Both distances and origin radii use that component's Geoopt geometry,
+    including fixed scale multipliers. Retrieval remains on the full product.
+
     Args:
         model: Manifold sentence model used to encode aligned parent-child pairs.
+        component: Product component stable name or zero-based index. Required
+            for product models; omit for single-manifold models. Only Poincare
+            and Lorentz product components have supported hierarchy semantics.
         margin: Non-negative, finite geodesic radial margin. ``0`` permits equal
             parent and child radii; positive values require the child to be at
             least ``margin`` farther from the origin.
@@ -40,10 +48,12 @@ class ManifoldRadialOrderLoss(nn.Module):
         self,
         model: ManifoldSentenceTransformer,
         margin: float = 0.1,
+        *,
+        component: str | int | None = None,
     ) -> None:
         super().__init__()
-        if getattr(model, "manifold_name", None) == "product":
-            raise ValueError("ManifoldRadialOrderLoss does not yet support product models")
+        self._component_index = _resolve_hierarchy_component(model, component)
+        self.component = component
         if margin < 0 or not math.isfinite(margin):
             raise ValueError("margin must be non-negative and finite")
 
@@ -75,6 +85,12 @@ class ManifoldRadialOrderLoss(nn.Module):
 
         parent_embeddings = self.model(parents)
         child_embeddings = self.model(children)
-        parent_radii = self.model.manifold.dist0(parent_embeddings)
-        child_radii = self.model.manifold.dist0(child_embeddings)
+        geometry, parent_embeddings = _hierarchy_geometry(
+            self.model, parent_embeddings, self._component_index,
+        )
+        _, child_embeddings = _hierarchy_geometry(
+            self.model, child_embeddings, self._component_index,
+        )
+        parent_radii = geometry.dist0(parent_embeddings)
+        child_radii = geometry.dist0(child_embeddings)
         return F.relu(parent_radii + self.margin - child_radii).mean()

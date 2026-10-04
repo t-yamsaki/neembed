@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from neembed.model import ManifoldSentenceTransformer
+from neembed.hierarchy_geometry import _hierarchy_geometry, _resolve_hierarchy_component
 
 
 class ManifoldHierarchyTripletLoss(nn.Module):
@@ -35,8 +36,15 @@ class ManifoldHierarchyTripletLoss(nn.Module):
     from explicit tree/DAG metadata can validate that metadata separately before
     forming batches.
 
+    For product models, an explicit Poincare/Lorentz component is required.
+    Both distances and origin radii use that component's Geoopt geometry,
+    including fixed scale multipliers. Retrieval remains on the full product.
+
     Args:
         model: Manifold sentence model used to encode aligned hierarchy triplets.
+        component: Product component stable name or zero-based index. Required
+            for product models; omit for single-manifold models. Only Poincare
+            and Lorentz product components have supported hierarchy semantics.
         margin: Non-negative, finite geodesic ranking margin separating the
             child from the unrelated node.
         radial_margin: Non-negative, finite geodesic radial margin requiring the
@@ -52,10 +60,11 @@ class ManifoldHierarchyTripletLoss(nn.Module):
         *,
         radial_margin: float = 0.1,
         radial_weight: float = 1.0,
+        component: str | int | None = None,
     ) -> None:
         super().__init__()
-        if getattr(model, "manifold_name", None) == "product":
-            raise ValueError("ManifoldHierarchyTripletLoss does not yet support product models")
+        self._component_index = _resolve_hierarchy_component(model, component)
+        self.component = component
         if margin < 0 or not math.isfinite(margin):
             raise ValueError("margin must be non-negative and finite")
         if radial_margin < 0 or not math.isfinite(radial_margin):
@@ -101,13 +110,22 @@ class ManifoldHierarchyTripletLoss(nn.Module):
 
         parent_embeddings = self.model(parents)
         child_embeddings = self.model(children)
+        geometry, parent_embeddings = _hierarchy_geometry(
+            self.model, parent_embeddings, self._component_index,
+        )
+        _, child_embeddings = _hierarchy_geometry(
+            self.model, child_embeddings, self._component_index,
+        )
         unrelated_embeddings = self.model(unrelated)
+        _, unrelated_embeddings = _hierarchy_geometry(
+            self.model, unrelated_embeddings, self._component_index,
+        )
 
-        child_distances = self.model.manifold.dist(
+        child_distances = geometry.dist(
             parent_embeddings,
             child_embeddings,
         )
-        unrelated_distances = self.model.manifold.dist(
+        unrelated_distances = geometry.dist(
             parent_embeddings,
             unrelated_embeddings,
         )
@@ -115,8 +133,8 @@ class ManifoldHierarchyTripletLoss(nn.Module):
             child_distances - unrelated_distances + self.margin
         )
 
-        parent_radii = self.model.manifold.dist0(parent_embeddings)
-        child_radii = self.model.manifold.dist0(child_embeddings)
+        parent_radii = geometry.dist0(parent_embeddings)
+        child_radii = geometry.dist0(child_embeddings)
         radial_penalty = F.relu(
             parent_radii + self.radial_margin - child_radii
         )

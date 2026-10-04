@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from neembed.model import ManifoldSentenceTransformer
+from neembed.hierarchy_geometry import _hierarchy_geometry, _resolve_hierarchy_component
 
 
 class ManifoldDepthLoss(nn.Module):
@@ -17,7 +18,7 @@ class ManifoldDepthLoss(nn.Module):
 
     Each non-negative integer depth ``d`` is mapped to the target radius
     ``d * radial_scale``. The observed radius is Geoopt's geodesic distance from
-    the configured manifold origin via ``model.manifold.dist0``. The loss is the
+    the supervised manifold origin via Geoopt ``dist0``. The loss is the
     mean squared error between observed and target radii.
 
     Depth ``0`` therefore pulls roots to the manifold origin. Nodes with the same
@@ -34,8 +35,15 @@ class ManifoldDepthLoss(nn.Module):
     ``depths`` sequences externally; IDs are not interpreted or persisted by the
     loss.
 
+    For product models, an explicit Poincare/Lorentz component is required.
+    Both distances and origin radii use that component's Geoopt geometry,
+    including fixed scale multipliers. Retrieval remains on the full product.
+
     Args:
         model: Manifold sentence model used to encode the supervised texts.
+        component: Product component stable name or zero-based index. Required
+            for product models; omit for single-manifold models. Only Poincare
+            and Lorentz product components have supported hierarchy semantics.
         radial_scale: Positive, finite geodesic radius assigned to one hierarchy
             depth step. A depth ``d`` has target radius ``d * radial_scale``.
     """
@@ -44,10 +52,12 @@ class ManifoldDepthLoss(nn.Module):
         self,
         model: ManifoldSentenceTransformer,
         radial_scale: float = 1.0,
+        *,
+        component: str | int | None = None,
     ) -> None:
         super().__init__()
-        if getattr(model, "manifold_name", None) == "product":
-            raise ValueError("ManifoldDepthLoss does not yet support product models")
+        self._component_index = _resolve_hierarchy_component(model, component)
+        self.component = component
         if (
             isinstance(radial_scale, bool)
             or radial_scale <= 0
@@ -111,7 +121,10 @@ class ManifoldDepthLoss(nn.Module):
 
         target_depths = self._normalize_depths(depths, batch_size=len(texts))
         embeddings = self.model(texts)
-        radii = self.model.manifold.dist0(embeddings)
+        geometry, embeddings = _hierarchy_geometry(
+            self.model, embeddings, self._component_index,
+        )
+        radii = geometry.dist0(embeddings)
         target_radii = target_depths.to(
             device=radii.device,
             dtype=radii.dtype,
