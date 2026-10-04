@@ -1,6 +1,9 @@
 Retrieval workflow
 ==================
 
+For v0.10 component configuration, full-product retrieval, diagnostics, and
+compatibility, see :doc:`mixed_curvature`.
+
 v0.6 extends the lightweight retrieval path introduced in v0.5 with exact text
 corpus search, corpus-level evaluation with explicit IDs and multi-positive
 relevance, and caller-invoked offline hard-negative mining. The pieces remain

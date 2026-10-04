@@ -42,8 +42,10 @@ encoder output to an intrinsic tangent representation:
 
    v = Wh.
 
-When ``embedding_dim`` is omitted, the projection is ``torch.nn.Identity`` and
-the encoder dimension is preserved.
+For a single-manifold model, when ``embedding_dim`` is omitted, the projection is
+``torch.nn.Identity`` and the encoder dimension is preserved. Product mode
+instead learns a projection to the sum of component intrinsic dimensions,
+maps each chunk, and packs points in order; see :doc:`mixed_curvature`.
 
 For ``manifold="poincare"``, :math:`v` is mapped directly from the origin
 tangent space onto the Poincare ball using Geoopt:
@@ -147,6 +149,8 @@ The v0.4 development API supports ``manifold="poincare"`` and
 supports opt-in trainable manifold prototypes and the focused hierarchy-aware
 objective described in :doc:`learnable_structure` and :doc:`training`.
 
-Spherical, SPD, product manifolds, mixed-curvature manifold products, automatic
-prototype discovery, and a generalized optimizer framework remain outside the
-current scope.
+Later APIs add Euclidean, SphereProjection, and signed Stereographic geometry
+(:doc:`constant_curvature_semantics`) and flat fixed-geometry products
+(:doc:`mixed_curvature`). Learnable product geometry, SPD/Siegel/Stiefel
+components, automatic prototype discovery, and a generalized optimizer framework
+remain outside the current scope.

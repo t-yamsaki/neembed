@@ -1,6 +1,10 @@
 Loss
 ====
 
+The :ref:`product-compatibility` matrix distinguishes full-product retrieval
+from hierarchy objectives requiring an explicit compatible component. See
+:doc:`../user_guide/mixed_curvature` for their composition.
+
 Retrieval objectives
 --------------------
 

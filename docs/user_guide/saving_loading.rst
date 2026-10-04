@@ -2,9 +2,13 @@ Saving and loading
 ==================
 
 ``ManifoldSentenceTransformer`` saves and reloads the local state required to
-reconstruct either supported sentence-model geometry. v0.4 keeps that helper
+reconstruct the configured sentence-model geometry. v0.4 keeps that helper
 backward-compatible while making the boundary around external prototype state
 explicit.
+
+v0.10 products use this same directory layout and persist their normalized
+ordered component metadata, including fixed scales. See :doc:`mixed_curvature`
+for product save/load and hierarchy-selector reconstruction.
 
 Save a sentence model
 ---------------------

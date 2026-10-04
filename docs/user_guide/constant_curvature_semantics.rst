@@ -99,6 +99,8 @@ The core v0.4-v0.8 objectives, evaluators, and exact-retrieval helpers operate o
 ``model(...)``, ``model.distance()``, ``manifold.dist()``, or
 ``manifold.dist0()`` rather than branching on a specific constant-curvature
 backend. The table below records the supported v0.9 API surface.
+For v0.10 mixed-curvature products, see the :ref:`product-compatibility` matrix
+and :doc:`mixed_curvature`.
 
 ``Supported`` means the API is intended to run with that backend under its dtype
 and device policy. It is not a claim that every geometry is equally suitable for
@@ -480,6 +482,6 @@ geometry should be chosen for a real dataset.
 Scope boundary
 --------------
 
-This guide does not introduce learnable signed curvature crossing zero, product
-or mixed-curvature models, SPD/Siegel/Stiefel spaces, or geometry-selection
-theory. Those remain separate work.
+This guide covers single-manifold geometry. Flat mixed-curvature products are
+documented in :doc:`mixed_curvature`. Learnable signed curvature crossing zero,
+SPD/Siegel/Stiefel spaces, and geometry-selection theory remain outside scope.

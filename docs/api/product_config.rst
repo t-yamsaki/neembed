@@ -1,6 +1,10 @@
 Product configuration
 =====================
 
+For configuration-to-training examples, optimizer/persistence behavior, and
+the :ref:`product-compatibility` matrix, see
+:doc:`../user_guide/mixed_curvature`.
+
 v0.10 supports flat mixed-curvature sentence embeddings through the existing
 :class:`neembed.ManifoldSentenceTransformer` encoder/projection architecture.
 A normalized ``product_config`` defines how projected encoder features are split,
