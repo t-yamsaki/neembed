@@ -9,6 +9,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+from neembed._loss_inputs import LossInputOptions, _encode_input, _normalize_input_options
 from neembed.model import ManifoldSentenceTransformer
 from neembed.hierarchy_geometry import _hierarchy_geometry, _resolve_hierarchy_component
 
@@ -42,6 +43,8 @@ class ManifoldRadialOrderLoss(nn.Module):
         margin: Non-negative, finite geodesic radial margin. ``0`` permits equal
             parent and child radii; positive values require the child to be at
             least ``margin`` farther from the origin.
+        input_options: Caller-chosen task/prompt_name/prompt options keyed by
+            ``parents`` and ``children``. Missing keys use raw text.
     """
 
     def __init__(
@@ -50,6 +53,7 @@ class ManifoldRadialOrderLoss(nn.Module):
         margin: float = 0.1,
         *,
         component: str | int | None = None,
+        input_options: LossInputOptions | None = None,
     ) -> None:
         super().__init__()
         self._component_index = _resolve_hierarchy_component(model, component)
@@ -58,6 +62,7 @@ class ManifoldRadialOrderLoss(nn.Module):
             raise ValueError("margin must be non-negative and finite")
 
         self.model = model
+        self.input_options = _normalize_input_options(input_options, ("parents", "children"))
         self.margin = float(margin)
 
     def forward(
@@ -83,8 +88,12 @@ class ManifoldRadialOrderLoss(nn.Module):
         if len(parents) != len(children):
             raise ValueError("parents and children must have the same length")
 
-        parent_embeddings = self.model(parents)
-        child_embeddings = self.model(children)
+        parent_embeddings = _encode_input(
+            self.model, parents, self.input_options, "parents",
+        )
+        child_embeddings = _encode_input(
+            self.model, children, self.input_options, "children",
+        )
         geometry, parent_embeddings = _hierarchy_geometry(
             self.model, parent_embeddings, self._component_index,
         )

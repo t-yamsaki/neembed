@@ -9,6 +9,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+from neembed._loss_inputs import LossInputOptions, _encode_input, _normalize_input_options
 from neembed.model import ManifoldSentenceTransformer
 from neembed.hierarchy_geometry import _hierarchy_geometry, _resolve_hierarchy_component
 
@@ -46,6 +47,8 @@ class ManifoldDepthLoss(nn.Module):
             and Lorentz product components have supported hierarchy semantics.
         radial_scale: Positive, finite geodesic radius assigned to one hierarchy
             depth step. A depth ``d`` has target radius ``d * radial_scale``.
+        input_options: Caller-chosen task/prompt_name/prompt options for ``texts``.
+            Depth labels are not text inputs. Missing options use raw text.
     """
 
     def __init__(
@@ -54,6 +57,7 @@ class ManifoldDepthLoss(nn.Module):
         radial_scale: float = 1.0,
         *,
         component: str | int | None = None,
+        input_options: LossInputOptions | None = None,
     ) -> None:
         super().__init__()
         self._component_index = _resolve_hierarchy_component(model, component)
@@ -66,6 +70,7 @@ class ManifoldDepthLoss(nn.Module):
             raise ValueError("radial_scale must be positive and finite")
 
         self.model = model
+        self.input_options = _normalize_input_options(input_options, ("texts",))
         self.radial_scale = float(radial_scale)
 
     @staticmethod
@@ -120,7 +125,7 @@ class ManifoldDepthLoss(nn.Module):
             raise ValueError("texts and depths must not be empty")
 
         target_depths = self._normalize_depths(depths, batch_size=len(texts))
-        embeddings = self.model(texts)
+        embeddings = _encode_input(self.model, texts, self.input_options, "texts")
         geometry, embeddings = _hierarchy_geometry(
             self.model, embeddings, self._component_index,
         )

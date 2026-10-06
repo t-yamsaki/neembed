@@ -5,6 +5,11 @@ neembed supports the original multiple-negatives ranking objective, teacher-scor
 margin regression, and a small prototype-based hierarchy objective. These paths
 use manifold geodesic distance from Geoopt rather than custom distance formulas.
 
+For role-aware encoders, configure ``input_options`` on the loss to match
+query/document inference. The positional training batches remain unchanged.
+See :doc:`retrieval_objectives` for per-input task/prompt examples, including
+explicit negatives, DistanceMSE, and independent hierarchy components.
+
 Geodesic ranking objective
 --------------------------
 

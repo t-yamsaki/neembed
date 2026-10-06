@@ -100,9 +100,11 @@ dimensions, arbitrary task names, and multimodal/chat inputs are outside this
 text-only contract. The existing role-free API still works with legacy encoder
 signatures. Dependency-version qualification is tracked separately in Issue #181.
 
-The current loss, ``rank()``, corpus search, evaluator, and mining convenience
+Built-in losses accept input-specific ``input_options`` through the same
+differentiable forward path; see :doc:`retrieval_objectives` for training
+examples. The ``rank()``, corpus search, evaluator, and mining convenience
 APIs retain their role-free calls. Their role-aware integration is tracked in
-Issues #177 and #178; use the explicit encoding/forward methods above when roles
+Issue #178; use the explicit encoding/forward methods above when roles
 are required.
 
 NumPy and Tensor output

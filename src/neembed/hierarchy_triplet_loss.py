@@ -9,6 +9,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+from neembed._loss_inputs import LossInputOptions, _encode_input, _normalize_input_options
 from neembed.model import ManifoldSentenceTransformer
 from neembed.hierarchy_geometry import _hierarchy_geometry, _resolve_hierarchy_component
 
@@ -51,6 +52,8 @@ class ManifoldHierarchyTripletLoss(nn.Module):
             child to lie farther from the origin than its parent.
         radial_weight: Positive, finite multiplier for the directional radial
             penalty.
+        input_options: Caller-chosen task/prompt_name/prompt options keyed by
+            ``parents``, ``children``, and ``unrelated``. Missing keys use raw text.
     """
 
     def __init__(
@@ -61,6 +64,7 @@ class ManifoldHierarchyTripletLoss(nn.Module):
         radial_margin: float = 0.1,
         radial_weight: float = 1.0,
         component: str | int | None = None,
+        input_options: LossInputOptions | None = None,
     ) -> None:
         super().__init__()
         self._component_index = _resolve_hierarchy_component(model, component)
@@ -73,6 +77,9 @@ class ManifoldHierarchyTripletLoss(nn.Module):
             raise ValueError("radial_weight must be positive and finite")
 
         self.model = model
+        self.input_options = _normalize_input_options(
+            input_options, ("parents", "children", "unrelated"),
+        )
         self.margin = float(margin)
         self.radial_margin = float(radial_margin)
         self.radial_weight = float(radial_weight)
@@ -108,15 +115,21 @@ class ManifoldHierarchyTripletLoss(nn.Module):
         if len(parents) != len(unrelated):
             raise ValueError("parents and unrelated must have the same length")
 
-        parent_embeddings = self.model(parents)
-        child_embeddings = self.model(children)
+        parent_embeddings = _encode_input(
+            self.model, parents, self.input_options, "parents",
+        )
+        child_embeddings = _encode_input(
+            self.model, children, self.input_options, "children",
+        )
         geometry, parent_embeddings = _hierarchy_geometry(
             self.model, parent_embeddings, self._component_index,
         )
         _, child_embeddings = _hierarchy_geometry(
             self.model, child_embeddings, self._component_index,
         )
-        unrelated_embeddings = self.model(unrelated)
+        unrelated_embeddings = _encode_input(
+            self.model, unrelated, self.input_options, "unrelated",
+        )
         _, unrelated_embeddings = _hierarchy_geometry(
             self.model, unrelated_embeddings, self._component_index,
         )

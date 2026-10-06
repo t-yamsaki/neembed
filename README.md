@@ -164,6 +164,12 @@ prompt selection with the differentiable training path. Calls without these
 options retain raw-text behavior. See the [Inference guide](https://neembed.readthedocs.io/en/latest/user_guide/inference.html)
 for precedence, prompt-aware pooling, routing support, and current integration limits.
 
+Built-in losses accept `input_options`, mapping their text input names to the
+same task/prompt options. Configure anchors as queries and positives/explicit
+negatives as documents while keeping existing training batches. See the
+[Retrieval objectives guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html)
+for examples and independent hierarchy/composite input settings.
+
 Encoder loading accepts `revision`, `local_files_only`, `cache_folder`, and
 `device` in both the constructor and local `from_pretrained()`. Pin a remote
 encoder with a commit ID, or use `local_files_only=True` for local/cached files.
