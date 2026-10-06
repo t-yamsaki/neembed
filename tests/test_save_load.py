@@ -103,7 +103,7 @@ def test_save_pretrained_round_trip_preserves_config_and_embeddings(
     after = loaded.encode(["Shiba Inu", "dog"], convert_to_tensor=True)
 
     config = json.loads((save_path / "neembed_config.json").read_text(encoding="utf-8"))
-    assert config == {
+    assert {key: config[key] for key in ("embedding_dim", "manifold", "curvature")} == {
         "embedding_dim": 2,
         "manifold": "poincare",
         "curvature": 2.0,
@@ -136,7 +136,7 @@ def test_lorentz_save_pretrained_round_trip_preserves_config_and_embeddings(
     after = loaded.encode(["Shiba Inu", "dog"], convert_to_tensor=True)
 
     config = json.loads((save_path / "neembed_config.json").read_text(encoding="utf-8"))
-    assert config == {
+    assert {key: config[key] for key in ("embedding_dim", "manifold", "curvature")} == {
         "embedding_dim": 2,
         "manifold": "lorentz",
         "curvature": 2.0,

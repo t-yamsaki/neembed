@@ -271,7 +271,7 @@ def test_sphere_projection_save_load_round_trip_preserves_signed_metadata(
     loaded = ManifoldSentenceTransformer.from_pretrained(save_path)
     after = loaded.encode(["a", "abcd"], convert_to_tensor=True)
 
-    assert config == {
+    assert {key: config[key] for key in ("embedding_dim", "manifold", "sectional_curvature")} == {
         "embedding_dim": 2,
         "manifold": "sphere_projection",
         "sectional_curvature": pytest.approx(0.5),

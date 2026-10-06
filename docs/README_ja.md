@@ -158,6 +158,10 @@ print(float(distance))
 
 ## ドキュメント
 
+ローカル保存ではgeometry・prompt・浮動小数点dtype・package version・取得可能な
+base modelの来歴をバージョン付きmetadataに記録します。形式バージョンのない
+v0.10以前のconfigも復元でき、読み込みには保存済みのローカルencoderを使います。
+
 `encode()` / `encode_query()` / `encode_document()` は `batch_size`（既定32）で
 入力順とgeometryのdtype/deviceを維持したバッチ推論ができます。正の整数を指定すると
 各encoder呼び出しの件数を制限できます。空の文章列は所定の出力幅の空行列を返し、

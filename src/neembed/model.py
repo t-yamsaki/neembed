@@ -12,6 +12,7 @@ from sentence_transformers import SentenceTransformer as _SentenceTransformer
 from torch import nn
 
 from neembed._input_options import InputOptions, _encode_inference_input, _normalize_input_options
+from neembed._model_metadata import DTYPES, _module_dtype, new_metadata, read_config, source_metadata, validate_config
 from neembed.manifolds import get_manifold
 from neembed.product_config import (
     ProductComponentConfig,
@@ -206,8 +207,9 @@ class ManifoldSentenceTransformer(nn.Module):
         projection remain on MPS. A product containing Lorentz, SphereProjection,
         or Stereographic uses a common float64 geometry dtype, with CPU fallback
         on MPS. Component scales are fixed distance multipliers applied through Geoopt.
-        Encoder loading options apply only to the current load and are not
-        written to neembed metadata. Unspecified options are left to Sentence
+        Encoder loading options apply only to the current load. Available model
+        ID/revision provenance is recorded when saving, while cache paths and
+        device/load options are not persisted. Unspecified options are left to Sentence
         Transformers; remote-code execution is not enabled by neembed.
     """
 
@@ -240,6 +242,7 @@ class ManifoldSentenceTransformer(nn.Module):
         if device is not None:
             encoder_kwargs["device"] = device
         self.encoder = SentenceTransformer(model_name_or_path, **encoder_kwargs)
+        self._base_model = source_metadata(self.encoder, model_name_or_path, revision)
 
         encoder_dim = self.encoder.get_embedding_dimension()
         if encoder_dim is None:
@@ -884,6 +887,10 @@ class ManifoldSentenceTransformer(nn.Module):
             output_path: Directory in which to save the model.
 
         Notes:
+            Writes format-version 1 metadata, including encoder prompts,
+            floating dtypes, package version, and available base model provenance.
+            Versionless legacy configurations remain loadable. Cache paths and
+            load-time device/options are not serialized.
             Poincare/Lorentz keep the legacy public ``curvature`` metadata. New
             v0.9 geometry stores the distinct signed ``sectional_curvature`` value.
             External modules such as :class:`neembed.ManifoldPrototypes`,
@@ -893,7 +900,6 @@ class ManifoldSentenceTransformer(nn.Module):
         output_path = Path(output_path)
         output_path.mkdir(parents=True, exist_ok=True)
 
-        self.encoder.save_pretrained(str(output_path / "encoder"))
         config: dict[str, Any] = {
             "embedding_dim": self._projection_dim,
             "manifold": self.manifold_name,
@@ -906,6 +912,9 @@ class ManifoldSentenceTransformer(nn.Module):
                 config["learnable_curvature"] = True
         else:
             config["sectional_curvature"] = self.sectional_curvature
+        config.update(new_metadata(self))
+        validate_config(config)
+        self.encoder.save_pretrained(str(output_path / "encoder"))
         (output_path / "neembed_config.json").write_text(
             json.dumps(config, indent=2) + "\n",
             encoding="utf-8",
@@ -938,41 +947,47 @@ class ManifoldSentenceTransformer(nn.Module):
             retain the saved legacy curvature magnitude and trainability; new
             v0.9 geometry restores signed sectional-curvature metadata. External
             prototype modules must be reconstructed and loaded separately.
+
+        Raises:
+            ValueError: For malformed required metadata, an unsupported format
+                version, or an inconsistent saved projection dtype. Metadata is
+                validated before loading the saved local encoder.
         """
         model_path = Path(model_path)
-        config = json.loads(
-            (model_path / "neembed_config.json").read_text(encoding="utf-8")
-        )
-        manifold_name = config["manifold"]
-        kwargs: dict[str, Any] = {
-            "manifold": manifold_name,
-            "embedding_dim": config["embedding_dim"],
+        config, kwargs = read_config(model_path / "neembed_config.json")
+        kwargs.update({
             "revision": revision,
             "local_files_only": local_files_only,
             "cache_folder": cache_folder,
             "device": device,
-        }
-        if manifold_name == "product":
-            product_config = ProductConfig.from_dict(config["product_config"])
-            if config["embedding_dim"] != product_config.projection_dim:
-                raise ValueError(
-                    "saved embedding_dim does not match product_config.projection_dim"
-                )
-            kwargs["product_config"] = product_config
-        elif manifold_name in {"poincare", "lorentz"}:
-            kwargs["curvature"] = config["curvature"]
-            kwargs["learnable_curvature"] = config.get(
-                "learnable_curvature",
-                False,
-            )
-        else:
-            kwargs["sectional_curvature"] = config["sectional_curvature"]
+        })
 
         model = cls(str(model_path / "encoder"), **kwargs)
+        # A local load-time revision is not the original model's provenance.
+        model._base_model = source_metadata(model.encoder, str(model_path / "encoder"), None)
+        if "format_version" in config:
+            for name, module in (("encoder", model.encoder), ("projection", model.projection),
+                                 ("geometry", model.manifold)):
+                dtype = config["dtypes"][name]
+                if dtype is not None:
+                    module.to(dtype=DTYPES[dtype])
+                elif _module_dtype(module) is not None:
+                    raise ValueError(f"dtypes.{name} is null but the saved module has floating state")
+            model.encoder.prompts = dict(config["input_config"]["prompts"])
+            model.encoder.default_prompt_name = config["input_config"]["default_prompt_name"]
+            model._base_model = dict(config["base_model"])
         projection_state = torch.load(
             model_path / "projection.pt",
             map_location="cpu",
             weights_only=True,
         )
+        if "format_version" in config:
+            expected_dtype = config["dtypes"]["projection"]
+            if not isinstance(projection_state, Mapping) or any(
+                not torch.is_tensor(value) or (value.is_floating_point() and
+                    str(value.dtype).removeprefix("torch.") != expected_dtype)
+                for value in projection_state.values()
+            ):
+                raise ValueError("projection.pt does not match the saved projection dtype")
         model.projection.load_state_dict(projection_state)
         return model

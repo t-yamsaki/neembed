@@ -1,6 +1,7 @@
 """Shared, differentiable prompt selection and query/document routing."""
 
 import json
+import socket
 
 import numpy as np
 import pytest
@@ -226,6 +227,38 @@ def local_prompt_encoder(tmp_path):
     path = tmp_path / "encoder"
     encoder.save_pretrained(str(path))
     return path
+
+
+@pytest.mark.parametrize("task", ["query", "document"])
+@pytest.mark.parametrize("geometry", [
+    {"manifold": "lorentz", "embedding_dim": 2, "learnable_curvature": True},
+    {"product_config": [
+        {"manifold": "lorentz", "intrinsic_dim": 2, "scale": 2.0},
+        {"manifold": "euclidean", "intrinsic_dim": 2},
+    ]},
+])
+def test_versioned_real_prompt_encoder_restores_roles_and_distances_offline(
+    local_prompt_encoder, tmp_path, monkeypatch, task, geometry,
+):
+    torch.manual_seed(0)
+    model = ManifoldSentenceTransformer(str(local_prompt_encoder), local_files_only=True, device="cpu", **geometry)
+    texts = ["dog mammal", "cat"]
+    before = getattr(model, "encode_" + task)(texts, convert_to_tensor=True)
+    path = tmp_path / "versioned"
+    model.save_pretrained(path)
+
+    def reject_network(*args, **kwargs):
+        pytest.fail("restoring a saved encoder must not use the network")
+
+    monkeypatch.setattr(socket.socket, "connect", reject_network)
+    monkeypatch.setattr(socket, "getaddrinfo", reject_network)
+    monkeypatch.setenv("HF_HUB_OFFLINE", "1")
+    monkeypatch.setenv("TRANSFORMERS_OFFLINE", "1")
+    restored = ManifoldSentenceTransformer.from_pretrained(path, local_files_only=True, device="cpu")
+    after = getattr(restored, "encode_" + task)(texts, convert_to_tensor=True)
+    torch.testing.assert_close(after, before, rtol=1e-6, atol=1e-8)
+    torch.testing.assert_close(restored.distance(*after), model.distance(*before), rtol=1e-6, atol=1e-8)
+    assert restored.encoder.prompts == model.encoder.prompts
 
 
 @pytest.mark.parametrize("task", ["query", "document"])
