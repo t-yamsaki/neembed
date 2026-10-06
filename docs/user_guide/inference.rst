@@ -1,8 +1,9 @@
 Inference
 =========
 
-The model-level public inference helpers are ``encode()``, ``distance()``, and
-``rank()`` on :class:`neembed.ManifoldSentenceTransformer`. v0.6 also exposes
+The model-level public inference helpers include ``encode()``, ``encode_query()``,
+``encode_document()``, ``distance()``, and ``rank()`` on
+:class:`neembed.ManifoldSentenceTransformer`. v0.6 also exposes
 :func:`neembed.exact_corpus_search` for exact multi-query text-corpus search.
 
 For product models, ``product_distance_diagnostics()`` reports named component
@@ -27,6 +28,82 @@ For ``manifold="lorentz"``, ``embedding_dim`` remains the intrinsic projected
 dimension, while the hyperboloid representation adds one ambient time-like
 coordinate. The corresponding shapes are therefore ``(embedding_dim + 1,)``
 and ``(batch_size, embedding_dim + 1)``.
+
+Query/document roles and prompts
+--------------------------------
+
+Use ``encode_query()`` and ``encode_document()`` to declare the input role.
+Both call the same geometry mapping as ``encode()`` and share prompt selection
+with differentiable ``forward()``:
+
+.. code-block:: python
+
+   # Explicit prefixes for a model that requires query/passage instructions.
+   queries = model.encode_query(["What is a dog?"], prompt="query: ")
+   documents = model.encode_document(["A dog is a mammal."], prompt="passage: ")
+
+   # Saved prompts are selected from model.encoder.prompts.
+   queries = model.encode(["What is a dog?"], task="query")
+   documents = model.encode_document(["A dog is a mammal."])
+
+``forward()`` and ``encode()`` accept keyword-only ``task``, ``prompt_name``,
+and ``prompt``. Supported tasks are ``"query"``, ``"document"``, or ``None``.
+The two inference wrappers set the corresponding task. Prompt selection follows
+these rules:
+
+1. An explicit ``prompt`` is used as-is. ``prompt=""`` disables automatic
+   prompt selection while retaining the task for routing.
+2. An explicit ``prompt_name`` selects that key in ``model.encoder.prompts``.
+3. With a task but no explicit prompt/name, query selects ``query``; document
+   selects the first existing key in ``document``, ``passage``, ``corpus`` order.
+4. If no role prompt exists, the saved ``encoder.default_prompt_name`` is used
+   when configured. Otherwise the input has no prompt.
+
+``prompt`` and ``prompt_name`` together are rejected, even when the explicit
+prompt is empty. Unknown prompt names and unsupported tasks raise ``ValueError``.
+Selected prompts must be strings. To configure custom named prompts without
+another configuration layer, update ``model.encoder.prompts`` directly; saved
+encoder prompts are restored through Sentence Transformers' own persistence.
+Per-call prompt/task arguments do not become saved defaults.
+
+For backward compatibility, **a call with no task, prompt, or prompt_name uses
+the original raw-text path**, even if the encoder has a default prompt. An
+explicit name or prefix without a task applies that prompt without selecting
+a role. An empty saved role prompt is a valid selection and does not fall through
+to the default.
+
+Pass raw texts: neembed delegates prompt application once to encoder
+``preprocess(prompt=...)`` and retains its prompt-length metadata for modules
+that exclude prompt tokens during pooling. It does not also concatenate a prefix
+or attempt to infer whether caller text was already manually prefixed.
+
+For training, use the normal module call with the same options:
+
+.. code-block:: python
+
+   model.train()
+   query_embeddings = model(["What is a dog?"], task="query", prompt="query: ")
+   document_embeddings = model(["A dog is a mammal."], task="document", prompt="passage: ")
+   # Build a differentiable loss from these embeddings, then call backward().
+
+This path calls encoder preprocessing and ``forward`` directly, preserving
+gradients through the encoder, projection, and any learnable curvature. It never
+calls encoder ``encode()``. Task is forwarded to both preprocessing and encoder
+forward so task-aware modules can choose the same route in both stages.
+
+The role-aware path is verified with Sentence Transformers 6.1 text encoders
+and a local query/document Router with matching output dimensions. Encoders must
+accept the selected prompt/task arguments in preprocessing and task in forward.
+Unsupported custom signatures or missing routes report their errors; neembed
+does not retry by dropping the task. Other Router layouts, unequal route output
+dimensions, arbitrary task names, and multimodal/chat inputs are outside this
+text-only contract. The existing role-free API still works with legacy encoder
+signatures. Dependency-version qualification is tracked separately in Issue #181.
+
+The current loss, ``rank()``, corpus search, evaluator, and mining convenience
+APIs retain their role-free calls. Their role-aware integration is tracked in
+Issues #177 and #178; use the explicit encoding/forward methods above when roles
+are required.
 
 NumPy and Tensor output
 -----------------------

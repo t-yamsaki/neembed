@@ -158,6 +158,12 @@ print(float(distance))
 
 ## ドキュメント
 
+`forward()` / `encode()` は `task="query"` / `"document"`、`prompt_name`、
+または明示的な `prompt` を受け付けます。`encode_query()` / `encode_document()`
+は勾配を保持する学習経路と同じ prompt 選択を使います。未指定時は従来の raw-text
+処理を維持します。優先順位、prompt-aware pooling、routing 対応範囲と現時点の
+統合範囲は [Inference guide](https://neembed.readthedocs.io/en/latest/user_guide/inference.html) を参照してください。
+
 constructor とローカルモデルの `from_pretrained()` では、encoder 読み込み用の
 `revision`、`local_files_only`、`cache_folder`、`device` を指定できます。
 remote encoder の固定には commit ID、ローカル・キャッシュ限定の読み込みには
