@@ -158,6 +158,12 @@ Each anchor is paired with the positive at the same batch index. Because off-dia
 
 ## Documentation
 
+`forward()` and `encode()` accept `task="query"` / `"document"`, `prompt_name`,
+or an explicit `prompt`. `encode_query()` and `encode_document()` share the same
+prompt selection with the differentiable training path. Calls without these
+options retain raw-text behavior. See the [Inference guide](https://neembed.readthedocs.io/en/latest/user_guide/inference.html)
+for precedence, prompt-aware pooling, routing support, and current integration limits.
+
 Encoder loading accepts `revision`, `local_files_only`, `cache_folder`, and
 `device` in both the constructor and local `from_pretrained()`. Pin a remote
 encoder with a commit ID, or use `local_files_only=True` for local/cached files.

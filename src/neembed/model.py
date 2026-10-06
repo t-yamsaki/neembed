@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import torch
 from sentence_transformers import SentenceTransformer
@@ -423,11 +423,65 @@ class ManifoldSentenceTransformer(nn.Module):
             "poincare and lorentz keep the legacy curvature magnitude API"
         )
 
-    def forward(self, sentences: Sequence[str]) -> torch.Tensor:
+    def _resolve_input_prompt(
+        self,
+        task: Literal["query", "document"] | None,
+        prompt_name: str | None,
+        prompt: str | None,
+    ) -> str | None:
+        """Choose a prompt without changing the legacy role-free path."""
+        if task is not None and task not in ("query", "document"):
+            raise ValueError("task must be 'query', 'document', or None")
+        if prompt is not None and not isinstance(prompt, str):
+            raise TypeError("prompt must be a string or None")
+        if prompt_name is not None and not isinstance(prompt_name, str):
+            raise TypeError("prompt_name must be a string or None")
+        if prompt is not None and prompt_name is not None:
+            raise ValueError("provide either prompt or prompt_name, not both")
+        if prompt is not None:
+            return prompt
+        # Historical forward/encode never applied encoder.default_prompt_name.
+        if task is None and prompt_name is None:
+            return None
+
+        prompts = getattr(self.encoder, "prompts", {})
+        if not isinstance(prompts, Mapping):
+            raise ValueError("encoder.prompts must be a mapping")
+        if prompt_name is None:
+            candidates = ("query",) if task == "query" else (
+                "document", "passage", "corpus",
+            )
+            prompt_name = next((name for name in candidates if name in prompts), None)
+            if prompt_name is None:
+                prompt_name = getattr(self.encoder, "default_prompt_name", None)
+        if prompt_name is None:
+            return None
+        if prompt_name not in prompts:
+            raise ValueError(f"unknown encoder prompt name: {prompt_name!r}")
+        resolved = prompts[prompt_name]
+        if not isinstance(resolved, str):
+            raise TypeError("selected encoder prompt must be a string")
+        return resolved
+
+    def forward(
+        self,
+        sentences: Sequence[str],
+        *,
+        task: Literal["query", "document"] | None = None,
+        prompt_name: str | None = None,
+        prompt: str | None = None,
+    ) -> torch.Tensor:
         """Encode a batch and map embeddings into the configured geometry.
 
         Args:
             sentences: Batch of input texts.
+            task: Optional query/document role, forwarded to encoder preprocessing
+                and forward for task-aware routing. Unspecified keeps legacy behavior.
+            prompt_name: Name from ``encoder.prompts``. Unknown names are rejected.
+            prompt: Explicit prefix, including ``""`` to disable prompt selection.
+                Cannot be combined with ``prompt_name``. Otherwise the role prompt
+                wins over the encoder default; with no role/name/prompt, no prompt
+                is selected. See the inference guide for document fallback names.
 
         Returns:
             Geometry-valued embeddings. Poincare, Euclidean, SphereProjection,
@@ -443,12 +497,22 @@ class ManifoldSentenceTransformer(nn.Module):
 
         Product output has final width ``product_config.ambient_dim``.
         """
-        features = self.encoder.preprocess(list(sentences))
+        resolved_prompt = self._resolve_input_prompt(task, prompt_name, prompt)
+        preprocess_kwargs: dict[str, Any] = {}
+        encoder_kwargs: dict[str, Any] = {}
+        if resolved_prompt is not None:
+            preprocess_kwargs["prompt"] = resolved_prompt
+        if task is not None:
+            preprocess_kwargs["task"] = task
+            encoder_kwargs["task"] = task
+        # Delegate prompt insertion and prompt-length metadata to the encoder.
+        # Do not call encoder.encode(), which would disable training gradients.
+        features = self.encoder.preprocess(list(sentences), **preprocess_kwargs)
         features = {
             key: value.to(self.encoder.device) if torch.is_tensor(value) else value
             for key, value in features.items()
         }
-        encoder_output: dict[str, Any] = self.encoder(features)
+        encoder_output: dict[str, Any] = self.encoder(features, **encoder_kwargs)
         tangent = self.projection(encoder_output["sentence_embedding"])
 
         if self.product_config is not None:
@@ -487,12 +551,18 @@ class ManifoldSentenceTransformer(nn.Module):
         sentences: str | Sequence[str],
         *,
         convert_to_tensor: bool = False,
+        task: Literal["query", "document"] | None = None,
+        prompt_name: str | None = None,
+        prompt: str | None = None,
     ) -> Any:
         """Encode text as geometry-valued embeddings for inference.
 
         Args:
             sentences: A single text or a sequence of texts.
             convert_to_tensor: Return a ``torch.Tensor`` instead of a NumPy array.
+            task: Optional query/document role, with the same rules as ``forward``.
+            prompt_name: Saved encoder prompt name, exclusive with ``prompt``.
+            prompt: Explicit prefix; ``""`` disables automatic prompt selection.
 
         Returns:
             A single geometry embedding for string input or a batch for sequence
@@ -514,15 +584,60 @@ class ManifoldSentenceTransformer(nn.Module):
         single_input = isinstance(sentences, str)
         batch = [sentences] if single_input else list(sentences)
 
+        input_kwargs: dict[str, Any] = {}
+        if task is not None:
+            input_kwargs["task"] = task
+        if prompt_name is not None:
+            input_kwargs["prompt_name"] = prompt_name
+        if prompt is not None:
+            input_kwargs["prompt"] = prompt
+
         self.eval()
         with torch.inference_mode():
-            embeddings = self(batch)
+            embeddings = self(batch, **input_kwargs)
 
         if single_input:
             embeddings = embeddings[0]
         if convert_to_tensor:
             return embeddings
         return embeddings.cpu().numpy()
+
+    def encode_query(
+        self,
+        sentences: str | Sequence[str],
+        *,
+        convert_to_tensor: bool = False,
+        prompt_name: str | None = None,
+        prompt: str | None = None,
+    ) -> Any:
+        """Encode queries with ``task='query'`` and shared prompt selection.
+
+        Uses the saved ``query`` prompt, then the saved default if no explicit
+        prompt/name is supplied. Return shape and inference mode match ``encode``.
+        """
+        return self.encode(
+            sentences, convert_to_tensor=convert_to_tensor, task="query",
+            prompt_name=prompt_name, prompt=prompt,
+        )
+
+    def encode_document(
+        self,
+        sentences: str | Sequence[str],
+        *,
+        convert_to_tensor: bool = False,
+        prompt_name: str | None = None,
+        prompt: str | None = None,
+    ) -> Any:
+        """Encode documents with ``task='document'`` and shared prompt selection.
+
+        Tries saved ``document``, ``passage``, ``corpus`` prompts in that order,
+        then the saved default if no explicit prompt/name is supplied. Return
+        shape and inference mode match ``encode``.
+        """
+        return self.encode(
+            sentences, convert_to_tensor=convert_to_tensor, task="document",
+            prompt_name=prompt_name, prompt=prompt,
+        )
 
     def _distance_tensors(self, a: Any, b: Any) -> tuple[torch.Tensor, torch.Tensor]:
         """Convert distance inputs using the configured geometry policy."""
