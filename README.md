@@ -158,6 +158,11 @@ Each anchor is paired with the positive at the same batch index. Because off-dia
 
 ## Documentation
 
+`encode()`, `encode_query()`, and `encode_document()` accept `batch_size=32`
+by default, preserving input order and geometry dtype/device. Set a smaller
+positive integer to bound each encoder call; empty sequences return an empty
+matrix with the configured output width. Encoding leaves the model in eval mode.
+
 `forward()` and `encode()` accept `task="query"` / `"document"`, `prompt_name`,
 or an explicit `prompt`. `encode_query()` and `encode_document()` share the same
 prompt selection with the differentiable training path. Calls without these

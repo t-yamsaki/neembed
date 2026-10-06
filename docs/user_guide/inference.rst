@@ -29,6 +29,36 @@ dimension, while the hyperboloid representation adds one ambient time-like
 coordinate. The corresponding shapes are therefore ``(embedding_dim + 1,)``
 and ``(batch_size, embedding_dim + 1)``.
 
+Bounded batching
+----------------
+
+``encode()``, ``encode_query()``, and ``encode_document()`` accept a keyword-only
+``batch_size`` (default ``32``). It must be a positive Python integer; zero,
+negative values, booleans, and non-integers raise ``ValueError`` before encoding.
+Each encoder call contains at most that many texts. Results preserve the original
+input order, and the final partial batch uses the same role and prompt settings.
+
+.. code-block:: python
+
+   embeddings = model.encode(texts, batch_size=16)
+   queries = model.encode_query(query_texts, batch_size=16, convert_to_tensor=True)
+   documents = model.encode_document(document_texts, batch_size=16)
+
+A string, including ``""``, returns one embedding vector. A sequence returns a
+matrix. An empty sequence returns shape ``(0, output_width)`` without calling the
+encoder; task and prompt options are still validated. ``output_width`` is the
+usual embedding width, including the extra Lorentz coordinate or the packed
+``product_config.ambient_dim``. Empty output follows the model parameter dtype
+and geometry device policy, including fixed ``float64`` geometry and MPS CPU
+fallbacks.
+
+NumPy output moves each completed batch to CPU before concatenation. Tensor
+output retains the complete result on its geometry device. Batching bounds the
+encoder's working batch; the input texts and final output remain in memory.
+It does not change differentiable ``forward()``, which processes its supplied
+training batch as one call. Batched and full results can differ by ordinary
+floating-point rounding from padded inputs and batch-dependent kernels.
+
 Query/document roles and prompts
 --------------------------------
 
@@ -135,6 +165,10 @@ Inference mode
 ``encode()`` switches the model to evaluation mode and executes the forward
 pass inside ``torch.inference_mode()``. Returned embeddings therefore do not
 track gradients and the helper is intended for inference rather than training.
+The model remains in evaluation mode after encoding, including an empty input
+or an encoder failure after processing starts. Invalid ``batch_size`` values are
+rejected before changing model mode. The role-specific helpers use the same
+contract. Call ``model.train()`` explicitly when resuming training.
 
 Training code should call the model through its normal ``forward()`` path; the
 provided loss does this automatically.

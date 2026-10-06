@@ -561,6 +561,7 @@ class ManifoldSentenceTransformer(nn.Module):
         self,
         sentences: str | Sequence[str],
         *,
+        batch_size: int = 32,
         convert_to_tensor: bool = False,
         task: Literal["query", "document"] | None = None,
         prompt_name: str | None = None,
@@ -570,6 +571,8 @@ class ManifoldSentenceTransformer(nn.Module):
 
         Args:
             sentences: A single text or a sequence of texts.
+            batch_size: Maximum number of texts per encoder call. Must be a
+                positive integer (not a boolean). Defaults to 32.
             convert_to_tensor: Return a ``torch.Tensor`` instead of a NumPy array.
             task: Optional query/document role, with the same rules as ``forward``.
             prompt_name: Saved encoder prompt name, exclusive with ``prompt``.
@@ -584,14 +587,22 @@ class ManifoldSentenceTransformer(nn.Module):
             Lorentz, SphereProjection, and Stereographic outputs use ``float64``
             for the manifold geometry path. SphereProjection/Stereographic tensor
             outputs are CPU tensors when the encoder uses Apple MPS.
+            An empty sequence returns shape ``(0, output_width)`` with the same
+            geometry dtype/device policy, without calling the encoder.
 
         Notes:
             Encoding switches the model to evaluation mode and runs under
             ``torch.inference_mode()``, so returned embeddings do not track
-            gradients.
+            gradients. The model remains in evaluation mode after encoding.
+            Batches preserve input order and use the same task/prompt settings.
+            NumPy output stages each completed batch on CPU; tensor output
+            retains the full result on the geometry device. The input list and
+            final output are still held in memory.
 
         Product output has final width ``product_config.ambient_dim``.
         """
+        if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size <= 0:
+            raise ValueError("batch_size must be a positive integer")
         single_input = isinstance(sentences, str)
         batch = [sentences] if single_input else list(sentences)
 
@@ -605,7 +616,29 @@ class ManifoldSentenceTransformer(nn.Module):
 
         self.eval()
         with torch.inference_mode():
-            embeddings = self(batch, **input_kwargs)
+            if batch:
+                outputs = []
+                for start in range(0, len(batch), batch_size):
+                    output = self(batch[start : start + batch_size], **input_kwargs)
+                    outputs.append(output if convert_to_tensor else output.cpu())
+                embeddings = outputs[0] if len(outputs) == 1 else torch.cat(outputs, dim=0)
+            else:
+                # Validate prompts even when there are no texts to preprocess.
+                self._resolve_input_prompt(task, prompt_name, prompt)
+                reference = next(self.projection.parameters(), None)
+                if reference is None:
+                    reference = next(self.encoder.parameters(), None)
+                dtype = torch.get_default_dtype() if reference is None else reference.dtype
+                if self.product_config is not None:
+                    width = self.product_config.ambient_dim
+                    dtype = product_geometry_dtype(self.product_config, dtype)
+                    device = product_geometry_device(self.product_config, self.encoder.device)
+                else:
+                    width = self.embedding_dim + (self.manifold_name == "lorentz")
+                    if self.manifold_name in _DOUBLE_GEOMETRY_MANIFOLDS:
+                        dtype = torch.float64
+                    device = _select_geometry_device(self.manifold_name, self.encoder.device)
+                embeddings = torch.empty((0, width), dtype=dtype, device=device)
 
         if single_input:
             embeddings = embeddings[0]
@@ -617,6 +650,7 @@ class ManifoldSentenceTransformer(nn.Module):
         self,
         sentences: str | Sequence[str],
         *,
+        batch_size: int = 32,
         convert_to_tensor: bool = False,
         prompt_name: str | None = None,
         prompt: str | None = None,
@@ -624,10 +658,11 @@ class ManifoldSentenceTransformer(nn.Module):
         """Encode queries with ``task='query'`` and shared prompt selection.
 
         Uses the saved ``query`` prompt, then the saved default if no explicit
-        prompt/name is supplied. Return shape and inference mode match ``encode``.
+        prompt/name is supplied. Batching, return shape, empty-input handling,
+        and inference mode match ``encode``.
         """
         return self.encode(
-            sentences, convert_to_tensor=convert_to_tensor, task="query",
+            sentences, batch_size=batch_size, convert_to_tensor=convert_to_tensor, task="query",
             prompt_name=prompt_name, prompt=prompt,
         )
 
@@ -635,6 +670,7 @@ class ManifoldSentenceTransformer(nn.Module):
         self,
         sentences: str | Sequence[str],
         *,
+        batch_size: int = 32,
         convert_to_tensor: bool = False,
         prompt_name: str | None = None,
         prompt: str | None = None,
@@ -643,10 +679,10 @@ class ManifoldSentenceTransformer(nn.Module):
 
         Tries saved ``document``, ``passage``, ``corpus`` prompts in that order,
         then the saved default if no explicit prompt/name is supplied. Return
-        shape and inference mode match ``encode``.
+        shape, batching, empty-input handling, and inference mode match ``encode``.
         """
         return self.encode(
-            sentences, convert_to_tensor=convert_to_tensor, task="document",
+            sentences, batch_size=batch_size, convert_to_tensor=convert_to_tensor, task="document",
             prompt_name=prompt_name, prompt=prompt,
         )
 
