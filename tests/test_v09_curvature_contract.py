@@ -111,7 +111,7 @@ def test_legacy_saved_models_keep_curvature_key_and_round_trip_semantics(
     loaded = ManifoldSentenceTransformer.from_pretrained(save_path)
     after = loaded.encode(["dog", "mammal"], convert_to_tensor=True)
 
-    assert config == {
+    assert {key: config[key] for key in ("embedding_dim", "manifold", "curvature")} == {
         "embedding_dim": 2,
         "manifold": manifold_name,
         "curvature": 2.0,

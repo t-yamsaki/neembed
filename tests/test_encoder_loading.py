@@ -95,12 +95,16 @@ def test_loading_options_are_forwarded_without_enabling_remote_code(
         model.encode(["dog", "cat"], convert_to_tensor=True),
         restored.encode(["dog", "cat"], convert_to_tensor=True),
     )
-    # Load-time settings never become a persistent source of cache paths/options.
-    assert json.loads((tmp_path / "neembed_config.json").read_text()) == {
+    # Persist provenance only, not a dictionary of load-time paths/options.
+    config = json.loads((tmp_path / "neembed_config.json").read_text())
+    assert {key: config[key] for key in ("embedding_dim", "manifold", "curvature")} == {
         "embedding_dim": 2,
         "manifold": "poincare",
         "curvature": 1.0,
     }
+    assert config["base_model"] == {"model_id": "fake-model", "revision": options.get("revision")}
+    assert not ({"device", "cache_folder", "local_files_only", "trust_remote_code"} & config.keys())
+    assert "/a/custom/cache" not in json.dumps(config)
 
 
 @pytest.mark.parametrize("geometry", [

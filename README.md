@@ -158,6 +158,10 @@ Each anchor is paired with the positive at the same batch index. Because off-dia
 
 ## Documentation
 
+Local saves now use versioned metadata for geometry, prompts, floating dtypes,
+package version, and available base-model provenance. Versionless v0.10 and
+earlier configurations remain loadable; restoration uses the saved local encoder.
+
 `encode()`, `encode_query()`, and `encode_document()` accept `batch_size=32`
 by default, preserving input order and geometry dtype/device. Set a smaller
 positive integer to bound each encoder call; empty sequences return an empty

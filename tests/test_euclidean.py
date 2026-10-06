@@ -240,7 +240,7 @@ def test_euclidean_save_load_round_trip_uses_sectional_curvature_metadata(
     loaded = ManifoldSentenceTransformer.from_pretrained(save_path)
     after = loaded.encode(["a", "abcd"], convert_to_tensor=True)
 
-    assert config == {
+    assert {key: config[key] for key in ("embedding_dim", "manifold", "sectional_curvature")} == {
         "embedding_dim": 2,
         "manifold": "euclidean",
         "sectional_curvature": 0.0,
