@@ -158,6 +158,12 @@ Each anchor is paired with the positive at the same batch index. Because off-dia
 
 ## Documentation
 
+Encoder loading accepts `revision`, `local_files_only`, `cache_folder`, and
+`device` in both the constructor and local `from_pretrained()`. Pin a remote
+encoder with a commit ID, or use `local_files_only=True` for local/cached files.
+See the [Saving and Loading guide](https://neembed.readthedocs.io/en/latest/user_guide/saving_loading.html)
+for examples and the distinction between encoder revision and local checkpoints.
+
 The full guide is hosted on Read the Docs:
 
 - [Installation](https://neembed.readthedocs.io/en/latest/getting_started/installation.html)

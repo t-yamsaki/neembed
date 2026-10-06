@@ -10,6 +10,41 @@ v0.10 products use this same directory layout and persist their normalized
 ordered component metadata, including fixed scales. See :doc:`mixed_curvature`
 for product save/load and hierarchy-selector reconstruction.
 
+Encoder loading options
+-----------------------
+
+The constructor accepts four keyword-only options forwarded to Sentence
+Transformers: ``revision``, ``local_files_only``, ``cache_folder``, and ``device``.
+Use an encoder repository commit ID for ``revision`` when reproducible remote
+loading matters; a branch or tag can change. For example, replace the revision
+placeholder with the desired encoder commit ID:
+
+.. code-block:: python
+
+   from neembed import ManifoldSentenceTransformer
+
+   model = ManifoldSentenceTransformer(
+       "sentence-transformers/all-MiniLM-L6-v2",
+       revision="<encoder-commit-id>",
+       cache_folder="./encoder_cache",
+       device="cpu",
+       embedding_dim=32,
+   )
+
+Set ``local_files_only=True`` to load a local encoder directory or an already
+cached encoder without downloading missing files. If the necessary files are
+missing, Sentence Transformers reports the loading failure. Unspecified options
+retain upstream defaults, including automatic encoder device selection and
+normal download behavior. neembed does not enable ``trust_remote_code``.
+Projection and geometry placement continue to follow the existing encoder
+device and geometry dtype/device policies.
+
+These options control the current load only; they are not added to
+``neembed_config.json``. The encoder itself is still saved into ``encoder/``;
+neembed does not serialize a dictionary of loading options, cache paths, or
+credentials. Revision provenance in neembed's own metadata is outside this
+loading-options change.
+
 Save a sentence model
 ---------------------
 
@@ -51,6 +86,22 @@ Load a sentence model
    from neembed import ManifoldSentenceTransformer
 
    loaded = ManifoldSentenceTransformer.from_pretrained("./saved_model")
+
+The same loading options can be supplied when restoring a local neembed model:
+
+.. code-block:: python
+
+   loaded = ManifoldSentenceTransformer.from_pretrained(
+       "./saved_model",
+       local_files_only=True,
+       cache_folder="./encoder_cache",
+       device="cpu",
+   )
+
+Here they apply to the saved ``encoder/`` directory. ``revision`` is also accepted
+and forwarded, but is normally omitted for local restoration: it does not select
+a revision of the neembed checkpoint or replace the saved encoder with a remote
+model. The caller chooses the checkpoint directory through ``model_path``.
 
 ``from_pretrained()`` reconstructs the Sentence Transformer from the saved
 ``encoder/`` directory, rebuilds the configured Poincare or Lorentz manifold,
