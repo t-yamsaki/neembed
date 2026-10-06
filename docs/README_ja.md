@@ -158,6 +158,12 @@ print(float(distance))
 
 ## ドキュメント
 
+constructor とローカルモデルの `from_pretrained()` では、encoder 読み込み用の
+`revision`、`local_files_only`、`cache_folder`、`device` を指定できます。
+remote encoder の固定には commit ID、ローカル・キャッシュ限定の読み込みには
+`local_files_only=True` を使います。使用例と encoder revision / ローカル checkpoint の
+違いは [Saving and Loading guide](https://neembed.readthedocs.io/en/latest/user_guide/saving_loading.html) を参照してください。
+
 詳細ガイドは Read the Docs にあります。
 
 - [Installation](https://neembed.readthedocs.io/en/latest/getting_started/installation.html)

@@ -175,6 +175,14 @@ class ManifoldSentenceTransformer(nn.Module):
             determine the projection width and split/map/pack layout. Curvature
             is fixed and configured per component; top-level curvature arguments
             must retain their defaults.
+        revision: Encoder repository branch, tag, or commit ID. Use a commit ID
+            to pin a remote encoder. This does not select a neembed checkpoint.
+        local_files_only: Load the encoder only from local files or the existing
+            cache when ``True``. Defaults to Sentence Transformers' normal
+            loading behavior without preventing downloads.
+        cache_folder: Optional Sentence Transformers download/cache directory.
+        device: Optional encoder device, such as ``"cpu"`` or ``"cuda:0"``.
+            Projection and geometry follow the existing device policies.
 
     Notes:
         The returned sentence embeddings are geometry-valued outputs, while the
@@ -187,6 +195,9 @@ class ManifoldSentenceTransformer(nn.Module):
         projection remain on MPS. A product containing Lorentz, SphereProjection,
         or Stereographic uses a common float64 geometry dtype, with CPU fallback
         on MPS. Component scales are fixed distance multipliers applied through Geoopt.
+        Encoder loading options apply only to the current load and are not
+        written to neembed metadata. Unspecified options are left to Sentence
+        Transformers; remote-code execution is not enabled by neembed.
     """
 
     def __init__(
@@ -202,9 +213,22 @@ class ManifoldSentenceTransformer(nn.Module):
         | Sequence[ProductComponentConfig | Mapping[str, Any]]
         | Mapping[str, Any]
         | None = None,
+        revision: str | None = None,
+        local_files_only: bool = False,
+        cache_folder: str | None = None,
+        device: str | None = None,
     ) -> None:
         super().__init__()
-        self.encoder = SentenceTransformer(model_name_or_path)
+        encoder_kwargs: dict[str, Any] = {}
+        if revision is not None:
+            encoder_kwargs["revision"] = revision
+        if local_files_only:
+            encoder_kwargs["local_files_only"] = local_files_only
+        if cache_folder is not None:
+            encoder_kwargs["cache_folder"] = cache_folder
+        if device is not None:
+            encoder_kwargs["device"] = device
+        self.encoder = SentenceTransformer(model_name_or_path, **encoder_kwargs)
 
         encoder_dim = self.encoder.get_embedding_dimension()
         if encoder_dim is None:
@@ -722,11 +746,22 @@ class ManifoldSentenceTransformer(nn.Module):
     def from_pretrained(
         cls,
         model_path: str | Path,
+        *,
+        revision: str | None = None,
+        local_files_only: bool = False,
+        cache_folder: str | None = None,
+        device: str | None = None,
     ) -> "ManifoldSentenceTransformer":
         """Load a model previously saved with :meth:`save_pretrained`.
 
         Args:
             model_path: Directory containing a saved neembed model.
+            revision: Forwarded to the saved encoder loader; does not select a
+                version of the local neembed directory. Usually omitted here.
+            local_files_only: Restrict encoder loading to local files/cache.
+            cache_folder: Optional encoder cache directory for this load only.
+            device: Optional encoder device; projection and geometry follow the
+                existing device policies.
 
         Returns:
             The reconstructed geometry-aware sentence model. Poincare/Lorentz
@@ -742,6 +777,10 @@ class ManifoldSentenceTransformer(nn.Module):
         kwargs: dict[str, Any] = {
             "manifold": manifold_name,
             "embedding_dim": config["embedding_dim"],
+            "revision": revision,
+            "local_files_only": local_files_only,
+            "cache_folder": cache_folder,
+            "device": device,
         }
         if manifold_name == "product":
             product_config = ProductConfig.from_dict(config["product_config"])

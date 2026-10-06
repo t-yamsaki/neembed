@@ -167,12 +167,28 @@ def test_v10_constructor_extends_without_replacing_prior_public_contracts() -> N
         "learnable_curvature",
         "sectional_curvature",
         "product_config",
+        "revision",
+        "local_files_only",
+        "cache_folder",
+        "device",
     )
     assert constructor["manifold"].default == "poincare"
     assert constructor["curvature"].default == 1.0
     assert constructor["learnable_curvature"].default is False
     assert constructor["sectional_curvature"].default is None
     assert constructor["product_config"].default is None
+    loading_defaults = {
+        "revision": None,
+        "local_files_only": False,
+        "cache_folder": None,
+        "device": None,
+    }
+    restored = signature(ManifoldSentenceTransformer.from_pretrained).parameters
+    for name, default in loading_defaults.items():
+        assert constructor[name].kind is constructor[name].KEYWORD_ONLY
+        assert constructor[name].default is default
+        assert restored[name].kind is restored[name].KEYWORD_ONLY
+        assert restored[name].default is default
     for api in (
         ManifoldDepthLoss, ManifoldRadialOrderLoss, ManifoldHierarchyTripletLoss,
         ManifoldHierarchyEvaluator,
