@@ -1,5 +1,7 @@
 """Shared, differentiable prompt selection and query/document routing."""
 
+import json
+
 import numpy as np
 import pytest
 import torch
@@ -260,6 +262,51 @@ def test_real_prompt_pooling_matches_native_encoder_and_local_round_trip(
     assert restored.encoder.prompts == model.encoder.prompts
     assert torch.allclose(
         actual, getattr(restored, "encode_" + task)(texts, convert_to_tensor=True), atol=1e-6,
+    )
+
+
+@pytest.mark.parametrize("prompts,task,expected_prompt", [
+    ({"fallback": "default: "}, "query", "default: "),
+    ({"fallback": "default: "}, "document", "default: "),
+    ({"passage": "passage: ", "fallback": "default: "}, "document", "passage: "),
+    ({"corpus": "passage: ", "fallback": "default: "}, "document", "passage: "),
+    ({"query": "", "fallback": "default: "}, "query", ""),
+    ({"document": "", "passage": "passage: ", "fallback": "default: "}, "document", ""),
+])
+def test_real_encoder_preserves_configured_role_keys_and_fallback_on_round_trip(
+    local_prompt_encoder, tmp_path, prompts, task, expected_prompt,
+):
+    # Model configs commonly contain only a default or a passage prompt. ST 6.1
+    # synthesizes absent query/document keys as "", losing that distinction.
+    config_path = local_prompt_encoder / "config_sentence_transformers.json"
+    config = json.loads(config_path.read_text())
+    config["prompts"] = prompts
+    config_path.write_text(json.dumps(config))
+    model = ManifoldSentenceTransformer(
+        str(local_prompt_encoder), manifold="euclidean", device="cpu", local_files_only=True,
+    )
+    texts = ["dog mammal", "cat"]
+    expected = model.encoder.encode(texts, prompt=expected_prompt, convert_to_tensor=True)
+    raw = model.encoder.encode(texts, prompt="", convert_to_tensor=True)
+    model.eval()
+    assert model.encoder.prompts == prompts
+    assert torch.allclose(model(texts, task=task), expected, atol=1e-6)
+    assert torch.allclose(
+        getattr(model, "encode_" + task)(texts, convert_to_tensor=True), expected, atol=1e-6,
+    )
+    assert torch.allclose(model.encode(texts, convert_to_tensor=True), raw, atol=1e-6)
+
+    saved = tmp_path / "saved-neembed"
+    model.save_pretrained(saved)
+    saved_config = json.loads((saved / "encoder" / config_path.name).read_text())
+    assert saved_config["prompts"] == prompts
+    assert saved_config["model_type"] == "SentenceTransformer"
+    restored = ManifoldSentenceTransformer.from_pretrained(
+        saved, local_files_only=True, device="cpu",
+    )
+    assert restored.encoder.prompts == prompts
+    assert torch.allclose(
+        getattr(restored, "encode_" + task)(texts, convert_to_tensor=True), expected, atol=1e-6,
     )
 
 

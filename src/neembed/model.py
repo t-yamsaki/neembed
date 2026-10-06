@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import torch
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer as _SentenceTransformer
 from torch import nn
 
 from neembed.manifolds import get_manifold
@@ -33,6 +33,16 @@ _DOUBLE_GEOMETRY_MANIFOLDS = {
     "sphere_projection",
     "stereographic",
 }
+
+
+class SentenceTransformer(_SentenceTransformer):
+    """Internal encoder that retains only explicitly configured prompt keys."""
+
+    # ST 6.1 adds query/document placeholders and normalizes them to "". Avoid
+    # creating them so an absent role can fall back to another prompt, while
+    # explicitly saved/user-supplied empty prompts still disable that fallback.
+    # The inherited model_type keeps saves compatible with upstream encoders.
+    _default_prompts: dict[str, str | None] = {}
 
 
 def _select_geometry_device(
