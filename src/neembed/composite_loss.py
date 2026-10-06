@@ -24,6 +24,10 @@ class ManifoldRetrievalHierarchyLoss(nn.Module):
     be combined with ``(anchors, positives)`` and
     ``(parents, children, unrelated)`` respectively.
 
+    Configure ``input_options`` on each component loss independently. The
+    wrapper keeps those settings intact; it neither infers input roles nor
+    propagates retrieval prompts to the hierarchy component.
+
     ``hierarchy_weight=0`` is a true retrieval-only path: the hierarchy component
     is not evaluated, so the value and gradients match direct retrieval-loss use
     even when hierarchy inputs are unavailable or expensive to compute.

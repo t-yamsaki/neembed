@@ -164,6 +164,12 @@ print(float(distance))
 処理を維持します。優先順位、prompt-aware pooling、routing 対応範囲と現時点の
 統合範囲は [Inference guide](https://neembed.readthedocs.io/en/latest/user_guide/inference.html) を参照してください。
 
+組み込み損失の `input_options` では、テキスト入力名ごとに同じ task / prompt 設定を
+指定できます。anchor を query、positive と明示 negative を document として設定し、
+従来の学習バッチをそのまま利用できます。使用例と階層・複合損失の独立した入力設定は
+[Retrieval objectives guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html)
+を参照してください。
+
 constructor とローカルモデルの `from_pretrained()` では、encoder 読み込み用の
 `revision`、`local_files_only`、`cache_folder`、`device` を指定できます。
 remote encoder の固定には commit ID、ローカル・キャッシュ限定の読み込みには

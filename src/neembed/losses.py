@@ -9,6 +9,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+from neembed._loss_inputs import LossInputOptions, _encode_input, _normalize_input_options
 from neembed.model import ManifoldSentenceTransformer
 from neembed.prototypes import ManifoldPrototypes
 
@@ -26,12 +27,18 @@ class ManifoldMultipleNegativesRankingLoss(nn.Module):
         model: Manifold sentence model used to encode anchors, positives, and
             optional explicit negatives.
         temperature: Positive, finite temperature used to scale distance logits.
+        input_options: Optional mapping from ``anchors``, ``positives``, or
+            ``negatives`` to model forward's task/prompt_name/prompt options.
+            Unspecified inputs keep raw-text encoding; negatives do not inherit
+            positive options. See the retrieval objectives guide for examples.
     """
 
     def __init__(
         self,
         model: ManifoldSentenceTransformer,
         temperature: float = 0.1,
+        *,
+        input_options: LossInputOptions | None = None,
     ) -> None:
         super().__init__()
         if temperature <= 0 or not math.isfinite(temperature):
@@ -39,6 +46,9 @@ class ManifoldMultipleNegativesRankingLoss(nn.Module):
 
         self.model = model
         self.temperature = float(temperature)
+        self.input_options = _normalize_input_options(
+            input_options, ("anchors", "positives", "negatives"),
+        )
 
     def forward(
         self,
@@ -67,12 +77,18 @@ class ManifoldMultipleNegativesRankingLoss(nn.Module):
         if negatives is not None and len(anchors) != len(negatives):
             raise ValueError("anchors and negatives must have the same length")
 
-        anchor_embeddings = self.model(anchors)
-        positive_embeddings = self.model(positives)
+        anchor_embeddings = _encode_input(
+            self.model, anchors, self.input_options, "anchors",
+        )
+        positive_embeddings = _encode_input(
+            self.model, positives, self.input_options, "positives",
+        )
         candidate_embeddings = positive_embeddings
 
         if negatives is not None:
-            negative_embeddings = self.model(negatives)
+            negative_embeddings = _encode_input(
+                self.model, negatives, self.input_options, "negatives",
+            )
             candidate_embeddings = torch.cat(
                 (positive_embeddings, negative_embeddings),
                 dim=0,
@@ -97,12 +113,16 @@ class ManifoldTripletLoss(nn.Module):
     Args:
         model: Manifold sentence model used to encode aligned triplets.
         margin: Non-negative, finite geodesic ranking margin.
+        input_options: Optional task/prompt_name/prompt options keyed by
+            ``anchors``, ``positives``, and ``negatives``. Missing keys use raw text.
     """
 
     def __init__(
         self,
         model: ManifoldSentenceTransformer,
         margin: float = 0.1,
+        *,
+        input_options: LossInputOptions | None = None,
     ) -> None:
         super().__init__()
         if margin < 0 or not math.isfinite(margin):
@@ -110,6 +130,9 @@ class ManifoldTripletLoss(nn.Module):
 
         self.model = model
         self.margin = float(margin)
+        self.input_options = _normalize_input_options(
+            input_options, ("anchors", "positives", "negatives"),
+        )
 
     def forward(
         self,
@@ -142,9 +165,15 @@ class ManifoldTripletLoss(nn.Module):
         if len(anchors) != len(negatives):
             raise ValueError("anchors and negatives must have the same length")
 
-        anchor_embeddings = self.model(anchors)
-        positive_embeddings = self.model(positives)
-        negative_embeddings = self.model(negatives)
+        anchor_embeddings = _encode_input(
+            self.model, anchors, self.input_options, "anchors",
+        )
+        positive_embeddings = _encode_input(
+            self.model, positives, self.input_options, "positives",
+        )
+        negative_embeddings = _encode_input(
+            self.model, negatives, self.input_options, "negatives",
+        )
         positive_distances = self.model.manifold.dist(
             anchor_embeddings,
             positive_embeddings,
@@ -174,11 +203,21 @@ class ManifoldMarginMSELoss(nn.Module):
 
     Args:
         model: Manifold sentence model used to encode aligned triplets.
+        input_options: Optional task/prompt_name/prompt options keyed by
+            ``anchors``, ``positives``, and ``negatives``. Missing keys use raw text.
     """
 
-    def __init__(self, model: ManifoldSentenceTransformer) -> None:
+    def __init__(
+        self,
+        model: ManifoldSentenceTransformer,
+        *,
+        input_options: LossInputOptions | None = None,
+    ) -> None:
         super().__init__()
         self.model = model
+        self.input_options = _normalize_input_options(
+            input_options, ("anchors", "positives", "negatives"),
+        )
 
     @staticmethod
     def _normalize_target_margin(
@@ -244,9 +283,15 @@ class ManifoldMarginMSELoss(nn.Module):
             batch_size=len(anchors),
         )
 
-        anchor_embeddings = self.model(anchors)
-        positive_embeddings = self.model(positives)
-        negative_embeddings = self.model(negatives)
+        anchor_embeddings = _encode_input(
+            self.model, anchors, self.input_options, "anchors",
+        )
+        positive_embeddings = _encode_input(
+            self.model, positives, self.input_options, "positives",
+        )
+        negative_embeddings = _encode_input(
+            self.model, negatives, self.input_options, "negatives",
+        )
         positive_distances = self.model.manifold.dist(
             anchor_embeddings,
             positive_embeddings,
@@ -275,11 +320,19 @@ class ManifoldDistanceMSELoss(nn.Module):
 
     Args:
         model: Manifold sentence model used to encode aligned text pairs.
+        input_options: Caller-chosen task/prompt_name/prompt options keyed by
+            ``texts_a`` and ``texts_b``. Neither side is assigned an implicit role.
     """
 
-    def __init__(self, model: ManifoldSentenceTransformer) -> None:
+    def __init__(
+        self,
+        model: ManifoldSentenceTransformer,
+        *,
+        input_options: LossInputOptions | None = None,
+    ) -> None:
         super().__init__()
         self.model = model
+        self.input_options = _normalize_input_options(input_options, ("texts_a", "texts_b"))
 
     @staticmethod
     def _normalize_target_distance(
@@ -341,8 +394,8 @@ class ManifoldDistanceMSELoss(nn.Module):
             batch_size=len(texts_a),
         )
 
-        embeddings_a = self.model(texts_a)
-        embeddings_b = self.model(texts_b)
+        embeddings_a = _encode_input(self.model, texts_a, self.input_options, "texts_a")
+        embeddings_b = _encode_input(self.model, texts_b, self.input_options, "texts_b")
         predicted_distance = self.model.manifold.dist(embeddings_a, embeddings_b)
         target = target.to(
             device=predicted_distance.device,
@@ -372,6 +425,8 @@ class ManifoldPrototypeHierarchyLoss(nn.Module):
             declare at most one parent and the relations must be acyclic.
         margin: Non-negative, finite ranking margin for the hierarchy term.
         hierarchy_weight: Non-negative, finite multiplier for the hierarchy term.
+        input_options: Optional task/prompt_name/prompt options for ``sentences``.
+            Prototype assignments and prototype points are not text inputs.
 
     Notes:
         For a child ``c`` and direct parent ``p``, every prototype ``n`` other
@@ -392,6 +447,7 @@ class ManifoldPrototypeHierarchyLoss(nn.Module):
         *,
         margin: float = 0.1,
         hierarchy_weight: float = 1.0,
+        input_options: LossInputOptions | None = None,
     ) -> None:
         super().__init__()
         if prototypes.manifold is not model.manifold:
@@ -446,6 +502,7 @@ class ManifoldPrototypeHierarchyLoss(nn.Module):
 
         self.model = model
         self.prototypes = prototypes
+        self.input_options = _normalize_input_options(input_options, ("sentences",))
         self.prototype_ids = ids
         self.parent_relations = tuple(relations)
         self.margin = float(margin)
@@ -525,7 +582,9 @@ class ManifoldPrototypeHierarchyLoss(nn.Module):
                 )
             assignment_indices.append(self._prototype_index[prototype_id])
 
-        embeddings = self.model(sentences)
+        embeddings = _encode_input(
+            self.model, sentences, self.input_options, "sentences",
+        )
         distances = self.prototypes(embeddings)
         targets = torch.tensor(
             assignment_indices,

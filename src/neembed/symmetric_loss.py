@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 
 from neembed.losses import ManifoldMultipleNegativesRankingLoss
+from neembed._loss_inputs import _encode_input
 
 
 class ManifoldSymmetricMultipleNegativesRankingLoss(
@@ -16,6 +17,8 @@ class ManifoldSymmetricMultipleNegativesRankingLoss(
     The loss averages two cross-entropy terms with the same aligned diagonal
     targets: ``anchor -> positive`` and ``positive -> anchor``. Both directions
     use the configured Geoopt manifold distance and the inherited temperature.
+    Inherited ``input_options`` apply once to each original input. The reverse
+    term reuses those embeddings without swapping roles or re-encoding texts.
 
     Explicit negatives remain caller-supplied and are appended only to the
     forward ``anchor -> candidate`` pool. They are not added to the reverse
@@ -50,12 +53,18 @@ class ManifoldSymmetricMultipleNegativesRankingLoss(
         if negatives is not None and len(anchors) != len(negatives):
             raise ValueError("anchors and negatives must have the same length")
 
-        anchor_embeddings = self.model(anchors)
-        positive_embeddings = self.model(positives)
+        anchor_embeddings = _encode_input(
+            self.model, anchors, self.input_options, "anchors",
+        )
+        positive_embeddings = _encode_input(
+            self.model, positives, self.input_options, "positives",
+        )
         candidate_embeddings = positive_embeddings
 
         if negatives is not None:
-            negative_embeddings = self.model(negatives)
+            negative_embeddings = _encode_input(
+                self.model, negatives, self.input_options, "negatives",
+            )
             candidate_embeddings = torch.cat(
                 (positive_embeddings, negative_embeddings),
                 dim=0,

@@ -105,6 +105,122 @@ boundary, and the API reference for exact validation rules:
 - :class:`neembed.ManifoldMarginMSELoss`
 - :class:`neembed.ManifoldDistanceMSELoss`
 
+Input roles and prompts during training
+---------------------------------------
+
+Every built-in text loss accepts the optional keyword-only constructor argument
+``input_options``. It maps each text input's **forward argument name** to a
+dictionary containing ``task``, ``prompt_name``, and/or ``prompt``. The loss
+passes these options through the same differentiable model forward path used
+by role-aware inference. See :doc:`inference` for prompt precedence, empty
+prompts, prompt-excluding pooling, and supported query/document routes.
+
+For query-to-document training, explicitly configure all three inputs, including
+hard negatives:
+
+.. code-block:: python
+
+   from neembed import (
+       ManifoldMultipleNegativesRankingLoss,
+       ManifoldSymmetricMultipleNegativesRankingLoss,
+       ManifoldTripletLoss,
+       ManifoldMarginMSELoss,
+   )
+
+   # Choose prefixes appropriate for your encoder. With saved role prompts,
+   # use just {"task": "query"} / {"task": "document"} instead.
+   query = {"task": "query", "prompt": "query: "}
+   document = {"task": "document", "prompt": "passage: "}
+   retrieval_options = {
+       "anchors": query,
+       "positives": document,
+       "negatives": document,
+   }
+   mnrl = ManifoldMultipleNegativesRankingLoss(model, input_options=retrieval_options)
+   symmetric = ManifoldSymmetricMultipleNegativesRankingLoss(
+       model, input_options=retrieval_options,
+   )
+   triplet = ManifoldTripletLoss(model, input_options=retrieval_options)
+   margin_mse = ManifoldMarginMSELoss(model, input_options=retrieval_options)
+   anchors, positives, negatives = ["dog", "cat"], ["mammal", "animal"], ["car", "boat"]
+   ranking_value = mnrl(anchors, positives, negatives)
+   triplet_value = triplet(anchors, positives, negatives)
+   teacher_value = margin_mse(anchors, positives, negatives, [0.5, 0.8])
+
+The symmetric loss encodes each original input once with its configured role.
+The reverse term reuses those document and query embeddings; it does not swap
+tasks or apply another prefix. Explicit negatives participate only in its
+forward term, as before. In-batch negative positives also retain the positive
+input's document settings.
+
+.. list-table:: Supported ``input_options`` keys
+   :header-rows: 1
+   :widths: 65 35
+
+   * - Loss
+     - Text input names
+   * - MNRL, symmetric MNRL, Triplet, MarginMSE
+     - ``anchors``, ``positives``, ``negatives``
+   * - ``ManifoldDistanceMSELoss``
+     - ``texts_a``, ``texts_b``
+   * - ``ManifoldRadialOrderLoss``
+     - ``parents``, ``children``
+   * - ``ManifoldHierarchyTripletLoss``
+     - ``parents``, ``children``, ``unrelated``
+   * - ``ManifoldDepthLoss``
+     - ``texts``
+   * - ``ManifoldPrototypeHierarchyLoss``
+     - ``sentences``
+
+Missing input keys, empty option dictionaries, and ``None`` option values keep
+the original raw-text behavior, even if the encoder has a default prompt. Roles
+are never inferred from argument names, and negative inputs do not inherit
+positive settings. To use a named prompt without routing, supply only
+``{"prompt_name": "custom"}``. To retain routing but disable prompt insertion,
+use ``{"task": "document", "prompt": ""}``.
+
+Mappings are copied at construction, so reusing or subsequently editing a
+caller's dictionary does not change an existing loss. Unknown text input names
+and option keys are rejected at construction. Option values and prompt names
+are validated by model forward when that text input is evaluated. Labels,
+target margins/distances, prototype assignments, and prototype points cannot
+receive text options. These loss settings are caller-owned and are not saved by
+``model.save_pretrained()``; reconstruct the loss with the desired options.
+
+For DistanceMSE and hierarchy supervision, the caller chooses the meaning of
+each side. For example, all hierarchy nodes may use document preprocessing,
+while pairwise distance supervision may compare queries to documents:
+
+.. code-block:: python
+
+   from neembed import (
+       ManifoldDistanceMSELoss,
+       ManifoldHierarchyTripletLoss,
+       ManifoldRetrievalHierarchyLoss,
+   )
+
+   distance_mse = ManifoldDistanceMSELoss(
+       model, input_options={"texts_a": query, "texts_b": document},
+   )
+   hierarchy = ManifoldHierarchyTripletLoss(
+       model, input_options={
+           "parents": document, "children": document, "unrelated": document,
+       },
+   )
+   combined = ManifoldRetrievalHierarchyLoss(triplet, hierarchy, hierarchy_weight=0.5)
+   total = combined(
+       (anchors, positives, negatives),
+       (["mammal", "animal"], ["dog", "cat"], ["car", "boat"]),
+   )
+   total.backward()
+
+The composite keeps each component's options independent, even when both use
+the same model or texts. With zero hierarchy weight, the hierarchy inputs and
+their prompts are not evaluated. For product hierarchy models, continue to pass
+an explicit compatible ``component``; input roles do not choose a geometry.
+The existing :class:`neembed.ManifoldTrainer` and positional batch contracts
+work unchanged because the options are attached to each loss.
+
 Choosing evaluation metrics
 ---------------------------
 

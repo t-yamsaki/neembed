@@ -220,6 +220,12 @@ retrieval objective remain unchanged while hierarchy supervision is added
 explicitly. ``hierarchy_weight`` is non-negative; a value of ``0`` is a true
 retrieval-only path and skips hierarchy evaluation in ``forward``.
 
+To declare preprocessing roles or prompts, set ``input_options`` on each
+component loss independently. Hierarchy input names do not imply query or
+document roles, and the composite does not copy retrieval options into the
+hierarchy component. See :doc:`retrieval_objectives` for the supported text
+input names and a role-aware composition example.
+
 The wrapper is not a general loss graph, scheduler, curriculum system, or
 learned weighting mechanism. Existing losses remain directly usable, and no
 trainer redesign is required. These losses only optimize ordinary model
