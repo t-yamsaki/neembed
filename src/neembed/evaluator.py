@@ -5,6 +5,7 @@ from collections.abc import Mapping, Sequence
 
 import torch
 
+from neembed._input_options import InputOptions, _encode_inference_input, _normalize_input_options
 from neembed.model import ManifoldSentenceTransformer
 from neembed.prototypes import ManifoldPrototypes
 from neembed.retrieval import (
@@ -28,6 +29,8 @@ class ManifoldEmbeddingEvaluator:
             reports Recall@1. A cutoff greater than or equal to the candidate
             count has Recall@K equal to 1 because the aligned target is always
             present in the candidate pool.
+        input_options: Optional task/prompt_name/prompt options keyed by
+            ``anchors`` and ``positives``. Neither side gets an implicit role.
 
     Raises:
         ValueError: If the anchor and positive counts differ, fewer than two
@@ -42,11 +45,13 @@ class ManifoldEmbeddingEvaluator:
         anchors: Sequence[str],
         positives: Sequence[str],
         recall_at_k: Sequence[int] = (1,),
+        input_options: InputOptions | None = None,
     ) -> None:
         self.model = model
         self.anchors = list(anchors)
         self.positives = list(positives)
         self.recall_at_k = tuple(recall_at_k)
+        self.input_options = _normalize_input_options(input_options, ("anchors", "positives"))
 
         if len(self.anchors) != len(self.positives):
             raise ValueError("anchors and positives must contain the same number of items")
@@ -79,12 +84,16 @@ class ManifoldEmbeddingEvaluator:
         was_training = self.model.training
         try:
             with torch.no_grad():
-                anchor_embeddings = self.model.encode(
+                anchor_embeddings = _encode_inference_input(
+                    self.model,
                     self.anchors,
+                    self.input_options.get("anchors"),
                     convert_to_tensor=True,
                 )
-                positive_embeddings = self.model.encode(
+                positive_embeddings = _encode_inference_input(
+                    self.model,
                     self.positives,
+                    self.input_options.get("positives"),
                     convert_to_tensor=True,
                 )
 
@@ -150,6 +159,10 @@ class ManifoldCorpusRetrievalEvaluator:
     corpus IDs retrieved in the first ``K`` results, then averaged across queries.
     ``MRR`` uses the rank of the first relevant result for each query. Equal-distance
     ties preserve corpus index order, matching exact corpus search.
+
+    ``input_options`` maps ``queries`` and ``corpus`` to optional
+    task/prompt_name/prompt settings, matching exact search and offline mining.
+    Unspecified inputs keep raw-text encoding, even with a saved default prompt.
     """
 
     def __init__(
@@ -164,6 +177,7 @@ class ManifoldCorpusRetrievalEvaluator:
         recall_at_k: Sequence[int] = (1,),
         query_chunk_size: int = 32,
         corpus_chunk_size: int = 256,
+        input_options: InputOptions | None = None,
     ) -> None:
         if isinstance(query_ids, str):
             raise ValueError("query_ids must be a sequence of IDs, not a string")
@@ -184,6 +198,7 @@ class ManifoldCorpusRetrievalEvaluator:
         self.recall_at_k = tuple(recall_at_k)
         self.query_chunk_size = query_chunk_size
         self.corpus_chunk_size = corpus_chunk_size
+        self.input_options = _normalize_input_options(input_options, ("queries", "corpus"))
 
         if not self.query_ids:
             raise ValueError("evaluation requires at least one query")
@@ -284,11 +299,13 @@ class ManifoldCorpusRetrievalEvaluator:
                     self.model,
                     self.queries,
                     batch_size=self.query_chunk_size,
+                    encode_options=self.input_options.get("queries"),
                 )
                 corpus_embeddings = _encode_text_batches(
                     self.model,
                     self.corpus,
                     batch_size=self.corpus_chunk_size,
+                    encode_options=self.input_options.get("corpus"),
                 )
 
                 relevant_index_sets = [
@@ -397,6 +414,8 @@ class ManifoldPrototypeAssignmentEvaluator:
             indices.
         sentences: Non-empty sequence of texts to evaluate.
         expected_prototype_ids: Expected prototype identifier for each sentence.
+        input_options: Optional task/prompt_name/prompt options for ``sentences``.
+            Expected IDs and prototype points are not text inputs.
 
     Raises:
         ValueError: If the prototypes do not use the model's manifold instance,
@@ -414,6 +433,7 @@ class ManifoldPrototypeAssignmentEvaluator:
         prototype_ids: Sequence[str],
         sentences: Sequence[str],
         expected_prototype_ids: Sequence[str],
+        input_options: InputOptions | None = None,
     ) -> None:
         if prototypes.manifold is not model.manifold:
             raise ValueError("prototypes must use the model's manifold instance")
@@ -431,6 +451,7 @@ class ManifoldPrototypeAssignmentEvaluator:
         self.prototype_ids = tuple(prototype_ids)
         self.sentences = list(sentences)
         self.expected_prototype_ids = tuple(expected_prototype_ids)
+        self.input_options = _normalize_input_options(input_options, ("sentences",))
 
         if len(self.prototype_ids) != self.prototypes.num_prototypes:
             raise ValueError(
@@ -480,8 +501,10 @@ class ManifoldPrototypeAssignmentEvaluator:
         prototypes_were_training = self.prototypes.training
         try:
             with torch.no_grad():
-                embeddings = self.model.encode(
+                embeddings = _encode_inference_input(
+                    self.model,
                     self.sentences,
+                    self.input_options.get("sentences"),
                     convert_to_tensor=True,
                 )
                 distances = self.prototypes(embeddings)

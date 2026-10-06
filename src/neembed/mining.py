@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from neembed._input_options import InputOptions, _normalize_input_options
 from neembed.retrieval import (
     _as_text_sequence,
     _encode_text_batches,
@@ -101,6 +102,7 @@ def mine_hard_negatives(
     num_negatives: int = 1,
     query_chunk_size: int = 32,
     corpus_chunk_size: int = 256,
+    input_options: InputOptions | None = None,
 ) -> list[list[dict[str, str | int | float]]]:
     """Mine exact, deterministic hard negatives before training.
 
@@ -126,6 +128,8 @@ def mine_hard_negatives(
             exact distance evaluation.
         corpus_chunk_size: Positive corpus batch/block size used for encoding and
             exact distance evaluation.
+        input_options: Optional task/prompt_name/prompt options keyed by
+            ``queries`` and ``corpus``, matching exact corpus search.
 
     Returns:
         One list per input query. Each inner list contains exactly
@@ -184,6 +188,7 @@ def mine_hard_negatives(
             )
         excluded_indices.append(indices)
 
+    options = _normalize_input_options(input_options, ("queries", "corpus"))
     was_training = model.training
     try:
         with torch.no_grad():
@@ -191,11 +196,13 @@ def mine_hard_negatives(
                 model,
                 query_list,
                 batch_size=query_chunk_size,
+                encode_options=options.get("queries"),
             )
             corpus_embeddings = _encode_text_batches(
                 model,
                 corpus_list,
                 batch_size=corpus_chunk_size,
+                encode_options=options.get("corpus"),
             )
 
             retained: list[list[tuple[float, int]]] = [[] for _ in query_list]

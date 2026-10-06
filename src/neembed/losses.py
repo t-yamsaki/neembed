@@ -9,7 +9,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from neembed._loss_inputs import LossInputOptions, _encode_input, _normalize_input_options
+from neembed._input_options import InputOptions, _encode_input, _normalize_input_options
 from neembed.model import ManifoldSentenceTransformer
 from neembed.prototypes import ManifoldPrototypes
 
@@ -38,7 +38,7 @@ class ManifoldMultipleNegativesRankingLoss(nn.Module):
         model: ManifoldSentenceTransformer,
         temperature: float = 0.1,
         *,
-        input_options: LossInputOptions | None = None,
+        input_options: InputOptions | None = None,
     ) -> None:
         super().__init__()
         if temperature <= 0 or not math.isfinite(temperature):
@@ -122,7 +122,7 @@ class ManifoldTripletLoss(nn.Module):
         model: ManifoldSentenceTransformer,
         margin: float = 0.1,
         *,
-        input_options: LossInputOptions | None = None,
+        input_options: InputOptions | None = None,
     ) -> None:
         super().__init__()
         if margin < 0 or not math.isfinite(margin):
@@ -211,7 +211,7 @@ class ManifoldMarginMSELoss(nn.Module):
         self,
         model: ManifoldSentenceTransformer,
         *,
-        input_options: LossInputOptions | None = None,
+        input_options: InputOptions | None = None,
     ) -> None:
         super().__init__()
         self.model = model
@@ -328,7 +328,7 @@ class ManifoldDistanceMSELoss(nn.Module):
         self,
         model: ManifoldSentenceTransformer,
         *,
-        input_options: LossInputOptions | None = None,
+        input_options: InputOptions | None = None,
     ) -> None:
         super().__init__()
         self.model = model
@@ -447,7 +447,7 @@ class ManifoldPrototypeHierarchyLoss(nn.Module):
         *,
         margin: float = 0.1,
         hierarchy_weight: float = 1.0,
-        input_options: LossInputOptions | None = None,
+        input_options: InputOptions | None = None,
     ) -> None:
         super().__init__()
         if prototypes.manifold is not model.manifold:

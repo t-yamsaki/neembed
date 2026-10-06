@@ -9,7 +9,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from neembed._loss_inputs import LossInputOptions, _encode_input, _normalize_input_options
+from neembed._input_options import InputOptions, _encode_input, _normalize_input_options
 from neembed.model import ManifoldSentenceTransformer
 from neembed.hierarchy_geometry import _hierarchy_geometry, _resolve_hierarchy_component
 
@@ -53,7 +53,7 @@ class ManifoldRadialOrderLoss(nn.Module):
         margin: float = 0.1,
         *,
         component: str | int | None = None,
-        input_options: LossInputOptions | None = None,
+        input_options: InputOptions | None = None,
     ) -> None:
         super().__init__()
         self._component_index = _resolve_hierarchy_component(model, component)

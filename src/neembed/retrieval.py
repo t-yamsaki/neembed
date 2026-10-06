@@ -1,9 +1,11 @@
 """Exact retrieval utilities built on manifold geodesic distance."""
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 import torch
+
+from neembed._input_options import InputOptions, _encode_inference_input, _normalize_input_options
 
 if TYPE_CHECKING:
     from neembed.model import ManifoldSentenceTransformer
@@ -49,11 +51,14 @@ def _encode_text_batches(
     texts: list[str],
     *,
     batch_size: int,
+    encode_options: Mapping[str, str | None] | None = None,
 ) -> torch.Tensor:
     """Encode text in bounded batches and stage completed embeddings on CPU."""
     batches: list[torch.Tensor] = []
     for start in range(0, len(texts), batch_size):
-        encoded = model.encode(texts[start : start + batch_size])
+        encoded = _encode_inference_input(
+            model, texts[start : start + batch_size], encode_options,
+        )
         batches.append(torch.as_tensor(encoded))
     return torch.cat(batches, dim=0)
 
@@ -118,6 +123,7 @@ def exact_corpus_search(
     top_k: int | None = None,
     query_chunk_size: int = 32,
     corpus_chunk_size: int = 256,
+    input_options: InputOptions | None = None,
 ) -> list[list[dict[str, str | int | float]]]:
     """Search a text corpus by exact manifold geodesic distance.
 
@@ -131,6 +137,8 @@ def exact_corpus_search(
             and distance evaluation.
         corpus_chunk_size: Positive corpus batch/block size used for text encoding
             and distance evaluation.
+        input_options: Optional task/prompt_name/prompt options keyed by
+            ``queries`` and ``corpus``. Missing settings keep raw-text encoding.
 
     Returns:
         One ranked result list per query, preserving query input order. Each result
@@ -171,15 +179,18 @@ def exact_corpus_search(
             )
         result_count = top_k
 
+    options = _normalize_input_options(input_options, ("queries", "corpus"))
     query_embeddings = _encode_text_batches(
         model,
         query_list,
         batch_size=query_chunk_size,
+        encode_options=options.get("queries"),
     )
     corpus_embeddings = _encode_text_batches(
         model,
         corpus_list,
         batch_size=corpus_chunk_size,
+        encode_options=options.get("corpus"),
     )
 
     retained: list[list[tuple[float, int]]] = [[] for _ in query_list]

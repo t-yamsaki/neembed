@@ -206,7 +206,11 @@ def test_v10_constructor_extends_without_replacing_prior_public_contracts() -> N
         "query",
         "candidates",
         "top_k",
+        "input_options",
     )
+    rank_options = signature(ManifoldSentenceTransformer.rank).parameters["input_options"]
+    assert rank_options.kind is rank_options.KEYWORD_ONLY
+    assert rank_options.default is None
     assert "query_chunk_size" in signature(exact_corpus_search).parameters
     assert "num_negatives" in signature(mine_hard_negatives).parameters
     assert tuple(signature(ManifoldTripletLoss.forward).parameters) == (
