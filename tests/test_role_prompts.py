@@ -230,6 +230,39 @@ def local_prompt_encoder(tmp_path):
 
 
 @pytest.mark.parametrize("task", ["query", "document"])
+def test_real_dense_float64_round_trip_preserves_exact_weights_and_embeddings(
+    local_prompt_encoder, tmp_path, monkeypatch, task,
+):
+    from sentence_transformers import SentenceTransformer
+    from sentence_transformers.sentence_transformer.modules import Dense
+
+    encoder = SentenceTransformer(str(local_prompt_encoder), local_files_only=True, device="cpu")
+    encoder.add_module("2", Dense(8, 2, bias=False, activation_function=nn.Identity()))
+    source = tmp_path / "dense-source"
+    encoder.save_pretrained(str(source))
+    model = ManifoldSentenceTransformer(str(source), manifold="euclidean", local_files_only=True, device="cpu").double()
+    with torch.no_grad():
+        model.encoder[2].linear.weight[0, 0] = 1.000000000123
+        model.encoder[2].linear.weight[1, 0] = 1e100
+    before = getattr(model, "encode_" + task)(["dog mammal", "cat"], convert_to_tensor=True)
+    saved = tmp_path / "dense-saved"
+    model.save_pretrained(saved)
+    assert (saved / "encoder_state.pt").exists()
+
+    def reject_network(*args, **kwargs):
+        pytest.fail("float64 restoration must use local weights")
+
+    monkeypatch.setattr(socket.socket, "connect", reject_network)
+    monkeypatch.setattr(socket, "getaddrinfo", reject_network)
+    restored = ManifoldSentenceTransformer.from_pretrained(saved, local_files_only=True, device="cpu")
+    for key, value in model.encoder.state_dict().items():
+        assert torch.equal(restored.encoder.state_dict()[key], value)
+    after = getattr(restored, "encode_" + task)(["dog mammal", "cat"], convert_to_tensor=True)
+    assert torch.isfinite(after).all()
+    torch.testing.assert_close(after, before, rtol=0, atol=0)
+
+
+@pytest.mark.parametrize("task", ["query", "document"])
 @pytest.mark.parametrize("geometry", [
     {"manifold": "lorentz", "embedding_dim": 2, "learnable_curvature": True},
     {"product_config": [

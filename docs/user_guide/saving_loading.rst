@@ -66,6 +66,15 @@ stores the configured ``manifold`` name, current public ``curvature`` magnitude,
 and projection dimension. ``projection.pt`` stores the projection state
 dictionary.
 
+A float64 encoder also saves ``encoder_state.pt``: an exact second copy of its
+tensor state. Some Sentence Transformers modules construct float32 parameters
+before loading their native checkpoints, which would round double weights or
+overflow values outside the float32 range. The loader restores the encoder dtype
+and then reloads this supplemental state with ``weights_only=True``. Float64
+saves therefore require additional disk space; other encoder dtypes use only
+the native ``encoder/`` files. The supplemental file is required when version-1
+metadata records a float64 encoder, and its keys/dtypes are validated on load.
+
 Versionless configurations from v0.10 and earlier remain loadable. When
 ``learnable_curvature=True``, the configuration additionally records
 that flag and saves the **current learned public curvature value**. Reloading
@@ -116,8 +125,8 @@ path. Per-call task/prompt arguments, loss/evaluator ``input_options``, and
 ``dtypes`` records the uniform floating-state dtype of the encoder, projection,
 and geometry module. Supported values are ``float16``, ``bfloat16``, ``float32``,
 and ``float64``; a module without floating state uses ``null``. The loader
-restores these dtypes before copying projection weights, avoiding a cast through
-the default projection dtype. Mixed floating dtypes within one module are
+restores these dtypes before copying projection weights and reloading any exact
+float64 encoder state, avoiding irreversible casts through float32. Mixed floating dtypes within one module are
 rejected at save time because this format cannot represent them. Geometry output
 rules still apply: Lorentz adds its ambient coordinate and maps in ``float64``;
 SphereProjection/Stereographic and products containing fixed-double components

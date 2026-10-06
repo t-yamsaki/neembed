@@ -25,7 +25,6 @@ class CheckpointEncoder(nn.Module):
         path = Path(name) / "encoder.pt"
         if path.exists():
             state = torch.load(path, weights_only=True)
-            self.linear.to(dtype=state["linear.weight"].dtype)
             self.load_state_dict(state)
         self.to(kwargs.get("device", "cpu"))
 
@@ -209,4 +208,17 @@ def test_projection_checkpoint_dtype_must_agree_with_metadata(saved):
     state = torch.load(path / "projection.pt", weights_only=True)
     torch.save({key: value.double() for key, value in state.items()}, path / "projection.pt")
     with pytest.raises(ValueError, match="projection.pt.*dtype"):
+        ManifoldSentenceTransformer.from_pretrained(path)
+
+
+def test_float64_encoder_checkpoint_must_be_present_and_match_dtype(saved):
+    model, path = saved
+    model.double()
+    model.save_pretrained(path)
+    state = torch.load(path / "encoder_state.pt", weights_only=True)
+    (path / "encoder_state.pt").unlink()
+    with pytest.raises(FileNotFoundError, match="encoder_state.pt"):
+        ManifoldSentenceTransformer.from_pretrained(path)
+    torch.save({key: value.float() for key, value in state.items()}, path / "encoder_state.pt")
+    with pytest.raises(ValueError, match="encoder_state.pt.*dtype"):
         ManifoldSentenceTransformer.from_pretrained(path)

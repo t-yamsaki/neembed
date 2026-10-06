@@ -30,6 +30,15 @@ def _module_dtype(module):
     return name
 
 
+def validate_state_dtype(state, expected_dtype, *, filename):
+    if not isinstance(state, Mapping) or any(
+        not torch.is_tensor(value) or (value.is_floating_point() and
+            str(value.dtype).removeprefix("torch.") != expected_dtype)
+        for value in state.values()
+    ):
+        raise ValueError(f"{filename} does not match the saved dtype")
+
+
 def _model_id(value):
     if _hub_id(value) is None or Path(value).exists():
         return None

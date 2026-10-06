@@ -12,7 +12,7 @@ from sentence_transformers import SentenceTransformer as _SentenceTransformer
 from torch import nn
 
 from neembed._input_options import InputOptions, _encode_inference_input, _normalize_input_options
-from neembed._model_metadata import DTYPES, _module_dtype, new_metadata, read_config, source_metadata, validate_config
+from neembed._model_metadata import DTYPES, _module_dtype, new_metadata, read_config, source_metadata, validate_config, validate_state_dtype
 from neembed.manifolds import get_manifold
 from neembed.product_config import (
     ProductComponentConfig,
@@ -891,6 +891,8 @@ class ManifoldSentenceTransformer(nn.Module):
             floating dtypes, package version, and available base model provenance.
             Versionless legacy configurations remain loadable. Cache paths and
             load-time device/options are not serialized.
+            Float64 encoders include an exact supplemental ``encoder_state.pt``
+            because some native modules otherwise load double weights as float32.
             Poincare/Lorentz keep the legacy public ``curvature`` metadata. New
             v0.9 geometry stores the distinct signed ``sectional_curvature`` value.
             External modules such as :class:`neembed.ManifoldPrototypes`,
@@ -915,6 +917,10 @@ class ManifoldSentenceTransformer(nn.Module):
         config.update(new_metadata(self))
         validate_config(config)
         self.encoder.save_pretrained(str(output_path / "encoder"))
+        if config["dtypes"]["encoder"] == "float64":
+            # Some native encoder modules load through float32 parameters. Keep
+            # exact double weights to reload after constructing their saved graph.
+            torch.save(self.encoder.state_dict(), output_path / "encoder_state.pt")
         (output_path / "neembed_config.json").write_text(
             json.dumps(config, indent=2) + "\n",
             encoding="utf-8",
@@ -973,6 +979,12 @@ class ManifoldSentenceTransformer(nn.Module):
                     module.to(dtype=DTYPES[dtype])
                 elif _module_dtype(module) is not None:
                     raise ValueError(f"dtypes.{name} is null but the saved module has floating state")
+            if config["dtypes"]["encoder"] == "float64":
+                encoder_state = torch.load(
+                    model_path / "encoder_state.pt", map_location="cpu", weights_only=True,
+                )
+                validate_state_dtype(encoder_state, "float64", filename="encoder_state.pt")
+                model.encoder.load_state_dict(encoder_state)
             model.encoder.prompts = dict(config["input_config"]["prompts"])
             model.encoder.default_prompt_name = config["input_config"]["default_prompt_name"]
             model._base_model = dict(config["base_model"])
@@ -982,12 +994,6 @@ class ManifoldSentenceTransformer(nn.Module):
             weights_only=True,
         )
         if "format_version" in config:
-            expected_dtype = config["dtypes"]["projection"]
-            if not isinstance(projection_state, Mapping) or any(
-                not torch.is_tensor(value) or (value.is_floating_point() and
-                    str(value.dtype).removeprefix("torch.") != expected_dtype)
-                for value in projection_state.values()
-            ):
-                raise ValueError("projection.pt does not match the saved projection dtype")
+            validate_state_dtype(projection_state, config["dtypes"]["projection"], filename="projection.pt")
         model.projection.load_state_dict(projection_state)
         return model
