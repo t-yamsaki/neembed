@@ -14,6 +14,95 @@ All retrieval paths use the configured Geoopt geodesic distance. Poincare and
 Lorentz therefore keep the same geometry semantics used by ``encode()`` and
 ``distance()`` elsewhere in neembed.
 
+Consistent query/document preprocessing
+---------------------------------------
+
+``rank()``, exact corpus search, binary/graded retrieval evaluation, and offline
+mining accept optional ``input_options``. Like the :doc:`retrieval_objectives`
+training API, this maps each text input name to ``task``, ``prompt_name``, and/or
+``prompt`` options. Reuse the same query and document settings across training
+and inference; only the outer input names differ:
+
+.. list-table:: Input names for role/prompt configuration
+   :header-rows: 1
+   :widths: 65 35
+
+   * - API
+     - ``input_options`` keys
+   * - ``model.rank()``
+     - ``query``, ``candidates``
+   * - ``exact_corpus_search()``, ``mine_hard_negatives()``
+     - ``queries``, ``corpus``
+   * - Binary and graded corpus retrieval evaluators
+     - ``queries``, ``corpus``
+   * - ``ManifoldEmbeddingEvaluator``
+     - ``anchors``, ``positives``
+   * - ``ManifoldHierarchyEvaluator``
+     - ``texts``
+   * - ``ManifoldPrototypeAssignmentEvaluator``
+     - ``sentences``
+
+For an encoder with saved query/document prompts:
+
+.. code-block:: python
+
+   from neembed import (
+       ManifoldMultipleNegativesRankingLoss, ManifoldCorpusRetrievalEvaluator,
+       exact_corpus_search, mine_hard_negatives,
+   )
+
+   query = {"task": "query"}
+   document = {"task": "document"}
+   # For explicit prefixes, use settings appropriate for your encoder, e.g.
+   # query = {"task": "query", "prompt": "query: "}
+   # document = {"task": "document", "prompt": "passage: "}
+   corpus_options = {"queries": query, "corpus": document}
+   queries = ["What is a dog?"]
+   corpus = ["A dog is a mammal.", "A car is a vehicle."]
+   query_ids, corpus_ids = ["q-dog"], ["dog", "car"]
+   relevance = {"q-dog": ["dog"]}
+
+   loss = ManifoldMultipleNegativesRankingLoss(model, input_options={
+       "anchors": query, "positives": document, "negatives": document,
+   })
+   reranked = model.rank(queries[0], corpus, input_options={
+       "query": query, "candidates": document,
+   })
+   results = exact_corpus_search(
+       model, queries, corpus, top_k=2, query_chunk_size=1, corpus_chunk_size=1,
+       input_options=corpus_options,
+   )
+   evaluator = ManifoldCorpusRetrievalEvaluator(
+       model=model, queries=queries, corpus=corpus, query_ids=query_ids,
+       corpus_ids=corpus_ids, relevance=relevance, input_options=corpus_options,
+   )
+   metrics = evaluator()
+   negatives = mine_hard_negatives(
+       model, queries, corpus, query_ids=query_ids, corpus_ids=corpus_ids,
+       positive_corpus_ids=relevance, input_options=corpus_options,
+   )
+
+``ManifoldGradedCorpusRetrievalEvaluator`` uses the same settings for both its
+binary metrics and nDCG rankings. Every encoding chunk gets its input's settings;
+the batch/block sizes, CPU staging, geodesic distances, query order, and stable
+corpus-index tie ordering remain unchanged. Relevance and exclusion IDs refer to
+the caller's original corpus, and returned candidate strings are the original
+texts. Prefixes are applied once by the encoder, not stored in IDs or text lists.
+
+Missing input keys, empty settings, and ``None`` option values retain raw-text
+encoding, even when the encoder has a default prompt. An input never inherits
+another input's options. A named prompt can be selected without a task, and
+``prompt=""`` disables prompt insertion while retaining an explicit route. See
+:doc:`inference` for precedence and supported encoder/Router signatures.
+
+Evaluators copy their settings at construction. Function/method helpers use a
+copy for the current call. Unknown input names and option keys are rejected;
+prompt names and values are checked by the model when that input is encoded.
+These options are caller-owned and are not persisted by model saving.
+Generic pair, hierarchy, and prototype evaluation have no implicit roles;
+choose their text semantics explicitly. Hierarchy roles do not select a product
+geometry component or alter node IDs, edges, or depths.
+
 Product embeddings
 ------------------
 

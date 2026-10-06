@@ -170,6 +170,12 @@ negatives as documents while keeping existing training batches. See the
 [Retrieval objectives guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html)
 for examples and independent hierarchy/composite input settings.
 
+`rank()`, exact corpus search, evaluators, and offline hard-negative mining also
+accept `input_options`. Reuse the same query/document settings as training,
+using each API's text input names. See the
+[Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html)
+for a complete example and the input-name mapping.
+
 Encoder loading accepts `revision`, `local_files_only`, `cache_folder`, and
 `device` in both the constructor and local `from_pretrained()`. Pin a remote
 encoder with a commit ID, or use `local_files_only=True` for local/cached files.

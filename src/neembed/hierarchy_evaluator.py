@@ -8,6 +8,7 @@ from typing import Literal
 
 import torch
 
+from neembed._input_options import InputOptions, _encode_inference_input, _normalize_input_options
 from neembed.hierarchy import _normalize_hierarchy_supervision
 from neembed.model import ManifoldSentenceTransformer
 from neembed.hierarchy_geometry import _hierarchy_geometry, _resolve_hierarchy_component
@@ -85,6 +86,8 @@ class ManifoldHierarchyEvaluator:
         depths: Optional mapping from node IDs to non-negative integer depths.
         contract: ``"dag"`` for an acyclic directed graph or ``"tree"`` for an
             acyclic forest whose nodes have at most one parent.
+        input_options: Caller-chosen task/prompt_name/prompt options for ``texts``.
+            Node IDs, edges, and depths have no implicit preprocessing role.
 
     Notes:
         Evaluation uses the supervised geometry's ``dist0`` so Poincare and Lorentz
@@ -102,6 +105,7 @@ class ManifoldHierarchyEvaluator:
         depths: Mapping[str, int] | None = None,
         contract: Literal["tree", "dag"] = "dag",
         component: str | int | None = None,
+        input_options: InputOptions | None = None,
     ) -> None:
         self._component_index = _resolve_hierarchy_component(model, component)
         self.component = component
@@ -130,14 +134,17 @@ class ManifoldHierarchyEvaluator:
         self.depths = hierarchy.depths
         self._depths_provided = depths is not None
         self.contract = hierarchy.contract
+        self.input_options = _normalize_input_options(input_options, ("texts",))
 
     def __call__(self) -> dict[str, float]:
         """Return radial hierarchy metrics for the configured supervision."""
         was_training = self.model.training
         try:
             with torch.no_grad():
-                embeddings = self.model.encode(
+                embeddings = _encode_inference_input(
+                    self.model,
                     self.texts,
+                    self.input_options.get("texts"),
                     convert_to_tensor=True,
                 )
                 geometry, embeddings = _hierarchy_geometry(

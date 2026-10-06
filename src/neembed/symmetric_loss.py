@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 
 from neembed.losses import ManifoldMultipleNegativesRankingLoss
-from neembed._loss_inputs import _encode_input
+from neembed._input_options import _encode_input
 
 
 class ManifoldSymmetricMultipleNegativesRankingLoss(

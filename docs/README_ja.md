@@ -170,6 +170,12 @@ print(float(distance))
 [Retrieval objectives guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html)
 を参照してください。
 
+`rank()`、exact corpus search、evaluator、offline hard-negative mining でも
+`input_options` を指定できます。各 API のテキスト入力名に対応させることで、学習時と
+同じ query / document 設定を使えます。使用例と入力名の対応表は
+[Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html)
+を参照してください。
+
 constructor とローカルモデルの `from_pretrained()` では、encoder 読み込み用の
 `revision`、`local_files_only`、`cache_folder`、`device` を指定できます。
 remote encoder の固定には commit ID、ローカル・キャッシュ限定の読み込みには

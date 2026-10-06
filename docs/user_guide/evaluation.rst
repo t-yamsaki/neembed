@@ -17,6 +17,13 @@ introducing a separate metrics framework. ``ManifoldEmbeddingEvaluator`` uses
 the model's own ``encode()`` and ``distance()`` methods, so evaluation follows
 the same manifold geometry used for inference.
 
+Every text evaluator accepts optional ``input_options`` matching its text
+argument names. Binary and graded corpus evaluators use ``queries``/``corpus``;
+pair evaluation uses ``anchors``/``positives``, hierarchy evaluation uses
+``texts``, and prototype assignment uses ``sentences``. Unspecified inputs keep
+raw-text encoding. See :doc:`retrieval` for role/prompt configuration shared
+with training, corpus search, and offline mining.
+
 Aligned retrieval task
 ----------------------
 

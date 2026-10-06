@@ -103,9 +103,9 @@ signatures. Dependency-version qualification is tracked separately in Issue #181
 Built-in losses accept input-specific ``input_options`` through the same
 differentiable forward path; see :doc:`retrieval_objectives` for training
 examples. The ``rank()``, corpus search, evaluator, and mining convenience
-APIs retain their role-free calls. Their role-aware integration is tracked in
-Issue #178; use the explicit encoding/forward methods above when roles
-are required.
+APIs also accept optional input-specific ``input_options``; see :doc:`retrieval`
+for their input names and a consistent training/search/mining example. Calls
+without settings retain their original raw-text behavior.
 
 NumPy and Tensor output
 -----------------------

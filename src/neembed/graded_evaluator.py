@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 import math
 from numbers import Real
 
+from neembed._input_options import InputOptions
 from neembed.evaluator import ManifoldCorpusRetrievalEvaluator
 from neembed.model import ManifoldSentenceTransformer
 from neembed.retrieval import exact_corpus_search
@@ -43,6 +44,8 @@ class ManifoldGradedCorpusRetrievalEvaluator(ManifoldCorpusRetrievalEvaluator):
             corpus size is evaluated over the full corpus.
         query_chunk_size: Positive query encoding/distance chunk size.
         corpus_chunk_size: Positive corpus encoding/distance chunk size.
+        input_options: Optional task/prompt_name/prompt options keyed by
+            ``queries`` and ``corpus``. Both binary and nDCG passes use them.
 
     Notes:
         nDCG is opt-in through this graded evaluator so the existing
@@ -66,6 +69,7 @@ class ManifoldGradedCorpusRetrievalEvaluator(ManifoldCorpusRetrievalEvaluator):
         ndcg_at_k: Sequence[int] = (1,),
         query_chunk_size: int = 32,
         corpus_chunk_size: int = 256,
+        input_options: InputOptions | None = None,
     ) -> None:
         if not isinstance(graded_relevance, Mapping):
             raise ValueError(
@@ -127,6 +131,7 @@ class ManifoldGradedCorpusRetrievalEvaluator(ManifoldCorpusRetrievalEvaluator):
             recall_at_k=recall_at_k,
             query_chunk_size=query_chunk_size,
             corpus_chunk_size=corpus_chunk_size,
+            input_options=input_options,
         )
 
         corpus_id_set = set(self.corpus_ids)
@@ -175,6 +180,7 @@ class ManifoldGradedCorpusRetrievalEvaluator(ManifoldCorpusRetrievalEvaluator):
                 top_k=result_count,
                 query_chunk_size=self.query_chunk_size,
                 corpus_chunk_size=self.corpus_chunk_size,
+                input_options=self.input_options,
             )
 
             ndcg_sums = {k: 0.0 for k in self.ndcg_at_k}

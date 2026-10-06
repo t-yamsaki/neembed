@@ -11,6 +11,7 @@ import torch
 from sentence_transformers import SentenceTransformer as _SentenceTransformer
 from torch import nn
 
+from neembed._input_options import InputOptions, _encode_inference_input, _normalize_input_options
 from neembed.manifolds import get_manifold
 from neembed.product_config import (
     ProductComponentConfig,
@@ -762,6 +763,7 @@ class ManifoldSentenceTransformer(nn.Module):
         candidates: Sequence[str],
         *,
         top_k: int | None = None,
+        input_options: InputOptions | None = None,
     ) -> list[dict[str, str | int | float]]:
         """Rank an in-memory candidate list by geodesic distance to a query.
 
@@ -771,6 +773,8 @@ class ManifoldSentenceTransformer(nn.Module):
             top_k: Number of ranked candidates to return. ``None`` returns the
                 full list. Integer values must be between 1 and the candidate
                 count, inclusive.
+            input_options: Optional task/prompt_name/prompt options keyed by
+                ``query`` and ``candidates``. Missing keys use raw-text encoding.
 
         Returns:
             Plain Python dictionaries ordered by ascending geodesic distance.
@@ -807,10 +811,15 @@ class ManifoldSentenceTransformer(nn.Module):
                 )
             result_count = top_k
 
+        options = _normalize_input_options(input_options, ("query", "candidates"))
         with torch.no_grad():
-            query_embedding = self.encode(query, convert_to_tensor=True)
-            candidate_embeddings = self.encode(
+            query_embedding = _encode_inference_input(
+                self, query, options.get("query"), convert_to_tensor=True,
+            )
+            candidate_embeddings = _encode_inference_input(
+                self,
                 candidate_list,
+                options.get("candidates"),
                 convert_to_tensor=True,
             )
             distances = self.distance(

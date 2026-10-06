@@ -226,6 +226,12 @@ document roles, and the composite does not copy retrieval options into the
 hierarchy component. See :doc:`retrieval_objectives` for the supported text
 input names and a role-aware composition example.
 
+``ManifoldHierarchyEvaluator`` accepts ``input_options={"texts": ...}`` so its
+nodes can use the same preprocessing as hierarchy training. Prototype assignment
+evaluation uses ``input_options={"sentences": ...}``. Both retain raw-text
+encoding without settings; text roles do not change hierarchy metadata or
+prototype IDs. See :doc:`retrieval` for the inference-side configuration rules.
+
 The wrapper is not a general loss graph, scheduler, curriculum system, or
 learned weighting mechanism. Existing losses remain directly usable, and no
 trainer redesign is required. These losses only optimize ordinary model
