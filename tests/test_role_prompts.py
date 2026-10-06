@@ -229,6 +229,31 @@ def local_prompt_encoder(tmp_path):
 
 
 @pytest.mark.parametrize("task", ["query", "document"])
+def test_batched_real_prompt_pooling_matches_full_forward(local_prompt_encoder, monkeypatch, task):
+    model = ManifoldSentenceTransformer(
+        str(local_prompt_encoder), manifold="euclidean", device="cpu", local_files_only=True,
+    )
+    texts = ["dog mammal", "cat", "dog cat mammal", "mammal", "dog"]
+    model.eval()
+    with torch.no_grad():
+        expected = model(texts, task=task)
+    original = model.encoder.preprocess
+    calls = []
+
+    def record_preprocess(batch, **kwargs):
+        features = original(batch, **kwargs)
+        calls.append((len(batch), kwargs["task"], features["prompt_length"]))
+        return features
+
+    monkeypatch.setattr(model.encoder, "preprocess", record_preprocess)
+    actual = getattr(model, "encode_" + task)(texts, batch_size=2, convert_to_tensor=True)
+    torch.testing.assert_close(actual, expected, rtol=1e-5, atol=1e-6)
+    assert [size for size, _, _ in calls] == [2, 2, 1]
+    assert all(role == task and prompt_length > 0 for _, role, prompt_length in calls)
+    assert not model.encoder[1].include_prompt
+
+
+@pytest.mark.parametrize("task", ["query", "document"])
 def test_real_prompt_pooling_matches_native_encoder_and_local_round_trip(
     local_prompt_encoder, tmp_path, monkeypatch, task,
 ):

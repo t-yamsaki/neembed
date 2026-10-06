@@ -158,6 +158,11 @@ print(float(distance))
 
 ## ドキュメント
 
+`encode()` / `encode_query()` / `encode_document()` は `batch_size`（既定32）で
+入力順とgeometryのdtype/deviceを維持したバッチ推論ができます。正の整数を指定すると
+各encoder呼び出しの件数を制限できます。空の文章列は所定の出力幅の空行列を返し、
+推論後は従来どおりevalモードを維持します。
+
 `forward()` / `encode()` は `task="query"` / `"document"`、`prompt_name`、
 または明示的な `prompt` を受け付けます。`encode_query()` / `encode_document()`
 は勾配を保持する学習経路と同じ prompt 選択を使います。未指定時は従来の raw-text
