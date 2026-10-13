@@ -46,7 +46,7 @@ def test_v10_public_package_metadata() -> None:
     assert f'Documentation = "{DOCUMENTATION_URL}"' in pyproject
     for python_version in ("3.10", "3.11", "3.12"):
         assert f'"Programming Language :: Python :: {python_version}"' in pyproject
-    for dependency in ("torch", "sentence-transformers", "geoopt"):
+    for dependency in ("torch>=2.3.0", "sentence-transformers>=5.4.1", "geoopt>=0.5.1"):
         assert f'    "{dependency}",' in pyproject
 
     assert package_metadata["Name"] == "neembed-geoopt"

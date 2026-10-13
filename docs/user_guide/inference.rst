@@ -121,14 +121,15 @@ gradients through the encoder, projection, and any learnable curvature. It never
 calls encoder ``encode()``. Task is forwarded to both preprocessing and encoder
 forward so task-aware modules can choose the same route in both stages.
 
-The role-aware path is verified with Sentence Transformers 6.1 text encoders
+The role-aware path is verified with Sentence Transformers 5.4.1 and 6.1 text encoders
 and a local query/document Router with matching output dimensions. Encoders must
 accept the selected prompt/task arguments in preprocessing and task in forward.
 Unsupported custom signatures or missing routes report their errors; neembed
 does not retry by dropping the task. Other Router layouts, unequal route output
 dimensions, arbitrary task names, and multimodal/chat inputs are outside this
 text-only contract. The existing role-free API still works with legacy encoder
-signatures. Dependency-version qualification is tracked separately in Issue #181.
+signatures. See :doc:`encoder_compatibility` for exact dependency profiles,
+pinned pretrained encoders, and the boundaries of this qualification.
 
 Built-in losses accept input-specific ``input_options`` through the same
 differentiable forward path; see :doc:`retrieval_objectives` for training

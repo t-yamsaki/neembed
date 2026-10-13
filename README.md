@@ -162,6 +162,12 @@ Local saves now use versioned metadata for geometry, prompts, floating dtypes,
 package version, and available base-model provenance. Versionless v0.10 and
 earlier configurations remain loadable; restoration uses the saved local encoder.
 
+The minimum qualified dependencies are PyTorch 2.3.0, Sentence Transformers
+5.4.1, and Geoopt 0.5.1. A two-profile CPU CI verifies pinned MiniLM and E5-small-v2
+encoders, including role-aware training, retrieval, and offline save/load. See
+the [compatibility guide](https://neembed.readthedocs.io/en/latest/user_guide/encoder_compatibility.html)
+for exact stacks, model revisions, and tested scope.
+
 `encode()`, `encode_query()`, and `encode_document()` accept `batch_size=32`
 by default, preserving input order and geometry dtype/device. Set a smaller
 positive integer to bound each encoder call; empty sequences return an empty

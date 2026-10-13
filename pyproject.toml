@@ -36,9 +36,9 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "torch",
-    "sentence-transformers",
-    "geoopt",
+    "torch>=2.3.0",
+    "sentence-transformers>=5.4.1",
+    "geoopt>=0.5.1",
 ]
 
 [project.urls]
