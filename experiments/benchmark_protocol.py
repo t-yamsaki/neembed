@@ -173,10 +173,11 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
                 raise ValueError("native variant must use the encoder's native width")
         else:
             dims.append(variant["intrinsic_dim"])
-        if variant["embedding_dtype"] not in ("float32", "float64") or (geometry == "lorentz" and variant["embedding_dtype"] != "float64"):
-            raise ValueError("unsupported embedding_dtype; Lorentz requires float64")
-        if geometry == "native" and variant["embedding_dtype"] != model["encoder_dtype"]:
-            raise ValueError("native embedding_dtype must match encoder_dtype")
+        expected_dtype = model["encoder_dtype"] if geometry == "native" else (
+            "float64" if geometry == "lorentz" else "float32"
+        )
+        if variant["embedding_dtype"] != expected_dtype:
+            raise ValueError(f"v1 {geometry} embedding_dtype must be {expected_dtype}")
         if geometry in ("poincare", "lorentz"):
             _number(variant["curvature"], "curvature", positive=True)
             if variant["curvature"] != 1.0:

@@ -34,17 +34,17 @@ untrained; do not imply it received the fine-tuning budget.
      - Cosine
      - D
      - D
-     - float32 initially
+     - float32 (fixed)
    * - Euclidean projection
      - Euclidean L2
      - D
      - D
-     - float32 initially
+     - float32 (fixed)
    * - Poincare projection
      - Geodesic
      - D
      - D
-     - float32 initially
+     - float32 (fixed)
    * - Lorentz projection
      - Geodesic
      - D
@@ -54,10 +54,12 @@ untrained; do not imply it received the fine-tuning budget.
 The four projected variants use the same intrinsic D. Lorentz's time coordinate
 is representation overhead, not an extra learned projection dimension. Record
 native width separately; the native model is a useful baseline but has a
-different output capacity. Initially use fixed curvature magnitude 1.0 for both
+different output capacity. v1 fixes curvature magnitude 1.0 for both
 hyperbolic geometries; curvature learning and mixed-curvature products are
 outside this first comparison. The dtype difference follows neembed's existing
-numerical policy and must be disclosed. Native cosine and projected cosine use
+numerical policy and must be disclosed. v1 fixes Euclidean/Poincare projected
+outputs at float32 and Lorentz outputs at float64; native outputs retain the
+configured shared encoder dtype. Native cosine and projected cosine use
 ``1 - cosine_similarity`` for ascending ranking; L2 uses the unnormalized
 projected vectors. Do not silently substitute cosine for geodesic distance.
 

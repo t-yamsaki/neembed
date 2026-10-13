@@ -44,6 +44,7 @@ def records(paths):
     (("inputs", "queries", "task"), "corpus"),
     (("inputs", "queries", "prompt_name"), "query"),
     (("variants", 4, "output_dim"), 2), (("variants", 4, "embedding_dtype"), "float32"),
+    (("variants", 1, "embedding_dtype"), "float64"), (("variants", 3, "embedding_dtype"), "float64"),
     (("variants", 3, "curvature"), 0.5), (("variants", 4, "curvature"), 2.0),
     (("variants", 1, "intrinsic_dim"), 3),
     (("variants", 0, "intrinsic_dim"), 2),
