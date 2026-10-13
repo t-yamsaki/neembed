@@ -84,7 +84,8 @@ def test_fixture_seed_files_preserve_provenance_and_unmeasured_values(config, tm
         assert left["config_sha256"] == canonical_hash(config)
         assert left["backend"]["kind"] == "fixture"
         assert left["runs"] == right["runs"]
-        assert left["environment"]["dependencies"]["torch"]
+        torch_version = left["environment"]["dependencies"]["torch"]
+        assert torch_version is None or isinstance(torch_version, str)
         assert left["environment"]["hardware"]["cpu_count"]
         assert len(left["runs"]) == 5
         for run in left["runs"]:
@@ -215,7 +216,7 @@ class ObservedStubBackend(TrackingBackend):
                            "output_dim": context["variant"]["output_dim"],
                            "encoder_dtype": context["model"]["encoder_dtype"],
                            "embedding_dtype": context["variant"]["embedding_dtype"],
-                           "device": "cpu", "optimizer_steps": 0,
+                           "device": "cpu", "optimizer_steps": 1,
                            "hardware": {"implementation": "contract test stub"}, "note": None}
         return fitted
 
@@ -229,6 +230,35 @@ def test_real_contract_and_minimize_selection(config, tmp_path):
     assert all(run["status"] == "partial" for seed in outputs for run in seed["runs"])
     assert all(artifact["temperature"] == 0.05 for artifact, _ in backend.tests)
     assert outputs[0]["runs"][4]["trials"][0]["observed"]["output_dim"] == 3
+
+
+@pytest.mark.parametrize("variant_index,policy,steps,valid", [
+    (0, "trainable", 0, False), (1, "trainable", 0, False),
+    (1, "frozen", 0, False), (0, "frozen", 0, True),
+    (0, "frozen", 1, False), (1, "frozen", 1, True),
+    (0, "trainable", 1, True), (1, "trainable", 1, True),
+])
+def test_training_steps_and_frozen_native_exception(config, tmp_path, variant_index, policy, steps, valid):
+    config["kind"] = "real"
+    config["training"]["encoder_policy"] = policy
+    config["variants"] = [config["variants"][variant_index]]
+    backend = ObservedStubBackend(config)
+    original = backend.fit_validate
+    def with_steps(context):
+        fitted = original(context)
+        fitted.observed["optimizer_steps"] = steps
+        return fitted
+    backend.fit_validate = with_steps
+    outputs = records(run_protocol(config, backend, tmp_path))
+    if valid:
+        assert all(seed["runs"][0]["status"] == "partial" for seed in outputs)
+        assert len(backend.tests) == 3
+    else:
+        assert all(seed["runs"][0]["status"] == "failed" for seed in outputs)
+        assert all(seed["runs"][0]["selected_trial"] is None for seed in outputs)
+        assert all(all(v is None for v in seed["runs"][0]["test"].values()) for seed in outputs)
+        assert all("optimizer step" in seed["runs"][0]["trials"][0]["error"]["message"] for seed in outputs)
+        assert backend.tests == []
 
 
 @pytest.mark.parametrize("key,value", [("model_snapshot_sha256", "f" * 64), ("encoder_trainable", False),

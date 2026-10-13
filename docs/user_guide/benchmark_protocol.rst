@@ -135,8 +135,9 @@ and ``observed`` execution facts. Observed fields are the initial
 adapters must compute these facts, not copy them from the plan. Mismatches in
 initial state, policy, dimensions, dtypes or device fail the trial; exceeding the
 step budget also fails. Model ID/revision remain in the embedded configuration.
-For frozen native references, run zero steps; projected frozen models still train
-their heads. Data hashes and license/preprocessing claims are adapter/caller
+Frozen native references must run zero steps. Every other real variant must run
+at least one optimizer step, including projected frozen models that train their
+heads. Data hashes and license/preprocessing claims are adapter/caller
 responsibilities, not automatically verified by the common runner.
 
 ``seed-N.json`` is self-contained, with these top-level fields:

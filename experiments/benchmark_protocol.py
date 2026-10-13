@@ -307,8 +307,12 @@ def _observed(value: Any, context: dict[str, Any], kind: str) -> dict[str, Any]:
                     "embedding_dtype": context["variant"]["embedding_dtype"]}
         if type(value["encoder_trainable"]) is not bool or any(value[k] != v for k, v in expected.items()):
             raise ValueError("observed model state/dimensions/dtypes/policy differ from plan")
-        if context["variant"]["geometry"] == "native" and not value["encoder_trainable"] and value["optimizer_steps"] != 0:
-            raise ValueError("frozen native references must execute zero optimizer steps")
+        frozen_native = context["variant"]["geometry"] == "native" and not value["encoder_trainable"]
+        if frozen_native:
+            if value["optimizer_steps"] != 0:
+                raise ValueError("frozen native references must execute zero optimizer steps")
+        elif value["optimizer_steps"] == 0:
+            raise ValueError("trained variants must execute at least one optimizer step")
         if context["execution"]["device"] == "cuda":
             matches = re.fullmatch(r"cuda(?::\d+)?", value["device"])
         else:
