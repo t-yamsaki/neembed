@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 import torch
+import numpy as np
+from numpy.typing import ArrayLike
 from sentence_transformers import SentenceTransformer as _SentenceTransformer
 from torch import nn
 
@@ -510,6 +512,8 @@ class ManifoldSentenceTransformer(nn.Module):
             double-precision geometry path when the encoder runs on Apple MPS.
 
         Product output has final width ``product_config.ambient_dim``.
+        Forward retains the caller's train/eval mode and gradient context.
+        Pass a batch of raw texts; preprocessing inserts the selected prompt.
         """
         resolved_prompt = self._resolve_input_prompt(task, prompt_name, prompt)
         preprocess_kwargs: dict[str, Any] = {}
@@ -569,7 +573,7 @@ class ManifoldSentenceTransformer(nn.Module):
         task: Literal["query", "document"] | None = None,
         prompt_name: str | None = None,
         prompt: str | None = None,
-    ) -> Any:
+    ) -> np.ndarray | torch.Tensor:
         """Encode text as geometry-valued embeddings for inference.
 
         Args:
@@ -601,6 +605,8 @@ class ManifoldSentenceTransformer(nn.Module):
             NumPy output stages each completed batch on CPU; tensor output
             retains the full result on the geometry device. The input list and
             final output are still held in memory.
+            NumPy conversion must support the output dtype; bfloat16 output
+            requires ``convert_to_tensor=True``.
 
         Product output has final width ``product_config.ambient_dim``.
         """
@@ -657,7 +663,7 @@ class ManifoldSentenceTransformer(nn.Module):
         convert_to_tensor: bool = False,
         prompt_name: str | None = None,
         prompt: str | None = None,
-    ) -> Any:
+    ) -> np.ndarray | torch.Tensor:
         """Encode queries with ``task='query'`` and shared prompt selection.
 
         Uses the saved ``query`` prompt, then the saved default if no explicit
@@ -677,7 +683,7 @@ class ManifoldSentenceTransformer(nn.Module):
         convert_to_tensor: bool = False,
         prompt_name: str | None = None,
         prompt: str | None = None,
-    ) -> Any:
+    ) -> np.ndarray | torch.Tensor:
         """Encode documents with ``task='document'`` and shared prompt selection.
 
         Tries saved ``document``, ``passage``, ``corpus`` prompts in that order,
@@ -722,15 +728,18 @@ class ManifoldSentenceTransformer(nn.Module):
 
         return a_tensor, b_tensor
 
-    def distance(self, a: Any, b: Any) -> torch.Tensor:
+    def distance(self, a: torch.Tensor | ArrayLike, b: torch.Tensor | ArrayLike) -> torch.Tensor:
         """Return the geodesic distance between two geometry embeddings.
 
         Args:
-            a: First geometry embedding or array-like value.
-            b: Second geometry embedding or array-like value.
+            a: First encoded geometry point or real numeric array-like batch.
+            b: Second encoded geometry point or real numeric array-like batch.
 
         Returns:
-            A tensor containing the configured geometry distance.
+            A tensor of geodesic distances with broadcast batch dimensions;
+            two individual points produce a scalar tensor. Smaller values mean
+            closer points. The final input dimension must be the geometry's
+            ambient width, including any Lorentz time coordinate.
 
         Notes:
             This is an inference helper. Inputs are moved to the geometry device
@@ -739,6 +748,8 @@ class ManifoldSentenceTransformer(nn.Module):
             ``float64``. Poincare and Euclidean retain the model parameter dtype.
             SphereProjection/Stereographic distance uses CPU when the encoder is
             on Apple MPS because MPS does not support ``float64`` tensors.
+            Model mode is unchanged. For differentiable distances during
+            training, call ``model.manifold.dist`` on ``forward`` outputs.
 
         Product distance uses the common geometry dtype/device and configured scales.
         """
@@ -749,7 +760,7 @@ class ManifoldSentenceTransformer(nn.Module):
 
     @torch.no_grad()
     def product_distance_diagnostics(
-        self, a: Any, b: Any,
+        self, a: torch.Tensor | ArrayLike, b: torch.Tensor | ArrayLike,
     ) -> dict[str, torch.Tensor | dict[str, torch.Tensor]]:
         """Report total and named component geodesic distances for a product.
 
@@ -829,6 +840,7 @@ class ManifoldSentenceTransformer(nn.Module):
             This helper is intended for small in-memory reranking. It does not
             build or persist a search index. Encoding and distance calculation run
             without gradient tracking through the existing inference helpers.
+            The model remains in evaluation mode after encoding.
         """
         if isinstance(candidates, str):
             raise ValueError(

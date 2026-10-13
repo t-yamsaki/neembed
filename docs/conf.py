@@ -45,6 +45,7 @@ html_theme_options = {
 
 autodoc_mock_imports = [
     "geoopt",
+    "numpy",
     "sentence_transformers",
     "torch",
 ]

@@ -36,6 +36,7 @@ class ManifoldRetrievalHierarchyLoss(nn.Module):
         retrieval_loss: Existing retrieval objective returning a scalar tensor.
         hierarchy_loss: Existing hierarchy objective returning a scalar tensor.
         hierarchy_weight: Non-negative, finite multiplier for the hierarchy term.
+            This is a fixed multiplier, not a trainable parameter.
 
     Notes:
         The component modules are registered as ordinary PyTorch submodules, so
@@ -83,6 +84,9 @@ class ManifoldRetrievalHierarchyLoss(nn.Module):
 
         Unlike :meth:`forward`, this method always evaluates both components,
         including when ``hierarchy_weight`` is zero.
+        Bundles may contain text sequences, depth values, or tensors according
+        to the selected components; returned values retain their gradient graph
+        when gradients are enabled. This method does not change model mode.
         """
         retrieval_args = self._normalize_inputs("retrieval_inputs", retrieval_inputs)
         hierarchy_args = self._normalize_inputs("hierarchy_inputs", hierarchy_inputs)
@@ -99,6 +103,8 @@ class ManifoldRetrievalHierarchyLoss(nn.Module):
 
         Args:
             retrieval_inputs: Positional arguments for ``retrieval_loss``.
+                This is an outer argument bundle, such as ``(anchors, positives)``,
+                not one flat text batch. Items follow the component's own types.
             hierarchy_inputs: Positional arguments for ``hierarchy_loss``. This
                 may be ``None`` only when ``hierarchy_weight`` is zero.
 

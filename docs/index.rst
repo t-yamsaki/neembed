@@ -53,6 +53,7 @@ for the rest of the class and function details generated from public docstrings.
    user_guide/hierarchy
    user_guide/evaluation
    user_guide/inference
+   user_guide/api_contracts
    user_guide/encoder_compatibility
    user_guide/saving_loading
 

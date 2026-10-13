@@ -156,6 +156,72 @@ print(float(distance))
 
 Each anchor is paired with the positive at the same batch index. Because off-diagonal candidates become in-batch negatives, avoid duplicate positives within one batch. This model-only path keeps the ordinary AdamW behavior even though its outputs lie on a manifold. See the [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html) for the objective and batching details, the [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html) for optional explicit negatives and retrieval evaluation, the [Retrieval objectives guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html) for v0.7 objective/metric selection, the [Hierarchy-native learning guide](https://neembed.readthedocs.io/en/latest/user_guide/hierarchy.html) for v0.8 explicit hierarchy supervision, the [Constant-curvature geometry guide](https://neembed.readthedocs.io/en/latest/user_guide/constant_curvature_semantics.html) before switching v0.9 geometry/curvature semantics, and the [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) before adding trainable manifold prototypes.
 
+## Role-aware training and search
+
+After installing the development checkout, download the two pinned encoders once
+with `HF_HUB_DISABLE_XET=1 python scripts/preload_role_models.py`. The following
+example then runs from the repository root with cached files only. E5-small-v2
+uses English text with explicit query/passage instructions; pass raw texts.
+
+<!-- v11-role-example -->
+```python
+import torch
+from neembed import ManifoldMultipleNegativesRankingLoss, ManifoldSentenceTransformer, exact_corpus_search
+
+model = ManifoldSentenceTransformer(
+    "intfloat/e5-small-v2", revision="ffb93f3bd4047442299a41ebb6fa998a38507c52",
+    local_files_only=True, device="cpu", embedding_dim=16,
+)
+model.encoder.prompts.update({"query": "query: ", "document": "passage: "})
+queries = ["What is a dog?", "Which animals can fly?"]
+documents = ["A dog is a mammal.", "Birds can fly.", "Trees are plants."]
+
+loss_fn = ManifoldMultipleNegativesRankingLoss(model, input_options={
+    "anchors": {"task": "query"}, "positives": {"task": "document"},
+})
+model.train()
+optimizer = torch.optim.AdamW(model.parameters(), lr=2e-5)
+optimizer.zero_grad()
+loss = loss_fn(queries, documents[:2])
+loss.backward()
+optimizer.step()
+
+embeddings = model.encode_query(queries, batch_size=1, convert_to_tensor=True)
+results = exact_corpus_search(model, queries, documents, top_k=2, input_options={
+    "queries": {"task": "query"}, "corpus": {"task": "document"},
+})
+model.save_pretrained("./saved_role_model")
+restored = ManifoldSentenceTransformer.from_pretrained("./saved_role_model", local_files_only=True, device="cpu")
+torch.testing.assert_close(restored.encode_query(queries, batch_size=1, convert_to_tensor=True), embeddings)
+print(results)
+```
+<!-- /v11-role-example -->
+
+`forward` and losses retain the caller's gradient context and model mode.
+`encode` switches to eval mode and returns CPU NumPy arrays by default, or
+geometry-device tensors with `convert_to_tensor=True`; call `model.train()`
+when resuming training. `distance` is a no-grad helper with broadcast Tensor
+output and leaves mode unchanged. Use `model.manifold.dist` on forward outputs
+for differentiable distances. Rankings put the smallest geodesic distance first;
+equal distances keep candidate/corpus order.
+
+For intrinsic dimension `D`, single geometry outputs have width `D`, except
+Lorentz's `D + 1`. Product width is `product_config.ambient_dim`, the sum of
+component intrinsic dimensions plus one for each Lorentz component. Lorentz,
+SphereProjection, Stereographic, and fixed-double products map/output float64;
+Poincare/Euclidean retain ordinary dtype. Tensors follow the geometry device
+(SphereProjection/Stereographic and fixed-double products fall back to CPU on
+MPS); NumPy outputs use CPU. NumPy conversion must support the output dtype:
+bfloat16 requires Tensor output. These policies do not qualify every device/dtype.
+
+Unspecified roles keep raw-text behavior even with a saved default prompt.
+Versionless v0.10-and-earlier checkpoints still load; new format-version 1
+metadata preserves prompts, geometry, dtype and available provenance. Per-call
+options and batch size, optimizer state, and external prototypes are not saved
+as defaults. Float64 encoders include supplemental exact weights. See the
+[public API contracts](https://neembed.readthedocs.io/en/latest/user_guide/api_contracts.html)
+and [compatibility guide](https://neembed.readthedocs.io/en/latest/user_guide/encoder_compatibility.html).
+
 ## Documentation
 
 Local saves now use versioned metadata for geometry, prompts, floating dtypes,

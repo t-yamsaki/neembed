@@ -1,7 +1,7 @@
 """Evaluation helpers for manifold-valued sentence embeddings."""
 
 from bisect import bisect_right
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 import torch
 
@@ -163,6 +163,9 @@ class ManifoldCorpusRetrievalEvaluator:
     ``input_options`` maps ``queries`` and ``corpus`` to optional
     task/prompt_name/prompt settings, matching exact search and offline mining.
     Unspecified inputs keep raw-text encoding, even with a saved default prompt.
+    Relevance values are non-string iterables of unique corpus IDs, including
+    lists and sets; their order does not define retrieval order. Evaluation is
+    no-grad and restores the model's previous train/eval mode, even on failure.
     """
 
     def __init__(
@@ -173,7 +176,7 @@ class ManifoldCorpusRetrievalEvaluator:
         queries: Sequence[str],
         corpus_ids: Sequence[str],
         corpus: Sequence[str],
-        relevance: Mapping[str, Sequence[str]],
+        relevance: Mapping[str, Iterable[str]],
         recall_at_k: Sequence[int] = (1,),
         query_chunk_size: int = 32,
         corpus_chunk_size: int = 256,

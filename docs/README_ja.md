@@ -156,6 +156,70 @@ print(float(distance))
 
 各 anchor は同じ batch index の positive と対応します。off-diagonal candidate は in-batch negative になるため、同じ batch 内で positive を重複させないでください。この model-only path は出力が manifold-valued でも通常の AdamW behavior のままです。目的関数と batching の詳細は [Training guide](https://neembed.readthedocs.io/en/latest/user_guide/training.html)、optional explicit negatives と retrieval evaluation は [Retrieval workflow guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval.html)、v0.7 の objective / metric 選択は [Retrieval objectives guide](https://neembed.readthedocs.io/en/latest/user_guide/retrieval_objectives.html)、v0.8 の explicit hierarchy supervision は [Hierarchy-native learning guide](https://neembed.readthedocs.io/en/latest/user_guide/hierarchy.html)、v0.9 の geometry/curvature semantics は [Constant-curvature geometry guide](https://neembed.readthedocs.io/en/latest/user_guide/constant_curvature_semantics.html)、trainable manifold prototype を追加する前には [Learnable structure guide](https://neembed.readthedocs.io/en/latest/user_guide/learnable_structure.html) を参照してください。
 
+## 役割付き学習と検索
+
+開発checkoutのインストール後、`HF_HUB_DISABLE_XET=1 python scripts/preload_role_models.py`
+でrevision固定のencoderを一度取得してください。次の例はrepository rootから
+キャッシュ限定で実行できます。E5-small-v2は英語テキストに明示的なquery/passage指示を
+付けて使用します。日本語版でも入力例は同じ英語にし、prefix未付与の文章を渡します。
+
+<!-- v11-role-example -->
+```python
+import torch
+from neembed import ManifoldMultipleNegativesRankingLoss, ManifoldSentenceTransformer, exact_corpus_search
+
+model = ManifoldSentenceTransformer(
+    "intfloat/e5-small-v2", revision="ffb93f3bd4047442299a41ebb6fa998a38507c52",
+    local_files_only=True, device="cpu", embedding_dim=16,
+)
+model.encoder.prompts.update({"query": "query: ", "document": "passage: "})
+queries = ["What is a dog?", "Which animals can fly?"]
+documents = ["A dog is a mammal.", "Birds can fly.", "Trees are plants."]
+
+loss_fn = ManifoldMultipleNegativesRankingLoss(model, input_options={
+    "anchors": {"task": "query"}, "positives": {"task": "document"},
+})
+model.train()
+optimizer = torch.optim.AdamW(model.parameters(), lr=2e-5)
+optimizer.zero_grad()
+loss = loss_fn(queries, documents[:2])
+loss.backward()
+optimizer.step()
+
+embeddings = model.encode_query(queries, batch_size=1, convert_to_tensor=True)
+results = exact_corpus_search(model, queries, documents, top_k=2, input_options={
+    "queries": {"task": "query"}, "corpus": {"task": "document"},
+})
+model.save_pretrained("./saved_role_model")
+restored = ManifoldSentenceTransformer.from_pretrained("./saved_role_model", local_files_only=True, device="cpu")
+torch.testing.assert_close(restored.encode_query(queries, batch_size=1, convert_to_tensor=True), embeddings)
+print(results)
+```
+<!-- /v11-role-example -->
+
+`forward`と損失は呼び出し側の勾配設定・model modeを維持します。`encode`はevalモードに
+切り替え、そのまま戻ります。既定はCPU上のNumPy配列、`convert_to_tensor=True`なら
+geometry device上のTensorです。学習再開時は`model.train()`を呼んでください。
+`distance`はno-gradの補助APIで、broadcastされたTensorを返し、modeを変更しません。
+勾配が必要ならforward出力に`model.manifold.dist`を使います。順位は測地距離の小さい順で、
+同距離ではcandidate/corpusの入力順を維持します。
+
+内在次元`D`の単一幾何の出力幅は`D`、Lorentzのみ`D + 1`です。Productの出力幅は
+`product_config.ambient_dim`で、各内在次元の和にLorentz成分ごとに1座標を加えます。
+Lorentz・SphereProjection・Stereographic・fixed-double Productの写像と出力はfloat64、
+Poincare/Euclideanは通常のdtypeを維持します。Tensorはgeometry deviceに従い、MPS上の
+SphereProjection/Stereographicとfixed-double ProductはCPUへfallbackします。
+NumPy出力はCPUで、出力dtypeがNumPy変換をサポートする必要があります。bfloat16は
+Tensor出力を指定してください。このpolicyは全device/dtypeの検証済み対応を意味しません。
+
+役割未指定時は、保存されたdefault promptがあっても従来のraw-text処理を維持します。
+形式バージョンのないv0.10以前のcheckpointも復元できます。新しいformat-version 1は
+prompt・geometry・dtype・取得可能な来歴を記録します。呼び出しごとの設定やbatch size、
+optimizer、外部prototypeは保存されたdefaultにはなりません。float64 encoderには
+精度を保つ補助重みファイルも含まれます。詳細は
+[公開API契約](https://neembed.readthedocs.io/en/latest/user_guide/api_contracts.html)と
+[互換性ガイド](https://neembed.readthedocs.io/en/latest/user_guide/encoder_compatibility.html)を参照してください。
+
 ## ドキュメント
 
 ローカル保存ではgeometry・prompt・浮動小数点dtype・package version・取得可能な
