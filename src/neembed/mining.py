@@ -1,6 +1,6 @@
 """Offline hard-negative mining over exact manifold corpus retrieval."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING
 
 import torch
@@ -34,7 +34,7 @@ def _as_unique_ids(value: Sequence[str], *, name: str) -> tuple[str, ...]:
 
 
 def _normalize_id_mapping(
-    value: Mapping[str, Sequence[str]],
+    value: Mapping[str, Iterable[str]],
     *,
     name: str,
     query_ids: tuple[str, ...],
@@ -97,8 +97,8 @@ def mine_hard_negatives(
     *,
     query_ids: Sequence[str],
     corpus_ids: Sequence[str],
-    positive_corpus_ids: Mapping[str, Sequence[str]],
-    excluded_corpus_ids: Mapping[str, Sequence[str]] | None = None,
+    positive_corpus_ids: Mapping[str, Iterable[str]],
+    excluded_corpus_ids: Mapping[str, Iterable[str]] | None = None,
     num_negatives: int = 1,
     query_chunk_size: int = 32,
     corpus_chunk_size: int = 256,
@@ -117,7 +117,8 @@ def mine_hard_negatives(
         corpus: Non-empty candidate corpus texts.
         query_ids: Unique caller-owned IDs aligned with ``queries``.
         corpus_ids: Unique caller-owned IDs aligned with ``corpus``.
-        positive_corpus_ids: Mapping from every query ID to one or more known
+        positive_corpus_ids: Mapping from every query ID to a non-string iterable
+            (such as a list or set) of one or more known
             positive corpus IDs. Known positives are never returned.
         excluded_corpus_ids: Optional additional exclusions per query. Missing
             query IDs mean no additional exclusions. When a query ID also occurs
@@ -130,6 +131,10 @@ def mine_hard_negatives(
             exact distance evaluation.
         input_options: Optional task/prompt_name/prompt options keyed by
             ``queries`` and ``corpus``, matching exact corpus search.
+
+    Notes:
+        Mining runs without gradients and restores the model's previous mode,
+        even on failure. ID iterable order does not define candidate rank.
 
     Returns:
         One list per input query. Each inner list contains exactly

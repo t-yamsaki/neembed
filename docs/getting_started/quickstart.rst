@@ -112,6 +112,9 @@ the other anchor's negative.
 Next steps
 ----------
 
+* Run ``python examples/v11_role_workflow.py --local-files-only`` after preloading
+  the pinned encoders; see :doc:`../user_guide/api_contracts` for the role-aware
+  train/search example and the gradient, dimension, dtype/device, and mode table.
 * Read :doc:`../user_guide/architecture` for manifold selection, curvature,
   dimensions, and Lorentz precision behavior.
 * Read :doc:`../user_guide/training` for the geodesic ranking objective,
@@ -119,8 +122,8 @@ Next steps
 * Read :doc:`../user_guide/evaluation` for metric definitions, epoch validation,
   DataLoader interoperability, and the Euclidean/Poincare/Lorentz benchmark.
 * Read :doc:`../user_guide/inference` for ``encode()`` and ``distance()``.
-* Read :doc:`../user_guide/saving_loading` for local model persistence across
-  both supported manifolds.
+* Read :doc:`../user_guide/saving_loading` for versioned local persistence and
+  legacy loading across the supported geometries and products.
 
 The repository also contains complete runnable examples in
 ``examples/train_poincare.py``, ``examples/train_lorentz.py``, and

@@ -5,6 +5,8 @@ The model-level public inference helpers include ``encode()``, ``encode_query()`
 ``encode_document()``, ``distance()``, and ``rank()`` on
 :class:`neembed.ManifoldSentenceTransformer`. v0.6 also exposes
 :func:`neembed.exact_corpus_search` for exact multi-query text-corpus search.
+For a combined contract table and runnable role-aware train/search example,
+see :doc:`api_contracts`.
 
 For product models, ``product_distance_diagnostics()`` reports named component
 distances alongside the unchanged Geoopt total. Encode text first and pass the
@@ -156,9 +158,10 @@ Set ``convert_to_tensor=True`` to keep the result as a ``torch.Tensor``:
        convert_to_tensor=True,
    )
 
-The Tensor stays on the model device. Lorentz manifold outputs use ``float64``
-for numerical stability; Poincare outputs keep the model's ordinary parameter
-dtype.
+The Tensor stays on the geometry device, including the existing CPU fallback
+for SphereProjection/Stereographic and fixed-double products on MPS. Lorentz
+outputs use ``float64``; Poincare outputs keep the ordinary parameter dtype.
+NumPy conversion must support the output dtype; bfloat16 requires Tensor output.
 
 Inference mode
 --------------
