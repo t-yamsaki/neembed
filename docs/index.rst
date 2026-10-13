@@ -55,6 +55,7 @@ for the rest of the class and function details generated from public docstrings.
    user_guide/inference
    user_guide/api_contracts
    user_guide/encoder_compatibility
+   user_guide/benchmark_protocol
    user_guide/saving_loading
 
 .. _api-reference:
