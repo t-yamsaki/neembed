@@ -179,6 +179,8 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("native embedding_dtype must match encoder_dtype")
         if geometry in ("poincare", "lorentz"):
             _number(variant["curvature"], "curvature", positive=True)
+            if variant["curvature"] != 1.0:
+                raise ValueError("v1 fixes Poincare and Lorentz curvature magnitude at 1.0")
         elif variant["curvature"] is not None:
             raise ValueError("native/Euclidean curvature must be null")
         trials = variant["trials"]
