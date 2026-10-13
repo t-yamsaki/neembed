@@ -162,6 +162,12 @@ print(float(distance))
 base modelの来歴をバージョン付きmetadataに記録します。形式バージョンのない
 v0.10以前のconfigも復元でき、読み込みには保存済みのローカルencoderを使います。
 
+検証済みの依存下限はPyTorch 2.3.0、Sentence Transformers 5.4.1、Geoopt 0.5.1です。
+最小版と現行版のCPU CIで、revision固定のMiniLMとE5-small-v2による役割付き学習・検索・
+オフライン保存復元を確認します。構成と対応範囲は
+[互換性ガイド](https://neembed.readthedocs.io/en/latest/user_guide/encoder_compatibility.html)
+を参照してください。
+
 `encode()` / `encode_query()` / `encode_document()` は `batch_size`（既定32）で
 入力順とgeometryのdtype/deviceを維持したバッチ推論ができます。正の整数を指定すると
 各encoder呼び出しの件数を制限できます。空の文章列は所定の出力幅の空行列を返し、

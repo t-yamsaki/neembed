@@ -8,6 +8,7 @@ on:
       - "src/**"
       - "tests/integration/**"
       - "tests/test_release_metadata.py"
+      - "scripts/preload_role_models.py"
       - ".github/workflows/release.yml"
   push:
     tags:
@@ -43,6 +44,9 @@ jobs:
         run: python -m pip install -e ".[dev]"
 
       - name: Run normal tests
+        env:
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
         run: python -m pytest -q
 
       - name: Preload real-stack sentence model
@@ -59,6 +63,12 @@ jobs:
               f"with dimension {model.get_sentence_embedding_dimension()}"
           )
           PY
+
+      - name: Preload pinned role-aware sentence models
+        timeout-minutes: 10
+        env:
+          HF_HUB_DISABLE_XET: "1"
+        run: python scripts/preload_role_models.py
 
       - name: Run real-stack acceptance tests
         timeout-minutes: 10

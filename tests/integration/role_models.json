@@ -1,0 +1,12 @@
+[
+  {
+    "name": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    "prompts": {"query": "", "document": ""}
+  },
+  {
+    "name": "intfloat/e5-small-v2",
+    "revision": "ffb93f3bd4047442299a41ebb6fa998a38507c52",
+    "prompts": {"query": "query: ", "document": "passage: "}
+  }
+]

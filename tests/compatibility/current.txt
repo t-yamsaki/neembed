@@ -1,0 +1,5 @@
+# Qualified current stack as of 2026-10-13: Python 3.12, Linux CPU.
+torch==2.14.1
+sentence-transformers==6.1.0
+transformers==5.19.0
+geoopt==0.5.1

@@ -24,13 +24,16 @@ Runtime dependencies
 
 The runtime dependency surface is intentionally small:
 
-* ``torch``
-* ``sentence-transformers``
-* ``geoopt``
+* ``torch>=2.3.0``
+* ``sentence-transformers>=5.4.1``
+* ``geoopt>=0.5.1``
 
 neembed uses Sentence Transformers for the pretrained encoder and Geoopt for
 Poincare-ball and Lorentz / Hyperboloid geometry rather than reimplementing
 either subsystem.
+
+See :doc:`../user_guide/encoder_compatibility` for the qualified minimum/current
+dependency profiles, immutable MiniLM/E5 revisions, and opt-in offline gates.
 
 Install from source
 -------------------

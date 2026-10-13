@@ -1,0 +1,7 @@
+# Qualified minimum stack: Python 3.10, Linux CPU.
+torch==2.3.0
+sentence-transformers==5.4.1
+transformers==4.41.0
+huggingface-hub==0.23.0
+numpy==1.26.4
+geoopt==0.5.1
