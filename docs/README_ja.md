@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [English README](../README.md)
 
-> **Status:** package version v0.10.0 では、flat mixed-curvature ProductManifold embedding、固定 Geoopt Scaled component metric、全 product 距離による retrieval、名前付き component 距離診断、明示的な component-targeted hierarchy supervision を追加しつつ、v0.4-v0.9 の single-manifold 公開 contract を維持しています。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
+> **Status:** package version v0.11.0 では、再現可能な encoder loading、微分可能な query/document 入力役割、バッチ encoding、versioned checkpoint metadata、公開 API・benchmark contract の文書を追加しました。v0.10.0 の ProductManifold/Scaled mixed-curvature support と v0.4-v0.9 の single-manifold contract は維持しています。公開 API は意図的に小さく保っていますが、安定版 1.0 までは変更される可能性があります。
 
 `neembed` は、pretrained Sentence Transformer と manifold-valued representation をつなぐ軽量な integration layer です。pretrained encoder はそのまま利用し、必要に応じて Euclidean embedding を projection したうえで、constant-curvature geometry の演算を Geoopt に委譲します。
 

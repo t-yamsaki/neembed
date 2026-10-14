@@ -99,7 +99,7 @@ For example:
 
    {
      "format_version": 1,
-     "neembed_version": "0.10.0",
+     "neembed_version": "0.11.0",
      "embedding_dim": 2,
      "manifold": "poincare",
      "curvature": 2.0,

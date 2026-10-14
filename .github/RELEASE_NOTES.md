@@ -1,0 +1,11 @@
+# v0.11.0
+
+v0.11.0 adds reproducible encoder loading (`revision`, `local_files_only`, `cache_folder`, `device`), differentiable query/document prompt handling, explicit input roles across retrieval and hierarchy objectives/evaluation/mining, and bounded public encoding with `batch_size=32` by default. `encode_query()` and `encode_document()` are inference helpers; training continues through model forward. Unspecified roles preserve the raw-text path, even when an encoder has a saved default prompt.
+
+New checkpoints use model metadata format 1, independent of the package version and nested ProductConfig version. They preserve prompt settings, floating-state dtypes, source provenance and existing geometry fields; float64 encoders use an additional exact `encoder_state.pt`. Versionless v0.10 and older configurations still load without in-place migration; re-saving writes the new format. Per-call roles/batch sizes, optimizer state and external prototypes remain caller-owned.
+
+All v0.4-v0.10 single-manifold and ProductManifold/Scaled mixed-curvature contracts remain supported. Product curvature/scales stay fixed. Qualified minimum dependencies are PyTorch 2.3.0, Sentence Transformers 5.4.1 and Geoopt 0.5.1, with Python 3.10/3.11/3.12 CI. Pinned MiniLM and English E5 CPU gates cover roles, gradients, search/evaluation/mining and offline persistence on minimum/current dependency profiles; these checks are not a promise of every encoder, dtype or device combination.
+
+English/Japanese runnable train/search/restore examples and Sphinx API, compatibility and persistence guides document the implemented contracts. A repository-local real-data benchmark protocol records provenance, input roles, geometry dimensions/dtypes, equal validation tuning budgets and at least three seeds, separates validation from final test, and preserves failures/null unmeasured values. Its offline lexical fixture runs no encoder/geometry/training. The deterministic examples are engineering regressions, not a research benchmark or a claim of geometry superiority; no real-data performance conclusion is published.
+
+Stable v1.0 API freeze, a real-data benchmark adapter/results, ANN/vector databases, automatic model/geometry selection, nested/custom products, product prototypes, advanced matrix manifolds and distributed retrieval/training remain outside this release.

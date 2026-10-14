@@ -59,12 +59,16 @@ jobs:
       - name: Install built wheel and verify import
         if: matrix.python-version == '3.12'
         shell: bash
+        env:
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
         run: |
           python -m pip uninstall -y neembed-geoopt
           python -m pip install --no-deps dist/*.whl
           python - <<'PY'
           from importlib.metadata import version
           import tomllib
+          from pathlib import Path
           import neembed
           from neembed import ProductConfig, normalize_product_config
 
@@ -73,5 +77,19 @@ jobs:
           config = normalize_product_config([{"manifold": "lorentz", "intrinsic_dim": 2}])
           assert config.projection_dim == 2 and config.ambient_dim == 3
           assert ProductConfig.from_dict(config.to_dict()) == config
+          assert not Path(neembed.__file__).resolve().is_relative_to(Path("src").resolve())
           print(neembed.__file__)
           PY
+          python -m pytest -q \
+            tests/test_import.py \
+            tests/test_v04_learnable_structure.py \
+            tests/test_v05_retrieval_example.py \
+            tests/test_v06_exact_retrieval_example.py \
+            tests/test_v07_objective_comparison_example.py \
+            tests/test_v08_hierarchy_learning_example.py \
+            tests/test_v09_constant_curvature_comparison_example.py \
+            tests/test_v10_mixed_curvature_workflow_example.py \
+            tests/test_v11_role_example.py \
+            tests/test_role_prompts.py \
+            tests/test_encode_batching.py \
+            tests/test_model_metadata.py

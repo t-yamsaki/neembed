@@ -8,6 +8,9 @@ on:
       - "src/**"
       - "tests/integration/**"
       - "tests/test_release_metadata.py"
+      - "tests/test_v11_release_hardening.py"
+      - ".github/RELEASE_NOTES.md"
+      - ".github/RELEASE_CHECKLIST.md"
       - "scripts/preload_role_models.py"
       - ".github/workflows/release.yml"
   push:
@@ -210,7 +213,7 @@ jobs:
       - name: Fresh install TestPyPI wheel
         run: python -m pip install /tmp/neembed-testpypi/neembed_geoopt-*.whl pytest
 
-      - name: Verify installed version and v0.4-v0.10 smoke
+      - name: Verify installed version and v0.4-v0.11 smoke
         shell: bash
         run: |
           PACKAGE_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
@@ -223,7 +226,11 @@ jobs:
             tests/test_v07_objective_comparison_example.py \
             tests/test_v08_hierarchy_learning_example.py \
             tests/test_v09_constant_curvature_comparison_example.py \
-            tests/test_v10_mixed_curvature_workflow_example.py
+            tests/test_v10_mixed_curvature_workflow_example.py \
+            tests/test_v11_role_example.py \
+            tests/test_role_prompts.py \
+            tests/test_encode_batching.py \
+            tests/test_model_metadata.py
 
       - name: Report TestPyPI-validated source commit
         run: echo "TestPyPI validated source commit ${GITHUB_SHA}"
@@ -304,7 +311,7 @@ jobs:
       - name: Fresh install PyPI wheel
         run: python -m pip install /tmp/neembed-pypi/neembed_geoopt-*.whl pytest
 
-      - name: Verify installed version and v0.4-v0.10 smoke
+      - name: Verify installed version and v0.4-v0.11 smoke
         shell: bash
         run: |
           PACKAGE_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
@@ -317,16 +324,20 @@ jobs:
             tests/test_v07_objective_comparison_example.py \
             tests/test_v08_hierarchy_learning_example.py \
             tests/test_v09_constant_curvature_comparison_example.py \
-            tests/test_v10_mixed_curvature_workflow_example.py
+            tests/test_v10_mixed_curvature_workflow_example.py \
+            tests/test_v11_role_example.py \
+            tests/test_role_prompts.py \
+            tests/test_encode_batching.py \
+            tests/test_model_metadata.py
 
   verify-hosted-docs:
-    name: Verify hosted v0.10 docs
+    name: Verify hosted v0.11 docs
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: smoke-pypi
     runs-on: ubuntu-latest
 
     steps:
-      - name: Verify Read the Docs deployed the release-specific v0.10 build
+      - name: Verify Read the Docs deployed the release-specific v0.11 build
         shell: bash
         run: |
           PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
@@ -341,12 +352,28 @@ jobs:
                 https://neembed.readthedocs.io/en/latest/user_guide/mixed_curvature.html \
                 -o /tmp/neembed-mixed-curvature.html \
               && grep -F "${EXPECTED_DOC_TITLE}" /tmp/neembed-mixed-curvature.html >/dev/null \
-              && grep -F "v0.10" /tmp/neembed-mixed-curvature.html >/dev/null; then
-              echo "Hosted Read the Docs matches ${EXPECTED_DOC_TITLE} and contains v0.9 single-manifold and v0.10 mixed-curvature guidance."
+              && grep -F "v0.10" /tmp/neembed-mixed-curvature.html >/dev/null \
+              && curl -fsSL \
+                https://neembed.readthedocs.io/en/latest/user_guide/api_contracts.html \
+                -o /tmp/neembed-api-contracts.html \
+              && grep -F "${EXPECTED_DOC_TITLE}" /tmp/neembed-api-contracts.html >/dev/null \
+              && grep -F "encode_query" /tmp/neembed-api-contracts.html >/dev/null \
+              && grep -F "batch_size" /tmp/neembed-api-contracts.html >/dev/null \
+              && curl -fsSL \
+                https://neembed.readthedocs.io/en/latest/user_guide/encoder_compatibility.html \
+                -o /tmp/neembed-encoder-compatibility.html \
+              && grep -F "${EXPECTED_DOC_TITLE}" /tmp/neembed-encoder-compatibility.html >/dev/null \
+              && grep -F "5.4.1" /tmp/neembed-encoder-compatibility.html >/dev/null \
+              && curl -fsSL \
+                https://neembed.readthedocs.io/en/latest/user_guide/benchmark_protocol.html \
+                -o /tmp/neembed-benchmark-protocol.html \
+              && grep -F "${EXPECTED_DOC_TITLE}" /tmp/neembed-benchmark-protocol.html >/dev/null \
+              && grep -F "optimizer_steps" /tmp/neembed-benchmark-protocol.html >/dev/null; then
+              echo "Hosted Read the Docs matches ${EXPECTED_DOC_TITLE} and contains v0.9/v0.10 geometry and v0.11 API, compatibility and benchmark guidance."
               exit 0
             fi
             if [ "${attempt}" -eq 6 ]; then
-              echo "Hosted Read the Docs did not expose the ${EXPECTED_DOC_TITLE} single-manifold and mixed-curvature builds."
+              echo "Hosted Read the Docs did not expose the ${EXPECTED_DOC_TITLE} geometry and v0.11 API/compatibility/benchmark builds."
               exit 1
             fi
             sleep 10
@@ -361,6 +388,11 @@ jobs:
       contents: write
 
     steps:
+      - name: Check out release notes from the validated tag
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
       - name: Create concise release notes
         env:
           GH_TOKEN: ${{ github.token }}
@@ -370,15 +402,8 @@ jobs:
             echo "GitHub Release ${GITHUB_REF_NAME} already exists."
             exit 0
           fi
-          cat > release-notes.md <<'EOF'
-          v0.10.0 adds ProductManifold/Scaled mixed-curvature support: ordered flat component configuration, intrinsic/ambient dimension accounting, split/map/pack embeddings, fixed per-component distance scales, full-product retrieval objectives and exact corpus APIs, named distance diagnostics, and explicit hierarchy supervision on a compatible Poincare/Lorentz component.
-
-          All v0.4-v0.9 single-manifold public contracts remain supported, including constant-curvature selection, hierarchy objectives, graded retrieval, exact search/mining, and opt-in learnable hyperbolic curvature/prototypes. The mixed-curvature guide documents optimizer, persistence, numerical/device behavior, and API compatibility. The deterministic v0.10 workflow is an engineering regression, not a research benchmark or a claim of geometry superiority.
-
-          Product curvature/scales are fixed. Product prototypes, nested/custom products, automatic component selection, SPD/Siegel/Stiefel/Birkhoff components, ANN/vector databases, and distributed retrieval/training remain outside scope.
-          EOF
           gh release create "${GITHUB_REF_NAME}" \
             --repo "${GITHUB_REPOSITORY}" \
             --verify-tag \
             --title "neembed ${GITHUB_REF_NAME}" \
-            --notes-file release-notes.md
+            --notes-file .github/RELEASE_NOTES.md

@@ -1,4 +1,4 @@
-"""Release-readiness checks for public v0.10 metadata and contracts."""
+"""Release-readiness checks for public v0.11 metadata and contracts."""
 
 from importlib.metadata import metadata
 from inspect import signature
@@ -31,14 +31,14 @@ def _read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def test_v10_public_package_metadata() -> None:
+def test_v11_public_package_metadata() -> None:
     pyproject = _read("pyproject.toml")
     package_metadata = metadata("neembed-geoopt")
     project_urls = package_metadata.get_all("Project-URL") or []
 
     assert 'requires = ["setuptools>=77.0.3"]' in pyproject
     assert 'name = "neembed-geoopt"' in pyproject
-    assert 'version = "0.10.0"' in pyproject
+    assert 'version = "0.11.0"' in pyproject
     assert 'requires-python = ">=3.10"' in pyproject
     assert 'license = "MIT"' in pyproject
     assert 'license-files = ["LICENSE"]' in pyproject
@@ -50,13 +50,13 @@ def test_v10_public_package_metadata() -> None:
         assert f'    "{dependency}",' in pyproject
 
     assert package_metadata["Name"] == "neembed-geoopt"
-    assert package_metadata["Version"] == "0.10.0"
+    assert package_metadata["Version"] == "0.11.0"
     assert package_metadata["Requires-Python"] == ">=3.10"
     assert f"Documentation, {DOCUMENTATION_URL}" in project_urls
     assert neembed.__name__ == "neembed"
 
 
-def test_v10_readmes_preserve_prior_scope_and_publish_product_surface() -> None:
+def test_v11_readmes_preserve_prior_scope_and_publish_product_surface() -> None:
     english = _read("README.md")
     japanese = _read("docs/README_ja.md")
     installation = _read("docs/getting_started/installation.rst")
@@ -67,7 +67,7 @@ def test_v10_readmes_preserve_prior_scope_and_publish_product_surface() -> None:
     for readme in (english, japanese):
         assert "TBD" not in readme
         assert "<YOUR_USERNAME>" not in readme
-        for release in ("v0.10.0", "v0.9", "v0.8", "v0.7", "v0.6", "v0.5", "v0.4", "v0.3"):
+        for release in ("v0.11.0", "v0.10.0", "v0.9", "v0.8", "v0.7", "v0.6", "v0.5", "v0.4", "v0.3"):
             assert release in readme
         for term in (
             "Poincaré",
@@ -104,15 +104,15 @@ def test_v10_readmes_preserve_prior_scope_and_publish_product_surface() -> None:
             assert term in readme
         assert DOCUMENTATION_URL in readme
 
-    assert "Package version v0.10.0" in english
-    assert "package version v0.10.0" in japanese
+    assert "Package version v0.11.0" in english
+    assert "package version v0.11.0" in japanese
     assert "fixed-curvature v0.3 path backward-compatible" in english
     assert "fixed-curvature の v0.3 path と後方互換" in japanese
     assert "not a benchmark or geometry-superiority claim" in english
     assert "geometry-superiority claim" in japanese
 
 
-def test_v10_geometry_guide_is_the_detailed_release_reference() -> None:
+def test_v11_geometry_guide_is_the_detailed_release_reference() -> None:
     geometry = _read("docs/user_guide/constant_curvature_semantics.rst")
     normalized_geometry = " ".join(geometry.split())
 
@@ -130,7 +130,7 @@ def test_v10_geometry_guide_is_the_detailed_release_reference() -> None:
     assert "does **not** by itself guarantee better embedding quality" in normalized_geometry
 
 
-def test_v10_constructor_extends_without_replacing_prior_public_contracts() -> None:
+def test_v11_constructor_extends_without_replacing_prior_public_contracts() -> None:
     required_public_names = {
         "ManifoldSentenceTransformer",
         "ManifoldMultipleNegativesRankingLoss",
@@ -264,7 +264,7 @@ def test_v10_constructor_extends_without_replacing_prior_public_contracts() -> N
     assert "margin-regression batches" in fit_doc
 
 
-def test_v10_release_suite_keeps_prior_regressions_and_geometry_matrix() -> None:
+def test_v11_release_suite_keeps_prior_regressions_and_geometry_matrix() -> None:
     required_tests = {
         "test_v04_learnable_structure.py",
         "test_v05_retrieval_example.py",
@@ -320,7 +320,7 @@ def test_v10_release_suite_keeps_prior_regressions_and_geometry_matrix() -> None
     assert (ROOT / "tests/integration/test_real_stack_v10.py").is_file()
 
 
-def test_v10_release_workflow_builds_and_smokes_validated_artifacts() -> None:
+def test_v11_release_workflow_builds_and_smokes_validated_artifacts() -> None:
     workflow = _read(".github/workflows/release.yml")
     ci = _read(".github/workflows/ci.yml")
     docs = _read(".github/workflows/docs.yml")
@@ -352,12 +352,14 @@ def test_v10_release_workflow_builds_and_smokes_validated_artifacts() -> None:
         "Verify PyPI wheel matches validated source artifact",
         "tests/test_v09_constant_curvature_comparison_example.py",
         "tests/test_v10_mixed_curvature_workflow_example.py",
+        "tests/test_v11_role_example.py",
+        "tests/test_model_metadata.py",
         "from importlib.metadata import version; import neembed",
     ):
         assert term in workflow
 
 
-def test_v10_release_workflow_preserves_publish_and_docs_boundaries() -> None:
+def test_v11_release_workflow_preserves_publish_and_docs_boundaries() -> None:
     workflow = _read(".github/workflows/release.yml")
 
     assert "Verify release tag points at current main" in workflow
@@ -380,9 +382,12 @@ def test_v10_release_workflow_preserves_publish_and_docs_boundaries() -> None:
     assert "create-github-release:" in workflow
     assert "needs: [smoke-pypi, verify-hosted-docs]" in workflow
     assert 'gh release create "${GITHUB_REF_NAME}"' in workflow
-    assert "v0.10.0 adds ProductManifold/Scaled mixed-curvature support" in workflow
-    assert "not a research benchmark or a claim of geometry superiority" in workflow
-    assert "ProductManifold/Scaled mixed-curvature support" in workflow
+    notes = _read(".github/RELEASE_NOTES.md")
+    assert notes.startswith("# v0.11.0\n")
+    assert "v0.11.0 adds reproducible encoder loading" in notes
+    assert "--notes-file .github/RELEASE_NOTES.md" in workflow
+    assert "not a research benchmark or a claim of geometry superiority" in notes
+    assert "ProductManifold/Scaled mixed-curvature contracts" in notes
 
 
 def test_gitignore_protects_common_public_release_artifacts() -> None:
