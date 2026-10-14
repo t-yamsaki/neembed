@@ -1,5 +1,20 @@
 # Experiments
 
+## v0.11 real-data benchmark protocol
+
+The [benchmark protocol](../docs/user_guide/benchmark_protocol.rst) fixes model/data provenance, query/document input roles, intrinsic/output dimensions, encoder/geometry dtypes, equal validation tuning budgets, at least three seeds, and one final test evaluation per seed/variant. It plans native Sentence Transformer, same-width Euclidean cosine/L2, Poincare and Lorentz comparisons. It adds no real-data performance claims or model adapters.
+
+[`benchmark_protocol.py`](benchmark_protocol.py) provides config v1 validation and a two-stage runner. [`configs/protocol_fixture.json`](configs/protocol_fixture.json) and the local lexical adapter exercise that runner without downloads:
+
+```bash
+python experiments/run_benchmark.py validate experiments/configs/protocol_fixture.json
+python experiments/run_benchmark.py run-fixture experiments/configs/protocol_fixture.json --output-dir /tmp/neembed-protocol-fixture
+```
+
+Each `seed-N.json` embeds the full plan, input settings, train/validation/test identities, dependency/hardware metadata, every tuning trial and the selected final test. Failed runs retain error details; unmeasured values remain `null`. Existing results are not overwritten. The fixture runs no encoder, geometry or training; its lexical scores are orchestration checks only. Real adapters must verify initial snapshots and prepared data, report observed execution facts, and implement the documented training/evaluation policy.
+
+The v0.3 tiny regression below remains unchanged.
+
 ## Euclidean vs Poincaré vs Lorentz benchmark
 
 The [v0.3 comparison benchmark](compare_euclidean_poincare.py) is a small engineering and regression reference for neembed. It compares three models built from the same pretrained Sentence Transformer:

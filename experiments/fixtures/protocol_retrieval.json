@@ -1,0 +1,14 @@
+{
+  "train": [
+    {"id": "train-dog", "query": "dog walks", "positive": "dog pet"},
+    {"id": "train-bird", "query": "bird flies", "positive": "bird wings"}
+  ],
+  "validation": [
+    {"id": "val-dog", "query": "dog pet", "documents": ["dog animal", "bird animal"], "positive_index": 0},
+    {"id": "val-bird", "query": "bird wings", "documents": ["dog animal", "bird animal"], "positive_index": 1}
+  ],
+  "test": [
+    {"id": "test-dog", "query": "dog animal", "documents": ["bird pet", "dog pet"], "positive_index": 1},
+    {"id": "test-bird", "query": "bird animal", "documents": ["bird wings", "dog pet"], "positive_index": 0}
+  ]
+}

@@ -1,0 +1,175 @@
+{
+  "format_version": 1,
+  "benchmark": "protocol-orchestration-fixture",
+  "kind": "fixture",
+  "model": {
+    "id": "lexical-overlap-fixture",
+    "revision": "1ce726a96247e9ad15b53ac41b0d92779e6302a55297251fa5afa6c66e58bff2",
+    "snapshot_sha256": "1ce726a96247e9ad15b53ac41b0d92779e6302a55297251fa5afa6c66e58bff2",
+    "native_dim": 4,
+    "encoder_dtype": "float32"
+  },
+  "inputs": {
+    "queries": {
+      "task": "query",
+      "prompt_name": null,
+      "prompt": "query: "
+    },
+    "documents": {
+      "task": "document",
+      "prompt_name": null,
+      "prompt": "passage: "
+    }
+  },
+  "dataset": {
+    "id": "protocol-retrieval-fixture",
+    "revision": "2ba986ba7d1a86d82eee6cf05e3d2d9e358f797eeb1ae33b92ba6f89ecf532dc",
+    "source": "experiments/fixtures/protocol_retrieval.json",
+    "license": "MIT",
+    "split_policy": "Explicit disjoint example IDs; shared candidate documents are permitted.",
+    "splits": {
+      "train": {
+        "id": "train",
+        "sha256": "2d02c09c830871bf2d9d76f1322f1cbae862176339783aa2efd4846639f13ce6",
+        "size": 2,
+        "ids": [
+          "train-dog",
+          "train-bird"
+        ]
+      },
+      "validation": {
+        "id": "validation",
+        "sha256": "8036137b1bc719e3ebc2070eb22cce9c424398f31d9aff028b410e6104e218f1",
+        "size": 2,
+        "ids": [
+          "val-dog",
+          "val-bird"
+        ]
+      },
+      "test": {
+        "id": "test",
+        "sha256": "77f915898ea636b854691e263bc3146db6a96c59fa459818aa6a2477bfac7db5",
+        "size": 2,
+        "ids": [
+          "test-dog",
+          "test-bird"
+        ]
+      }
+    }
+  },
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "variants": [
+    {
+      "name": "native_cosine",
+      "geometry": "native",
+      "distance": "cosine",
+      "intrinsic_dim": 4,
+      "output_dim": 4,
+      "embedding_dtype": "float32",
+      "curvature": null,
+      "trials": [
+        {
+          "temperature": 0.05
+        },
+        {
+          "temperature": 0.1
+        }
+      ]
+    },
+    {
+      "name": "euclidean_cosine",
+      "geometry": "euclidean",
+      "distance": "cosine",
+      "intrinsic_dim": 2,
+      "output_dim": 2,
+      "embedding_dtype": "float32",
+      "curvature": null,
+      "trials": [
+        {
+          "temperature": 0.05
+        },
+        {
+          "temperature": 0.1
+        }
+      ]
+    },
+    {
+      "name": "euclidean_l2",
+      "geometry": "euclidean",
+      "distance": "euclidean",
+      "intrinsic_dim": 2,
+      "output_dim": 2,
+      "embedding_dtype": "float32",
+      "curvature": null,
+      "trials": [
+        {
+          "temperature": 0.05
+        },
+        {
+          "temperature": 0.1
+        }
+      ]
+    },
+    {
+      "name": "poincare",
+      "geometry": "poincare",
+      "distance": "geodesic",
+      "intrinsic_dim": 2,
+      "output_dim": 2,
+      "embedding_dtype": "float32",
+      "curvature": 1.0,
+      "trials": [
+        {
+          "temperature": 0.05
+        },
+        {
+          "temperature": 0.1
+        }
+      ]
+    },
+    {
+      "name": "lorentz",
+      "geometry": "lorentz",
+      "distance": "geodesic",
+      "intrinsic_dim": 2,
+      "output_dim": 3,
+      "embedding_dtype": "float64",
+      "curvature": 1.0,
+      "trials": [
+        {
+          "temperature": 0.05
+        },
+        {
+          "temperature": 0.1
+        }
+      ]
+    }
+  ],
+  "training": {
+    "encoder_policy": "trainable",
+    "objective": "mnrl",
+    "optimizer": "AdamW",
+    "learning_rate": 2e-05,
+    "weight_decay": 0.01,
+    "epochs": 1,
+    "batch_size": 2,
+    "max_steps": 1,
+    "trials_per_variant": 2
+  },
+  "selection": {
+    "metric": "fixture_recall_at_1",
+    "direction": "maximize",
+    "metrics": [
+      "fixture_recall_at_1",
+      "unmeasured_example"
+    ]
+  },
+  "execution": {
+    "device": "cpu",
+    "deterministic": true
+  }
+}
