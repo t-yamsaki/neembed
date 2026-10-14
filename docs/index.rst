@@ -14,6 +14,11 @@ positive-magnitude path. v0.10 supports flat mixed-curvature products
 with fixed component scales, full-product retrieval, named distance diagnostics,
 and component-targeted hierarchy supervision.
 
+v0.11 adds explicit query/document roles, reproducible encoder loading, bounded
+encoding and versioned model metadata. Read :doc:`user_guide/api_contracts`,
+:doc:`user_guide/encoder_compatibility` and :doc:`user_guide/benchmark_protocol`
+for the implemented contracts and tested scope.
+
 Start with :doc:`getting_started/quickstart` if you want the ordinary training
 workflow. For v0.7 objective selection and graded relevance -- MNRL, symmetric
 MNRL, Triplet, MarginMSE, DistanceMSE, and nDCG@K -- see

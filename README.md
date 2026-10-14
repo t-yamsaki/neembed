@@ -4,7 +4,7 @@
 
 [Documentation](https://neembed.readthedocs.io/en/latest/) · [日本語](docs/README_ja.md)
 
-> **Status:** Package version v0.10.0 adds flat mixed-curvature ProductManifold embeddings, fixed Geoopt Scaled component metrics, full-product retrieval, named component distance diagnostics, and explicit component-targeted hierarchy supervision, while preserving all v0.4-v0.9 single-manifold public contracts. The API remains intentionally small and may still evolve before a stable 1.0 release.
+> **Status:** Package version v0.11.0 adds reproducible encoder loading, differentiable query/document input roles, batched encoding, versioned checkpoint metadata, and documented public API/benchmark contracts. It retains v0.10.0 ProductManifold/Scaled mixed-curvature support and all v0.4-v0.9 single-manifold contracts. The API remains intentionally small and may still evolve before a stable 1.0 release.
 
 `neembed` is a lightweight integration layer between pretrained Sentence Transformer models and manifold-valued representations. It keeps the pretrained encoder intact, optionally projects its Euclidean output, and delegates constant-curvature geometry to Geoopt.
 
